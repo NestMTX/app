@@ -1,6 +1,8 @@
 import { BaseCommand, args } from '@adonisjs/core/ace'
 import joi from 'joi'
+import { connect } from 'node:net'
 import type { CommandOptions } from '@adonisjs/core/types/ace'
+import type { Socket } from 'node:net'
 
 const MediaMTXEvents = {
   init: ['MTX_PATH', 'RTSP_PORT'],
@@ -39,10 +41,10 @@ export default class MediaMtxOnEvent extends BaseCommand {
       process.exit(1)
     }
     /**
-     * Generate the payload which will be sent to the main process
+     * Generate the body which will be sent to the main process
      */
     const event: keyof typeof MediaMTXEvents = this.event as keyof typeof MediaMTXEvents
-    const payload: Record<string, string | undefined> = {}
+    const body: Record<string, string | undefined> = {}
     const schema = joi
       .object(
         Object.assign(
@@ -54,14 +56,39 @@ export default class MediaMtxOnEvent extends BaseCommand {
       .unknown(false)
     const keys: string[] = MediaMTXEvents[event]
     keys.forEach((key) => {
-      payload[key] = process.env[key]
+      body[key] = process.env[key]
     })
-    const { error: payloadError } = schema.validate(payload)
-    if (payloadError) {
-      this.logger.error(payloadError)
+    const { error: bodyError } = schema.validate(body)
+    if (bodyError) {
+      this.logger.error(bodyError)
       process.exit(1)
     }
-    // const ipcSocketPath = this.app.tmpPath('ipc.sock')
-    // this.logger.info('Hello world from "MediaMtxOnEvent"')
+    const payload = JSON.stringify([event, body])
+    const ipcSocketPath = this.app.tmpPath('ipc.sock')
+    let client: Socket
+    try {
+      await new Promise<void>((resolve, reject) => {
+        client = connect(ipcSocketPath, () => {
+          client.off('error', reject)
+          resolve()
+        })
+        client.on('error', reject)
+      })
+    } catch (err) {
+      this.logger.error(err)
+      process.exit(1)
+    }
+    client!.on('error', (err) => {
+      this.logger.error(err)
+      process.exit(1)
+    })
+    client!.write(payload)
+    await new Promise<void>((resolve) => setTimeout(resolve, 250))
+    const closePromise = new Promise<void>((resolve) => {
+      client!.on('close', () => resolve())
+    })
+    client!.end()
+    await closePromise
+    process.exit(0)
   }
 }
