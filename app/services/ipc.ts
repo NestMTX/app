@@ -1,5 +1,6 @@
 import { createServer, Socket } from 'node:net'
 import { EventEmitter } from 'node:events'
+import { rm } from 'node:fs/promises'
 import type { Server } from 'node:net'
 import type { ApplicationService } from '@adonisjs/core/types'
 import type { LoggerService } from '@adonisjs/core/types'
@@ -61,6 +62,7 @@ export class IPCService extends EventEmitter {
   async boot(logger: LoggerService) {
     this.#logger = logger.child({ service: 'ipc' })
     const ipcSocketPath = this.#app.tmpPath('ipc.sock')
+    await rm(ipcSocketPath, { force: true })
     this.#server.listen(ipcSocketPath, () => {
       this.#log.info(`IPC Server listening on ${ipcSocketPath}`)
     })

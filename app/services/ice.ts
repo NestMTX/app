@@ -71,6 +71,8 @@ export class ICEService {
   }
 
   get asMediaMtxIceServers() {
-    return [...this.#known] as IceServer[]
+    return [...this.#known]
+      .map((s) => ({ ...s, urls: undefined }))
+      .filter((s) => s.url) as IceServer[]
   }
 }
