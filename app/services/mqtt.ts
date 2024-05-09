@@ -6,6 +6,8 @@ import { ApiServiceRequestError } from '#services/api'
 import { inspect } from 'node:util'
 import env from '#start/env'
 import Joi from 'joi'
+import Aedes from 'aedes'
+import { createServer } from 'node:net'
 
 const requestPayloadSchema = Joi.object({
   command: Joi.string().valid('list', 'read', 'create', 'update', 'delete').required(),
@@ -55,7 +57,6 @@ export class MqttService {
       this.#logger.error(error.message, error)
     })
     this.#client.on('message', (topic, message, packet) => {
-      // @todo: implement this as how we are going to handle requests
       switch (topic) {
         case MqttService.topic('requests'):
           this.#onRequest(message, packet)
@@ -154,5 +155,16 @@ export class MqttService {
   static topic(...parts: string[]): string {
     const base = env.get('MQTT_BASE_TOPIC', 'nestmtx')
     return [base, ...parts].join('/')
+  }
+
+  static serve(port: number, logger: LoggerService) {
+    // @ts-expect-error for some reason, the type definitions for aedes are incorrect
+    const aedes = Aedes({})
+    const server = createServer(aedes.handle)
+    const lg = logger.child({ service: 'mqtt-broker' })
+    server.listen(port, function () {
+      lg.info(`MQTT Broker listening on port ${port}`)
+    })
+    return server
   }
 }

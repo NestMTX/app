@@ -1,6 +1,7 @@
 import type { ApplicationService } from '@adonisjs/core/types'
 import type { LoggerServiceWithConfig } from '#services/socket.io'
 import type { IClientOptions, MqttClient } from 'mqtt'
+import type { Server } from 'node:net'
 import { MigrationRunner } from '@adonisjs/lucid/migration'
 import fs from 'node:fs/promises'
 import { join } from 'node:path'
@@ -23,6 +24,7 @@ declare module '@adonisjs/core/types' {
   interface ContainerBindings {
     'api/service': ApiService
     'socket.io/service': SocketIoService
+    'mqtt/broker'?: Server
     'mqtt/client'?: MqttClient
     'mediamtx': MediaMTXService
     'nat/service': NATService
@@ -35,6 +37,7 @@ export default class AppProvider {
   #api: ApiService
   #io: SocketIoService
   #mediamtx: MediaMTXService
+  #mqttBroker?: Server
   #mqtt?: MqttClient
   #nat: NATService
   #ice: ICEService
@@ -54,6 +57,7 @@ export default class AppProvider {
   register() {
     this.app.container.singleton('api/service', () => this.#api)
     this.app.container.singleton('socket.io/service', () => this.#io)
+    this.app.container.singleton('mqtt/broker', () => this.#mqttBroker)
     this.app.container.singleton('mqtt/client', () => this.#mqtt)
     this.app.container.singleton('mediamtx', () => this.#mediamtx)
     this.app.container.singleton('nat/service', () => this.#nat)
@@ -115,14 +119,21 @@ export default class AppProvider {
         protocol: Joi.string()
           .required()
           .allow('wss', 'ws', 'mqtt', 'mqtts', 'tcp', 'ssl', 'wx', 'wxs', 'ali', 'alis'),
-        host: Joi.string().required().hostname(),
-        port: Joi.number().required().min(1).max(65535),
+        host: Joi.alternatives()
+          .try(Joi.string().hostname(), Joi.string().valid(':instance:'))
+          .required(),
+        port: Joi.number().required().min(1).max(65535).default(1883),
         username: Joi.string().optional(),
         password: Joi.string().optional(),
         manualConnect: Joi.boolean().optional(),
       })
       const { value, error } = mqttConfigSchema.validate(mqttConfig)
       if (!error) {
+        if (value.host === ':instance:') {
+          logger.info('Starting local MQTT Broker...')
+          this.#mqttBroker = MqttService.serve(value.port!, logger)
+          value.host = '127.0.0.1'
+        }
         this.#mqtt = MqttConnect(value)
       } else {
         logger.error('Invalid MQTT Configuration. Not connecting to MQTT Server.')
