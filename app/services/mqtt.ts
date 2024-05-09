@@ -1,7 +1,7 @@
 import type { ApiService, CommandContext } from '#services/api'
 import type { LoggerService } from '@adonisjs/core/types'
 import type { Logger } from '@adonisjs/logger'
-import type { MqttClient } from 'mqtt'
+import type { MqttClient, IPublishPacket } from 'mqtt'
 import { ApiServiceRequestError } from '#services/api'
 import { inspect } from 'node:util'
 import env from '#start/env'
@@ -21,21 +21,21 @@ const requestPayloadSchema = Joi.object({
 })
 
 export class MqttService {
-  // readonly #api: ApiService
+  readonly #api: ApiService
   readonly #client: MqttClient
   readonly #logger: Logger
 
-  constructor(_api: ApiService, client: MqttClient, logger: LoggerService) {
-    // this.#api = api
+  constructor(api: ApiService, client: MqttClient, logger: LoggerService) {
+    this.#api = api
     this.#client = client
     this.#logger = logger.child({ service: 'mqtt' })
     this.#client.on('connect', () => {
       this.#logger.info('Connected to broker')
-      this.#client.subscribe(MqttService.topic('requests'), (error) => {
+      this.#client.subscribe(MqttService.topic('+'), (error) => {
         if (error) {
           this.#logger.error('Failed to subscribe to requests topic', error)
         } else {
-          this.#logger.info(`Subscribed to "${MqttService.topic('requests')}" topic`)
+          this.#logger.info(`Subscribed to mqtt topics`)
         }
       })
     })
@@ -58,7 +58,7 @@ export class MqttService {
       // @todo: implement this as how we are going to handle requests
       switch (topic) {
         case MqttService.topic('requests'):
-          this.#onRequest(message)
+          this.#onRequest(message, packet)
           break
 
         default:
@@ -69,7 +69,7 @@ export class MqttService {
     this.#client.connect()
   }
 
-  async #onRequest(message: Buffer) {
+  async #onRequest(message: Buffer, _packet: IPublishPacket) {
     const stringified = message.toString()
     let payload: any
     try {
@@ -83,6 +83,35 @@ export class MqttService {
       return this.#handleError(error)
     }
     const context: CommandContext = value
+    const res = await this.#api.handle(context)
+    if (res instanceof Error) {
+      if (res instanceof ApiServiceRequestError) {
+        return this.#respondToRequest!(context.requestId, {
+          error: {
+            message: res.message,
+            details: res.details,
+            context: context,
+          },
+        })
+      }
+      return this.#respondToRequest!(context.requestId, {
+        error: {
+          message: res.message,
+          details: [],
+          context: context,
+        },
+      })
+    }
+    return this.#respondToRequest!(context.requestId, res)
+  }
+
+  async #respondToRequest(requestId: string, payload: any) {
+    const topic = MqttService.topic('responses', requestId)
+    try {
+      await this.#client.publishAsync(topic, JSON.stringify(payload))
+    } catch (err) {
+      this.#logger.error(`Failed to publish response to "${topic}": ${err.message}`)
+    }
   }
 
   async #handleError(error: Error) {
