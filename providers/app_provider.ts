@@ -77,6 +77,7 @@ export default class AppProvider {
       this.#io.boot(logger as LoggerServiceWithConfig)
       await this.#ipc.boot(logger as LoggerServiceWithConfig)
       const db = await this.app.container.make('lucid.db')
+      const hash = await this.app.container.make('hash')
       const migrator = new MigrationRunner(db, this.app, {
         direction: 'up',
       })
@@ -89,6 +90,15 @@ export default class AppProvider {
           username: 'system',
           password: 'system',
           can_login: false,
+          created_at: DateTime.utc().toSQL(),
+        })
+      }
+      const interfaceUserExists = await db.from('users').where('username', 'nestmtx').first()
+      if (!interfaceUserExists) {
+        await db.table('users').insert({
+          username: 'nestmtx',
+          password: await hash.make('nestmtx'),
+          can_login: true,
           created_at: DateTime.utc().toSQL(),
         })
       }

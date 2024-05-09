@@ -10,4 +10,4 @@
 import router from '@adonisjs/core/services/router'
 import ApiController from '#controllers/api_controller'
 
-router.any('/:module/:id?', [ApiController, 'handle'])
+router.any('/api/:module/:id?', [ApiController, 'handle'])
