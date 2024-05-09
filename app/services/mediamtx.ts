@@ -5,7 +5,6 @@ import { existsSync, createReadStream } from 'node:fs'
 import { execa } from 'execa'
 import { Readable } from 'node:stream'
 import pm2 from 'pm2'
-import type { ExecaChildProcess } from 'execa'
 import type { ApplicationService } from '@adonisjs/core/types'
 import type { LoggerService } from '@adonisjs/core/types'
 import type { Logger } from '@adonisjs/logger'
@@ -24,9 +23,7 @@ export class MediaMTXService {
   readonly #stdErrLogPath: string
   #stdOutStream?: Readable
   #stdErrStream?: Readable
-  #process?: ExecaChildProcess
   #logger?: Logger
-  #failureCount = 0
 
   constructor(app: ApplicationService) {
     this.#app = app
@@ -52,12 +49,20 @@ export class MediaMTXService {
     this.#stdErrStream = createReadStream(this.#stdErrLogPath)
     this.#stdOutStream.on('data', (chunk) => {
       if (this.#logger) {
-        this.#logger.info(chunk.toString())
+        chunk
+          .toString()
+          .split('\n')
+          .filter((l: string) => l.trim().length > 0)
+          .forEach((l: string) => this.#logger!.info(l))
       }
     })
     this.#stdErrStream.on('data', (chunk) => {
       if (this.#logger) {
-        this.#logger.error(chunk.toString())
+        chunk
+          .toString()
+          .split('\n')
+          .filter((l: string) => l.trim().length > 0)
+          .forEach((l: string) => this.#logger!.error(l))
       }
     })
     this.#stdOutStream.on('error', (err) => {
