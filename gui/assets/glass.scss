@@ -1,0 +1,69 @@
+@use "sass:map";
+@use "vuetify/lib/styles/tools/_functions.sass" as *;
+@use "vuetify/lib/styles/settings/_colors.scss" as vc;
+
+@mixin background-color($color_value) {
+    background-color: rgba($color_value, 0.15) !important;
+    backdrop-filter: blur(15px);
+}
+
+@mixin text-color($color_value) {
+    color: $color_value !important;
+}
+
+@mixin background-text-color($color_name, $color_type) {
+    $map_value: map-deep-get(vc.$text-on-colors, $color_name, $color_type);
+
+    --v-theme-on-surface: #{$map_value} !important;
+    color: $map_value !important;
+}
+
+$themeColors: (
+    "accent",
+    "background",
+    "cancel",
+    "error",
+    "highlight",
+    "info",
+    "notify",
+    "primary",
+    "question",
+    "secondary",
+    "success",
+    "surface",
+    "warning"
+) !default;
+
+@each $color in $themeColors {
+    [class*="bg-"].glass-#{$color},
+    .glass-#{$color} {
+        background-color: rgb(var(--v-theme-#{$color}), 0.15) !important;
+        backdrop-filter: blur(15px);
+        --v-theme-on-surface: var(--v-theme-on-#{$color}) !important;
+        color: rgb(var(--v-theme-on-#{$color})) !important;
+    }
+}
+
+@if (vc.$colors) {
+    @each $color_name, $color_color in vc.$colors {
+        @each $color_type, $color_value in $color_color {
+            @if ($color_type == "base") {
+                .glass-#{$color_name} {
+                    @include background-color($color_value);
+
+                    @if (map.has-key(vc.$text-on-colors, $color_name)) {
+                        @include background-text-color($color_name, $color_type);
+                    }
+                }
+            } @else if ($color_type != "shades") {
+                .glass-#{$color_name}-#{$color_type} {
+                    @include background-color($color_value);
+
+                    @if (map.has-key(vc.$text-on-colors, $color_name)) {
+                        @include background-text-color($color_name, $color_type);
+                    }
+                }
+            }
+        }
+    }
+}

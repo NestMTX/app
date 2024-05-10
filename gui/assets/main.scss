@@ -1,0 +1,33 @@
+$family:
+    "Noto Sans Display",
+    "Verdana",
+    "Geneva",
+    -apple-system,
+    "Helvetica Neue",
+    Roboto,
+    "Segoe UI",
+    sans-serif;
+
+@use "vuetify" with (
+    $body-font-family: $family,
+    $heading-font-family: $family
+);
+
+@use "@jakguru/vueprint/vueprint-no-vuetify.scss" as *;
+
+.v-application {
+    &[class*="v-theme--nestmtx-"] {
+        background-color: rgb(var(--v-theme-background));
+        background-repeat: no-repeat;
+        background-size: cover;
+        background-position: center center;
+        background-attachment: local;
+    }
+
+    &.v-theme--nestmtx-night {
+        background-image: url("~/assets/backgrounds/dark.svg");
+    }
+    &.v-theme--nestmtx-day {
+        background-image: url("~/assets/backgrounds/light.svg");
+    }
+}
