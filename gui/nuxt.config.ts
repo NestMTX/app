@@ -7,7 +7,7 @@ export const vueprintModuleOptions: VueprintModuleOptions = {
   },
   identity: {
     tokenRefresh: async (api, signal) => {
-      const { status, data } = await api.get('/api/auth/refresh', { signal })
+      const { status, data } = await api.get('/api/token/refresh', { signal })
       if (status === 200) {
         return data
       } else {
