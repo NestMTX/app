@@ -3,16 +3,8 @@
       <v-main>
         <v-container v-if="!authenticated" class="fill-height">
           <v-row justify="center">
-            <v-col cols="12" sm="6" md="5" lg="4">
-              <v-card color="transparent" class="glass-surface" min-height="100">
-                <v-toolbar color="transparent">
-                    <img src="~/assets/icon.png" alt="NestMTX" class="ms-4" height="32" width="32" />
-                    <v-toolbar-title class="font-raleway font-weight-bold">NestMTX</v-toolbar-title>
-                    <v-spacer />
-                    <ThemeToggle />
-                </v-toolbar>
-                <v-divider />
-              </v-card>
+            <v-col cols="12" sm="6" md="5" lg="4" xl="3">
+              <LoginForm />
             </v-col>
           </v-row>
         </v-container>
@@ -26,11 +18,12 @@
   <script lang="ts">
   import { defineComponent } from 'vue'
   import { useVueprint } from '@jakguru/vueprint/utilities'
-  import ThemeToggle from '@/components/theme/toggle.vue'
+  import LoginForm from '@/components/forms/login.vue'
+
   import type { IdentityService } from '@jakguru/vueprint'
   export default defineComponent({
     name: 'DefaultLayout',
-    components: { ThemeToggle },
+    components: { LoginForm },
     setup() {
       const { mounted, booted, ready } = useVueprint({
         onReady: {

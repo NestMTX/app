@@ -1,16 +1,8 @@
 export default {
   fields: {
     generic: 'This field',
-    fname: 'First Name',
-    lname: 'Last Name',
-    email: 'Email',
-    phone: 'Phone Number',
+    username: 'Username',
     password: 'Password',
-    confirmPassword: 'Confirm Password',
-    country: 'Country',
-    tos: 'Terms of Service',
-    privacy: 'Privacy and Cookie Policy',
-    search: 'Search for {what}',
   },
   validation: {
     bad: 'The value is not a valid {label}',
