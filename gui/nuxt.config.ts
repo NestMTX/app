@@ -91,7 +91,21 @@ export default defineNuxtConfig({
       },
     },
   },
-  modules: ['@jakguru/vueprint/nuxt'],
+  modules: [
+    '@jakguru/vueprint/nuxt',
+    (_options, nuxt) => {
+      nuxt.hooks.hook('vite:extendConfig', (config) => {
+        // @ts-expect-error
+        config.resolve.alias = {
+          // @ts-expect-error
+          ...config.resolve.alias,
+          joi: 'joi/lib',
+        }
+      })
+    },
+    '@vee-validate/nuxt',
+    '@nuxtjs/i18n',
+  ],
   vueprint: vueprintModuleOptions,
   build: {
     transpile: ['@jakguru/vueprint'],
@@ -123,6 +137,14 @@ export default defineNuxtConfig({
         { rel: 'mask-icon', href: '/safari-pinned-tab.svg', color: '#5bbad5' },
       ],
     },
+  },
+  veeValidate: {
+    autoImports: true,
+  },
+  i18n: {
+    differentDomains: false,
+    defaultLocale: 'en',
+    locales: ['en'],
   },
 })
 
