@@ -4,6 +4,9 @@ export default {
     username: 'Username',
     password: 'Password',
   },
+  actions: {
+    login: 'Log In',
+  },
   validation: {
     bad: 'The value is not a valid {label}',
     notAFile: 'Please select {label}',

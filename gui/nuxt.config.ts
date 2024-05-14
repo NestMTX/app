@@ -28,7 +28,7 @@ export const vueprintModuleOptions: VueprintModuleOptions = {
           accent: '#FFFFFF',
           background: '#121212',
           cancel: '#f44336',
-          error: '#FFB74D',
+          error: '#EF9A9A',
           highlight: '#e67e7e',
           info: '#8bb4e7',
           notify: '#F6AD01',
@@ -46,7 +46,7 @@ export const vueprintModuleOptions: VueprintModuleOptions = {
           accent: '#676464',
           background: '#FFFFFF',
           cancel: '#f44336',
-          error: '#D50000',
+          error: '#B71C1C',
           highlight: '#0684c2',
           info: '#8bb4e7',
           notify: '#F6AD01',
@@ -56,6 +56,34 @@ export const vueprintModuleOptions: VueprintModuleOptions = {
           success: '#29D967',
           surface: '#ffffff',
           warning: '#f3cc31',
+        },
+      },
+    },
+    options: {
+      defaults: {
+        VTextField: {
+          variant: 'outlined',
+          hideDetails: 'auto',
+        },
+        VSelect: {
+          variant: 'outlined',
+          hideDetails: 'auto',
+          itemTitle: 'title',
+          itemValue: 'value',
+        },
+        VAutocomplete: {
+          variant: 'outlined',
+          hideDetails: 'auto',
+          itemTitle: 'title',
+          itemValue: 'value',
+        },
+        VSwitch: {
+          color: 'primary',
+          hideDetails: 'auto',
+        },
+        VFileInput: {
+          variant: 'outlined',
+          hideDetails: 'auto',
         },
       },
     },

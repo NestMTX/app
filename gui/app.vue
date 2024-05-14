@@ -28,6 +28,7 @@
 import { defineComponent, inject, computed, ref, onMounted, onBeforeUnmount } from 'vue'
 import { useVueprint } from '@jakguru/vueprint/utilities'
 import { useTheme } from "vuetify";
+import { initializeLocale } from '@/utilities/i18n'
 import ThemeToggle from '@/components/theme/toggle.vue'
 import type { PushService } from '@jakguru/vueprint/services/push'
 import type { LocalStorageService } from '@jakguru/vueprint'
@@ -55,6 +56,7 @@ export default defineComponent({
       }
     }
     onMounted(() => {
+      initializeLocale()
       if (ls) {
         const ct = ls.get('theme')
         if (theme && ct) {

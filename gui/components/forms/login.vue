@@ -7,6 +7,55 @@
             <ThemeToggle />
         </v-toolbar>
         <v-divider />
+        <v-container>
+            <v-row>
+                <v-col cols="12">
+                    <v-text-field
+                    v-bind="form.username"
+                    scroll-into-view
+                    :label="$t('fields.username')"
+                    autocomplete="username"
+                    :disabled="formIsSubmitting"
+                    density="comfortable"
+                    :clearable="!formIsSubmitting && !formIsValidating"
+                    prepend-inner-icon="mdi-account-outline"
+                    >
+                    <template #append-inner>
+                        <slot name="email-append"></slot>
+                    </template>
+                    </v-text-field>
+                </v-col>
+            </v-row>
+            <v-row>
+                <v-col cols="12">
+                    <VPasswordField
+                    v-bind="form.password"
+                    scroll-into-view
+                    :label="$t('fields.password')"
+                    autocomplete="current-password"
+                    prepend-inner-icon="mdi-lock-outline"
+                    :disabled="formIsSubmitting"
+                    density="comfortable"
+                    :clearable="!formIsSubmitting && !formIsValidating"
+                    />
+                </v-col>
+            </v-row>
+            <v-row>
+                <v-col cols="12">
+                    <v-btn
+                    type="submit"
+                    color="secondary"
+                    size="x-large"
+                    block
+                    :disabled="formIsValidating"
+                    :loading="formIsSubmitting"
+                    class="text-white"
+                    >
+                    {{ $t('actions.login') }}
+                    </v-btn>
+                </v-col>
+            </v-row>
+        </v-container>
     </v-card>
 </template>
 
