@@ -1,6 +1,13 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import app from '@adonisjs/core/services/app'
-import type { CommandContext } from '#services/api'
+import type {
+  CommandContext,
+  ListCommandContext,
+  CreateCommandContext,
+  ReadCommandContext,
+  UpdateCommandContext,
+  DeleteCommandContext,
+} from '#services/api'
 import {
   ApiServiceRequestError,
   ApiServiceRequestNotFoundError,
@@ -18,19 +25,25 @@ export default class ApiController {
     switch (request.method()) {
       case 'GET':
         if (params.id) {
-          ctx.command = 'read'
+          ;(ctx as ReadCommandContext).command = 'read'
+          ;(ctx as ReadCommandContext).entity = params.id.toString()
         } else {
-          ctx.command = 'list'
+          ;(ctx as ListCommandContext).command = 'list'
+          ;(ctx as ListCommandContext).payload = request.all()
         }
         break
       case 'POST':
-        ctx.command = 'create'
+        ;(ctx as CreateCommandContext).command = 'create'
+        ;(ctx as CreateCommandContext).payload = request.all()
         break
       case 'PUT':
-        ctx.command = 'update'
+        ;(ctx as UpdateCommandContext).command = 'update'
+        ;(ctx as UpdateCommandContext).payload = request.all()
+        ;(ctx as UpdateCommandContext).entity = params.id.toString()
         break
       case 'DELETE':
-        ctx.command = 'delete'
+        ;(ctx as DeleteCommandContext).command = 'delete'
+        ;(ctx as DeleteCommandContext).entity = params.id.toString()
         break
     }
     const res = await apiService.handle(ctx as CommandContext)

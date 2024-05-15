@@ -329,7 +329,11 @@ export default {
       plural: 'countries',
     },
   },
-  errors: {},
+  errors: {
+    login: {
+      title: 'Login Failed',
+    }
+  },
   dialogs: {},
   $vuetify: {
     badge: 'Badge',

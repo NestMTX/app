@@ -83,7 +83,7 @@ export const validateEmail = (t: I18nT, value: string, ctx?: FieldValidationMeta
 }
 
 export const validatePassword = (t: I18nT, value: string, ctx?: FieldValidationMetaInfo) => {
-  const schema = joi.string().min(6).max(13).required().alphanum()
+  const schema = joi.string().min(6).required()
   return getJoiResultForVeeValidate(t, schema, value, ctx)
 }
 

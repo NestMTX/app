@@ -22,7 +22,10 @@ interface SpecificEntityCommandContext extends BaseCommandContext {
   entity: string
 }
 
-export interface ListCommandContext extends BaseCommandContext {}
+export interface ListCommandContext extends BaseCommandContext {
+  // The query payload to be used in the command
+  payload: any // @TODO: Define the shape of the payload for list commands
+}
 export interface CreateCommandContext extends BaseCommandContext {
   // The payload to be used in the command
   payload: any
@@ -142,6 +145,22 @@ export class ApiService {
       module: joi.string().required(),
       requestId: joi.string().required(),
       user: joi.object().optional(),
+      entity: joi.when('command', {
+        switch: [
+          { is: 'read', then: joi.string().required() },
+          { is: 'update', then: joi.string().required() },
+          { is: 'delete', then: joi.string().required() },
+        ],
+        otherwise: joi.forbidden(),
+      }),
+      payload: joi.when('command', {
+        switch: [
+          { is: 'list', then: joi.object().required() },
+          { is: 'create', then: joi.object().required() },
+          { is: 'update', then: joi.object().required() },
+        ],
+        otherwise: joi.forbidden(),
+      }),
     })
   }
 
@@ -315,7 +334,7 @@ export class ApiService {
         })
       }
       if ('function' === typeof mod.list || 'function' === typeof mod.create) {
-        const path = `/${name}`
+        const path = `/api/${name}`
         const methods: any = {}
         if ('function' === typeof mod.list) {
           methods.get = {
@@ -418,7 +437,7 @@ export class ApiService {
         'function' === typeof mod.update ||
         'function' === typeof mod.delete
       ) {
-        const path = `/${name}/{id}`
+        const path = `/api/${name}/{id}`
         const methods: any = {}
         if ('function' === typeof mod.read) {
           methods.get = {

@@ -1,11 +1,5 @@
 <template>
   <NuxtLayout>
-    <v-app-bar v-if="complete && !updating" app color="transparent" class="glass-primary">
-        <img src="~/assets/icon.png" alt="NestMTX" class="ms-4" height="32" width="32" >
-        <v-toolbar-title class="font-raleway font-weight-bold">NestMTX</v-toolbar-title>
-        <v-spacer />
-        <ThemeToggle />
-    </v-app-bar>
     <NuxtPage v-if="complete && !updating" />
     <v-snackbar
       :model-value="updateable"
@@ -29,13 +23,11 @@ import { defineComponent, inject, computed, ref, onMounted, onBeforeUnmount } fr
 import { useVueprint } from '@jakguru/vueprint/utilities'
 import { useTheme } from "vuetify";
 import { initializeLocale } from '@/utilities/i18n'
-import ThemeToggle from '@/components/theme/toggle.vue'
 import type { PushService } from '@jakguru/vueprint/services/push'
 import type { LocalStorageService , BusService } from '@jakguru/vueprint'
 
 export default defineComponent({
   name: 'App',
-  components: { ThemeToggle },
   setup() {
     const theme = useTheme();
     const { mounted, booted, ready, updateable } = useVueprint({}, true)

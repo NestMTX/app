@@ -114,8 +114,8 @@
             } else {
                 swal.fire({
                     icon: 'error',
-                    title: 'Login Failed',
-                    text: 'Something went wrong. Please try again.'
+                    title: t('errors.login.title'),
+                    text: t(data.error.message),
                 })
             }
         })

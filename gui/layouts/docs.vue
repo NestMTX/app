@@ -1,22 +1,18 @@
 <template>
     <v-app v-if="complete">
       <v-locale-provider :locale="locale" :rtl="rtl" :messages="messages">
-        <v-app-bar v-if="complete && authenticated" app color="transparent" class="glass-surface">
+        <v-app-bar v-if="complete" app color="transparent" class="glass-surface">
           <img src="~/assets/icon.png" alt="NestMTX" class="ms-4" height="32" width="32" >
           <v-toolbar-title class="font-raleway font-weight-bold">NestMTX</v-toolbar-title>
           <v-spacer />
           <I18nPicker />
           <ThemeToggle />
         </v-app-bar>
+        <v-navigation-drawer app color="transparent" class="glass-surface">
+          lala
+        </v-navigation-drawer>
         <v-main>
-          <v-container v-if="!authenticated" class="fill-height">
-            <v-row justify="center">
-              <v-col cols="12" sm="6" md="5" lg="4" xl="3">
-                <LoginForm />
-              </v-col>
-            </v-row>
-          </v-container>
-          <v-container v-else fluid>
+          <v-container fluid>
             <slot/>
           </v-container>
         </v-main>
@@ -25,16 +21,14 @@
   </template>
   
   <script lang="ts">
-  import { defineComponent } from 'vue'
+  import { defineComponent, computed, inject } from 'vue'
   import { useVueprint } from '@jakguru/vueprint/utilities'
-  import LoginForm from '@/components/forms/login.vue'
   import { useI18n } from 'vue-i18n'
   import languages from '@/constants/languages'
   import * as locales from '@/locales'
-  import type { IdentityService } from '@jakguru/vueprint'
+  import type { IdentityService, ApiService } from '@jakguru/vueprint'
   export default defineComponent({
     name: 'DefaultLayout',
-    components: { LoginForm },
     setup() {
       const { locale } = useI18n()
       const { mounted, booted, ready } = useVueprint({
@@ -46,6 +40,7 @@
       }, true)
       const complete = computed(() => mounted.value && booted.value && ready.value)
       const identity = inject<IdentityService>('identity')!
+      const api = inject<ApiService>('api')!
       const authenticated = computed(() => identity.authenticated.value)
       const rtl = computed(() => {
         const lang = languages[locale.value]
