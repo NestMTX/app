@@ -1,3 +1,11 @@
+import ar from './ar'
 import en from './en'
+import es from './es'
+import he from './he'
 
-export { en }
+export {
+    ar,
+    en,
+    es,
+    he,
+}

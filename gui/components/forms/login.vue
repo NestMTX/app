@@ -1,9 +1,10 @@
 <template>
     <v-card color="transparent" class="glass-surface" min-height="100" tag="form" action="#" method="POST" @submit.stop="submit">
         <v-toolbar color="transparent">
-            <img src="~/assets/icon.png" alt="NestMTX" class="ms-4" height="32" width="32" />
+            <img src="~/assets/icon.png" alt="NestMTX" class="ms-4" height="32" width="32" >
             <v-toolbar-title class="font-raleway font-weight-bold">NestMTX</v-toolbar-title>
             <v-spacer />
+            <I18nPicker />
             <ThemeToggle />
         </v-toolbar>
         <v-divider />
@@ -21,7 +22,7 @@
                     prepend-inner-icon="mdi-account-outline"
                     >
                     <template #append-inner>
-                        <slot name="email-append"></slot>
+                        <slot name="email-append"/>
                     </template>
                     </v-text-field>
                 </v-col>
@@ -62,15 +63,16 @@
 <script lang="ts">
   import { defineComponent } from 'vue'
   import ThemeToggle from '@/components/theme/toggle.vue'
+  import I18nPicker from '@/components/i18n/picker.vue'
   import VPasswordField from '@/components/fields/password.vue'
   import { useForm } from 'vee-validate'
   import { useI18n } from 'vue-i18n'
   import { validateUsername, validatePassword } from '@/utilities/validations'
 
-  import type { IdentityService } from '@jakguru/vueprint'
+  import type { IdentityService, ApiService, SwalService } from '@jakguru/vueprint'
   export default defineComponent({
     name: 'LoginForm',
-    components: { ThemeToggle, VPasswordField },
+    components: { ThemeToggle, I18nPicker, VPasswordField },
     setup() {
         const { t } = useI18n({ useScope: 'global' })
         const vuetifyConfig = (state: any) => ({
@@ -87,7 +89,6 @@
             isSubmitting: formIsSubmitting,
             isValidating: formIsValidating,
             defineComponentBinds: defineFormComponentBinds,
-            setFieldValue: setFormFieldValue,
             errors: formErrors,
             resetForm: resetFormFields,
             resetField: resetFormField,
@@ -103,8 +104,20 @@
                 password: validatePassword.bind(null, t),
             },
         })
+        const identity = inject<IdentityService>('identity')!
+        const api = inject<ApiService>('api')!
+        const swal = inject<SwalService>('swal')!
         const submit = handleFormSubmit(async (values) => {
-            console.log(values)
+            const { status, data } = await api.post('/api/auth/', values)
+            if (status === 200) {
+                identity.login(data.bearer, data.expiration, data.user)
+            } else {
+                swal.fire({
+                    icon: 'error',
+                    title: 'Login Failed',
+                    text: 'Something went wrong. Please try again.'
+                })
+            }
         })
         const form = computed(() => ({
             username: defineFormComponentBinds('username', vuetifyConfig).value,

@@ -17,9 +17,8 @@
   <script lang="ts">
   import { computed, inject } from "vue";
   import { useTheme } from "vuetify";
-  import type { LocalStorageService } from '@jakguru/vueprint'
-  import type { BusService } from '@jakguru/vueprint'
-  export default {
+  import type { LocalStorageService , BusService } from '@jakguru/vueprint'
+    export default {
     name: "ThemeToggle",
     setup() {
       const ls = inject<LocalStorageService>('ls')

@@ -7,7 +7,7 @@ export const vueprintModuleOptions: VueprintModuleOptions = {
   },
   identity: {
     tokenRefresh: async (api, signal) => {
-      const { status, data } = await api.get('/api/token/refresh', { signal })
+      const { status, data } = await api.get('/api/token/', { signal })
       if (status === 200) {
         return data
       } else {
@@ -120,12 +120,13 @@ export default defineNuxtConfig({
     },
   },
   modules: [
+    '@nuxt/eslint',
     '@jakguru/vueprint/nuxt',
     (_options, nuxt) => {
       nuxt.hooks.hook('vite:extendConfig', (config) => {
-        // @ts-expect-error
+        // @ts-expect-error - this is a hack to get around bad types
         config.resolve.alias = {
-          // @ts-expect-error
+          // @ts-expect-error - this is a hack to get around bad types
           ...config.resolve.alias,
           joi: 'joi/lib',
         }

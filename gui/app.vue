@@ -1,7 +1,7 @@
 <template>
   <NuxtLayout>
-    <v-app-bar app color="transparent" class="glass-primary" v-if="complete && !updating">
-        <img src="~/assets/icon.png" alt="NestMTX" class="ms-4" height="32" width="32" />
+    <v-app-bar v-if="complete && !updating" app color="transparent" class="glass-primary">
+        <img src="~/assets/icon.png" alt="NestMTX" class="ms-4" height="32" width="32" >
         <v-toolbar-title class="font-raleway font-weight-bold">NestMTX</v-toolbar-title>
         <v-spacer />
         <ThemeToggle />
@@ -31,8 +31,7 @@ import { useTheme } from "vuetify";
 import { initializeLocale } from '@/utilities/i18n'
 import ThemeToggle from '@/components/theme/toggle.vue'
 import type { PushService } from '@jakguru/vueprint/services/push'
-import type { LocalStorageService } from '@jakguru/vueprint'
-import type { BusService } from '@jakguru/vueprint'
+import type { LocalStorageService , BusService } from '@jakguru/vueprint'
 
 export default defineComponent({
   name: 'App',

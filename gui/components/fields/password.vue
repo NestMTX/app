@@ -38,7 +38,7 @@ export default defineComponent({
 </script>
 
 <template>
-  <v-text-field ref="field" v-bind="updatedProps" v-on="updatedEmitters" class="v-password-field" />
+  <v-text-field ref="field" v-bind="updatedProps" class="v-password-field" v-on="updatedEmitters" />
 </template>
 
 <style lang="scss">
