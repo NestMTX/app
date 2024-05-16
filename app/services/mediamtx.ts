@@ -3,7 +3,6 @@ import fs from 'node:fs/promises'
 import yaml from 'yaml'
 import { existsSync, createReadStream } from 'node:fs'
 import { execa } from 'execa'
-import { Readable } from 'node:stream'
 import pm2 from 'pm2'
 import type { ApplicationService } from '@adonisjs/core/types'
 import type { LoggerService } from '@adonisjs/core/types'
@@ -11,6 +10,7 @@ import type { Logger } from '@adonisjs/logger'
 import type { NATService } from '#services/nat'
 import type { ICEService } from '#services/ice'
 import type { ProcessDescription, Proc } from 'pm2'
+import type { Readable } from 'node:stream'
 
 /**
  * A class for managing the MediaMTX service process

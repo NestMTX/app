@@ -1,13 +1,18 @@
+import type { ApplicationService } from '@adonisjs/core/types'
 import type server from '@adonisjs/core/services/server'
 import type { Socket } from 'socket.io'
 import type User from '#models/user'
 import type { ApiService, CommandContext } from '#services/api'
 import type { LoggerService } from '@adonisjs/core/types'
+import type { Readable } from 'node:stream'
 import { Server as SocketIoServer } from 'socket.io'
 import { Secret } from '@adonisjs/core/helpers'
 import Joi from 'joi'
 import { ApiServiceRequestError } from '#services/api'
 import { inspect } from 'node:util'
+import fs from 'node:fs/promises'
+import { existsSync, createReadStream } from 'node:fs'
+import { execa } from 'execa'
 
 type HttpServerService = typeof server
 
@@ -38,10 +43,14 @@ export interface AppSocket extends Socket {
 export class SocketIoService {
   #io: SocketIoServer
   #logger?: LoggerService
+  readonly #app: ApplicationService
   readonly #api: ApiService
   readonly #sockets: Map<string, AppSocket>
+  readonly #loggerFifoPath: string
+  #loggerFifoStream?: Readable
 
-  constructor(api: ApiService) {
+  constructor(app: ApplicationService, api: ApiService) {
+    this.#app = app
     this.#sockets = new Map()
     this.#api = api
     this.#io = new SocketIoServer({
@@ -52,6 +61,7 @@ export class SocketIoService {
     this.#io.use(this.#hooksMiddleware.bind(this))
     this.#io.use(this.#authenticationMiddleware.bind(this))
     this.#io.on('connection', this.#onIncomingConnection.bind(this))
+    this.#loggerFifoPath = this.#app.tmpPath('logger.sock')
   }
 
   get #log() {
@@ -85,7 +95,18 @@ export class SocketIoService {
     if (!server) {
       return
     }
+    await Promise.all([this.#makeFifo(this.#loggerFifoPath)])
+    this.#loggerFifoStream = createReadStream(this.#loggerFifoPath)
     this.#io.attach(server)
+    this.#loggerFifoStream.on('data', (chunk) => {
+      try {
+        const obj = JSON.parse(chunk.toString())
+        console.log({ obj })
+        this.broadcast('log', obj)
+      } catch {
+        this.#log.error(`Failed to parse log message: ${chunk.toString()}`)
+      }
+    })
   }
 
   #hooksMiddleware(socket: AppSocket, next: (err?: Error) => void) {
@@ -159,7 +180,7 @@ export class SocketIoService {
         })
       }
     }
-    const ctx: CommandContext = { ...request!, user: socket.user }
+    const ctx: CommandContext = { ...request!, user: socket.user } as CommandContext
     const res = await this.#api.handle(ctx as CommandContext)
     if (res instanceof Error) {
       if (res instanceof ApiServiceRequestError) {
@@ -184,5 +205,12 @@ export class SocketIoService {
 
   broadcast(event: string, ...args: any[]) {
     this.#io.emit(event, ...args)
+  }
+
+  async #makeFifo(path: string) {
+    if (existsSync(path)) {
+      await fs.unlink(path)
+    }
+    await execa('mkfifo', [path])
   }
 }

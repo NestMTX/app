@@ -1,6 +1,6 @@
 import env from '#start/env'
 import app from '@adonisjs/core/services/app'
-import { defineConfig, targets } from '@adonisjs/core/logger'
+import { defineConfig, targets, transport } from '@adonisjs/core/logger'
 
 const loggerConfig = defineConfig({
   default: 'app',
@@ -18,6 +18,14 @@ const loggerConfig = defineConfig({
         targets: targets()
           .pushIf(!app.inProduction, targets.pretty())
           .pushIf(app.inProduction, targets.file({ destination: 1 }))
+          .push(
+            transport({
+              target: app.makePath('logger-transports', 'fifo.mjs'),
+              options: {
+                destination: app.tmpPath('logger.sock'),
+              },
+            })
+          )
           .toArray(),
       },
     },

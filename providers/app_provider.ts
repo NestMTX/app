@@ -44,7 +44,7 @@ export default class AppProvider {
   #ipc: IPCService
   constructor(protected app: ApplicationService) {
     this.#api = new ApiService()
-    this.#io = new SocketIoService(this.#api)
+    this.#io = new SocketIoService(this.app, this.#api)
     this.#mediamtx = new MediaMTXService(this.app)
     this.#nat = new NATService()
     this.#ice = new ICEService()
