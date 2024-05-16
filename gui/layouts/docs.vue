@@ -1,6 +1,6 @@
 <template>
     <v-app v-if="complete">
-      <v-locale-provider :locale="locale" :rtl="rtl" :messages="messages">
+      <v-locale-provider :locale="locale" :rtl="rtl">
         <v-app-bar v-if="complete" app color="transparent" class="glass-surface">
           <img src="~/assets/icon.png" alt="NestMTX" class="ms-4" height="32" width="32" >
           <v-toolbar-title class="font-raleway font-weight-bold">NestMTX</v-toolbar-title>
@@ -25,7 +25,6 @@
   import { useVueprint } from '@jakguru/vueprint/utilities'
   import { useI18n } from 'vue-i18n'
   import languages from '@/constants/languages'
-  import * as locales from '@/locales'
   import type { IdentityService, ApiService } from '@jakguru/vueprint'
   export default defineComponent({
     name: 'DefaultLayout',
@@ -46,8 +45,7 @@
         const lang = languages[locale.value]
         return lang ? lang.rtl : false
       })
-      const messages = computed(() => (locales as any)[locale.value] as any || {})
-      return { complete, identity, authenticated, locale, rtl, messages }
+      return { complete, identity, authenticated, locale, rtl }
     },
   })
   </script>

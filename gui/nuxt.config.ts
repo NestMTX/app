@@ -1,5 +1,9 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 import type { VueprintModuleOptions } from '@jakguru/vueprint/nuxt'
+import * as languages from './locales'
+
+const locales = Object.keys(languages)
+const messages = Object.assign({}, ...locales.map((lang) => ({ [lang]: (languages[lang as keyof typeof languages] as any).$vuetify || {} })))
 
 export const vueprintModuleOptions: VueprintModuleOptions = {
   bus: {
@@ -86,6 +90,11 @@ export const vueprintModuleOptions: VueprintModuleOptions = {
           hideDetails: 'auto',
         },
       },
+      locale: {
+        locale: 'en',
+        fallback: 'en',
+        messages,
+      }
     },
   },
   webfontloader: {
@@ -121,6 +130,8 @@ export default defineNuxtConfig({
   },
   modules: [
     '@nuxt/eslint',
+    '@vee-validate/nuxt',
+    '@nuxtjs/i18n',
     '@jakguru/vueprint/nuxt',
     (_options, nuxt) => {
       nuxt.hooks.hook('vite:extendConfig', (config) => {
@@ -132,8 +143,6 @@ export default defineNuxtConfig({
         }
       })
     },
-    '@vee-validate/nuxt',
-    '@nuxtjs/i18n',
   ],
   vueprint: vueprintModuleOptions,
   build: {
@@ -173,7 +182,8 @@ export default defineNuxtConfig({
   i18n: {
     differentDomains: false,
     defaultLocale: 'en',
-    locales: ['en'],
+    locales: locales,
+    strategy: 'prefix_except_default',
   },
 })
 

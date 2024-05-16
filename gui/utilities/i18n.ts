@@ -21,17 +21,18 @@ export const setLocale = (locale: WritableComputedRef<string>, isRtl: Ref<boolea
 }
 
 export const initializeLocale = (): void => {
-  const { locale } = useI18n({ useScope: 'global' })
+  const { setLocale, locale } = useI18n({ useScope: 'global' })
   const { isRtl } = useLocale()
   const ls = inject<LocalStorageService>('ls')
-  let iso = 'en'
+  let iso = locale.value
   if (ls) {
-    iso = ls.get('locale') || 'en'
+    iso = ls.get('locale') || locale.value || 'en'
   }
   const language = languages[iso]
   if (!language) {
     return
   }
-  locale.value = language.iso
+  // locale.value = language.iso
+  setLocale(language.iso)
   isRtl.value = language.rtl
 }
