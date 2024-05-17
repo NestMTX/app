@@ -89,7 +89,7 @@ export default defineComponent({
               iodbg('reconnect_failed')
             })
             io.on('log', (msg: string) => {
-              iodbg(msg)
+              iodbg('log', msg)
             })
           }
         },

@@ -4971,6 +4971,13 @@ pgpass@1.x:
   dependencies:
     split2 "^4.1.0"
 
+pick-port@^2.0.1:
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/pick-port/-/pick-port-2.0.1.tgz#bdd3ccfe3def02288fd4978b4b82158be6aa8996"
+  integrity sha512-8GSFuOCelctwcW0CkNGFahrGJyKxx2hMOmzDxVaHTknsikh4Zi+edCFUMgfAcBLRkV0GYQT64QivSi4SxDeKdA==
+  dependencies:
+    debug "^4.3.4"
+
 picocolors@^1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/picocolors/-/picocolors-1.0.0.tgz#cb5bdc74ff3f51892236eaf79d68bc44564ab81c"

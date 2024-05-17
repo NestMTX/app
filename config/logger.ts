@@ -1,6 +1,7 @@
 import env from '#start/env'
 import app from '@adonisjs/core/services/app'
 import { defineConfig, targets } from '@adonisjs/core/logger'
+import '#services/server.log'
 
 const loggerConfig = defineConfig({
   default: 'app',
@@ -17,9 +18,9 @@ const loggerConfig = defineConfig({
       transport: {
         targets: targets()
           .push({
-            target: app.makePath('logger-transports', 'fifo.mjs'),
+            target: app.makePath('logger-transports', 'event_emitter.mjs'),
             options: {
-              destination: app.tmpPath('logger.sock'),
+              destination: env.get('PINO_PORT', 62000),
             },
           })
           .pushIf(!app.inProduction, targets.pretty())

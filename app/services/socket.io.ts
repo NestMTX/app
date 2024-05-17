@@ -4,13 +4,12 @@ import type { Socket } from 'socket.io'
 import type User from '#models/user'
 import type { ApiService, CommandContext } from '#services/api'
 import type { LoggerService } from '@adonisjs/core/types'
-import type { Readable } from 'node:stream'
 import { Server as SocketIoServer } from 'socket.io'
 import { Secret } from '@adonisjs/core/helpers'
 import Joi from 'joi'
 import { ApiServiceRequestError } from '#services/api'
 import { inspect } from 'node:util'
-import { existsSync, createReadStream } from 'node:fs'
+import logEmitter from '#services/emitter.log'
 
 type HttpServerService = typeof server
 
@@ -38,17 +37,24 @@ export interface AppSocket extends Socket {
   respondToRequest?: (requestId: string, response: any) => void
 }
 
+export interface PinoLog {
+  [key: string]: any
+  level: string
+  time: string
+  pid: number
+  hostname: string
+  msg: string
+  service?: string
+}
+
 export class SocketIoService {
   #io: SocketIoServer
   #logger?: LoggerService
-  readonly #app: ApplicationService
   readonly #api: ApiService
   readonly #sockets: Map<string, AppSocket>
-  readonly #loggerFifoPath: string
-  #loggerFifoStream?: Readable
+  readonly #logs: PinoLog[] = []
 
-  constructor(app: ApplicationService, api: ApiService) {
-    this.#app = app
+  constructor(_app: ApplicationService, api: ApiService) {
     this.#sockets = new Map()
     this.#api = api
     this.#io = new SocketIoServer({
@@ -59,7 +65,8 @@ export class SocketIoService {
     this.#io.use(this.#hooksMiddleware.bind(this))
     this.#io.use(this.#authenticationMiddleware.bind(this))
     this.#io.on('connection', this.#onIncomingConnection.bind(this))
-    this.#loggerFifoPath = this.#app.tmpPath('logger.sock')
+    logEmitter.on('log', this.broadcast.bind(this, 'log'))
+    logEmitter.on('log', (log) => this.#pushLog(log))
   }
 
   get #log() {
@@ -82,7 +89,6 @@ export class SocketIoService {
    */
   boot(logger: LoggerServiceWithConfig) {
     this.#logger = logger
-    // logger.config.transport.targets.push
   }
 
   /**
@@ -93,24 +99,7 @@ export class SocketIoService {
     if (!server) {
       return
     }
-    await Promise.all([this.#awaitFifo(this.#loggerFifoPath)])
-    this.#loggerFifoStream = createReadStream(this.#loggerFifoPath)
     this.#io.attach(server)
-    this.#loggerFifoStream.on('data', (chunk) => {
-      const lines = chunk
-        .toString()
-        .split('\n')
-        .map((line: string) => line.trim())
-        .filter((line: string) => line)
-      for (const line of lines) {
-        try {
-          const obj = JSON.parse(line)
-          this.broadcast('log', obj)
-        } catch {
-          this.#log.error(`Failed to parse log message: ${line}`)
-        }
-      }
-    })
   }
 
   #hooksMiddleware(socket: AppSocket, next: (err?: Error) => void) {
@@ -140,12 +129,20 @@ export class SocketIoService {
 
   #onIncomingConnection(socket: AppSocket) {
     this.#sockets.set(socket.id, socket)
+    this.#logs.forEach((log) => socket.emit('log', log))
     this.#log.info(`Socket ${socket.id} connected`)
     socket.on('request', this.#onRequest.bind(this, socket))
     socket.on('disconnect', () => {
       this.#log.info(`Socket ${socket.id} disconnected`)
       this.#sockets.delete(socket.id)
     })
+  }
+
+  #pushLog(log: PinoLog) {
+    this.#logs.push(log)
+    while (this.#logs.length > 100) {
+      this.#logs.shift()
+    }
   }
 
   async #onRequest(socket: AppSocket, payload: unknown) {
@@ -209,14 +206,5 @@ export class SocketIoService {
 
   broadcast(event: string, ...args: any[]) {
     this.#io.emit(event, ...args)
-  }
-
-  async #awaitFifo(path: string) {
-    let exists = existsSync(path)
-    while (!exists) {
-      await new Promise((resolve) => setTimeout(resolve, 100))
-      exists = existsSync(path)
-    }
-    return
   }
 }
