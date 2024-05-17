@@ -332,7 +332,7 @@ export default {
   errors: {
     login: {
       title: 'Login Failed',
-    }
+    },
   },
   dialogs: {},
   $vuetify: {
@@ -342,11 +342,11 @@ export default {
     dismiss: 'Dismiss',
     confirmEdit: {
       ok: 'OK',
-      cancel: 'Cancel'
+      cancel: 'Cancel',
     },
     dataIterator: {
       noResultsText: 'No matching records found',
-      loadingText: 'Loading items...'
+      loadingText: 'Loading items...',
     },
     dataTable: {
       itemsPerPageText: 'Rows per page:',
@@ -356,9 +356,9 @@ export default {
         sortNone: 'Not sorted.',
         activateNone: 'Activate to remove sorting.',
         activateDescending: 'Activate to sort descending.',
-        activateAscending: 'Activate to sort ascending.'
+        activateAscending: 'Activate to sort ascending.',
       },
-      sortBy: 'Sort by'
+      sortBy: 'Sort by',
     },
     dataFooter: {
       itemsPerPageText: 'Items per page:',
@@ -367,49 +367,49 @@ export default {
       prevPage: 'Previous page',
       firstPage: 'First page',
       lastPage: 'Last page',
-      pageText: '{0}-{1} of {2}'
+      pageText: '{0}-{1} of {2}',
     },
     dateRangeInput: {
-      divider: 'to'
+      divider: 'to',
     },
     datePicker: {
       itemsSelected: '{0} selected',
       range: {
         title: 'Select dates',
-        header: 'Enter dates'
+        header: 'Enter dates',
       },
       title: 'Select date',
       header: 'Enter date',
       input: {
-        placeholder: 'Enter date'
-      }
+        placeholder: 'Enter date',
+      },
     },
     noDataText: 'No data available',
     carousel: {
       prev: 'Previous visual',
       next: 'Next visual',
       ariaLabel: {
-        delimiter: 'Carousel slide {0} of {1}'
-      }
+        delimiter: 'Carousel slide {0} of {1}',
+      },
     },
     calendar: {
       moreEvents: '{0} more',
-      today: 'Today'
+      today: 'Today',
     },
     input: {
       clear: 'Clear {0}',
       prependAction: '{0} prepended action',
       appendAction: '{0} appended action',
-      otp: 'Please enter OTP character {0}'
+      otp: 'Please enter OTP character {0}',
     },
     fileInput: {
       counter: '{0} files',
-      counterSize: '{0} files ({1} in total)'
+      counterSize: '{0} files ({1} in total)',
     },
     timePicker: {
       am: 'AM',
       pm: 'PM',
-      title: 'Select Time'
+      title: 'Select Time',
     },
     pagination: {
       ariaLabel: {
@@ -419,22 +419,22 @@ export default {
         page: 'Go to page {0}',
         currentPage: 'Page {0}, Current page',
         first: 'First page',
-        last: 'Last page'
-      }
+        last: 'Last page',
+      },
     },
     stepper: {
       next: 'Next',
-      prev: 'Previous'
+      prev: 'Previous',
     },
     rating: {
       ariaLabel: {
-        item: 'Rating {0} of {1}'
-      }
+        item: 'Rating {0} of {1}',
+      },
     },
     loading: 'Loading...',
     infiniteScroll: {
       loadMore: 'Load more',
-      empty: 'No more'
-    }
+      empty: 'No more',
+    },
   },
 }

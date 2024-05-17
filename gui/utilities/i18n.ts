@@ -7,7 +7,11 @@ import type { WritableComputedRef, Ref } from 'vue'
 
 export const asArray = Object.keys(languages).map((key) => languages[key])
 
-export const setLocale = (locale: WritableComputedRef<string>, isRtl: Ref<boolean>, is: string): void => {
+export const setLocale = (
+  locale: WritableComputedRef<string>,
+  isRtl: Ref<boolean>,
+  is: string
+): void => {
   const language = languages[is]
   if (!language) {
     return

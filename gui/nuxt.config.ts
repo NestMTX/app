@@ -3,7 +3,12 @@ import type { VueprintModuleOptions } from '@jakguru/vueprint/nuxt'
 import * as languages from './locales'
 
 const locales = Object.keys(languages)
-const messages = Object.assign({}, ...locales.map((lang) => ({ [lang]: (languages[lang as keyof typeof languages] as any).$vuetify || {} })))
+const messages = Object.assign(
+  {},
+  ...locales.map((lang) => ({
+    [lang]: (languages[lang as keyof typeof languages] as any).$vuetify || {},
+  }))
+)
 
 export const vueprintModuleOptions: VueprintModuleOptions = {
   bus: {
@@ -94,7 +99,7 @@ export const vueprintModuleOptions: VueprintModuleOptions = {
         locale: 'en',
         fallback: 'en',
         messages,
-      }
+      },
     },
   },
   webfontloader: {
@@ -122,6 +127,14 @@ export default defineNuxtConfig({
     server: {
       proxy: {
         '/api': {
+          target: 'http://127.0.0.1:2000',
+          changeOrigin: true,
+        },
+        '/socket.io': {
+          target: 'http://127.0.0.1:2000',
+          changeOrigin: true,
+        },
+        '/socket.io/': {
           target: 'http://127.0.0.1:2000',
           changeOrigin: true,
         },

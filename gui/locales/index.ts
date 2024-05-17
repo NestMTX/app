@@ -4,10 +4,4 @@ import es from './es'
 import fr from './fr'
 import he from './he'
 
-export {
-    ar,
-    en,
-    es,
-    fr,
-    he,
-}
+export { ar, en, es, fr, he }

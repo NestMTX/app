@@ -63,7 +63,7 @@ const usage = clu([
 
 if (options.help) {
   console.log(usage)
-   
+
   process.exit(0)
 }
 
@@ -78,16 +78,16 @@ const run = async () => {
   if (error) {
     console.error(c.redBright(error.message))
     console.log(c.yellow(`Rerun with --help for usage information.`))
-     
+
     process.exit(1)
   }
   const { key, language, force } = value
   console.log(c.blue(`Loading source file...`))
   const dotted = dot.dot(en)
   const keys = Object.keys(dotted)
-   
+
   const dstPathForFs = join(__dirname, `../locales/${language}.ts`)
-   
+
   const dstPathForImporting = join(__dirname, `../locales/${language}`)
   console.log(c.blue(`Checking if destination file exists...`))
   const exists = existsSync(dstPathForFs)
@@ -110,7 +110,7 @@ const run = async () => {
   const keysToTranslate = keys.filter((k) => !dstDotted[k] && dotted[k])
   if (keysToTranslate.length === 0) {
     console.log(c.green(`Nothing to translate.`))
-     
+
     process.exit(0)
   }
   console.log(c.cyan(`Translating ${keysToTranslate.length} keys...`))

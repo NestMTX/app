@@ -10,9 +10,7 @@ import { Secret } from '@adonisjs/core/helpers'
 import Joi from 'joi'
 import { ApiServiceRequestError } from '#services/api'
 import { inspect } from 'node:util'
-import fs from 'node:fs/promises'
 import { existsSync, createReadStream } from 'node:fs'
-import { execa } from 'execa'
 
 type HttpServerService = typeof server
 
@@ -95,16 +93,22 @@ export class SocketIoService {
     if (!server) {
       return
     }
-    await Promise.all([this.#makeFifo(this.#loggerFifoPath)])
+    await Promise.all([this.#awaitFifo(this.#loggerFifoPath)])
     this.#loggerFifoStream = createReadStream(this.#loggerFifoPath)
     this.#io.attach(server)
     this.#loggerFifoStream.on('data', (chunk) => {
-      try {
-        const obj = JSON.parse(chunk.toString())
-        console.log({ obj })
-        this.broadcast('log', obj)
-      } catch {
-        this.#log.error(`Failed to parse log message: ${chunk.toString()}`)
+      const lines = chunk
+        .toString()
+        .split('\n')
+        .map((line: string) => line.trim())
+        .filter((line: string) => line)
+      for (const line of lines) {
+        try {
+          const obj = JSON.parse(line)
+          this.broadcast('log', obj)
+        } catch {
+          this.#log.error(`Failed to parse log message: ${line}`)
+        }
       }
     })
   }
@@ -127,7 +131,7 @@ export class SocketIoService {
     }
     if (token) {
       const bearerToken = new Secret(token)
-      console.log({ bearerToken })
+      console.log({ bearerToken, token })
       const err = new Error('Authorization is not yet enabled')
       return next(err)
     }
@@ -207,10 +211,12 @@ export class SocketIoService {
     this.#io.emit(event, ...args)
   }
 
-  async #makeFifo(path: string) {
-    if (existsSync(path)) {
-      await fs.unlink(path)
+  async #awaitFifo(path: string) {
+    let exists = existsSync(path)
+    while (!exists) {
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      exists = existsSync(path)
     }
-    await execa('mkfifo', [path])
+    return
   }
 }
