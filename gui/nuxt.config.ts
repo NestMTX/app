@@ -50,7 +50,7 @@ export const vueprintModuleOptions: VueprintModuleOptions = {
         },
       },
       'nestmtx-day': {
-        dark: true,
+        dark: false,
         colors: {
           accent: '#676464',
           background: '#FFFFFF',

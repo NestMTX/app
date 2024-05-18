@@ -42,6 +42,10 @@ $themeColors: (
         --v-theme-on-surface: var(--v-theme-on-#{$color}) !important;
         color: rgb(var(--v-theme-on-#{$color})) !important;
     }
+
+    .glass-#{$color} .bg-transparent {
+        color: rgb(var(--v-theme-on-#{$color})) !important;
+    }
 }
 
 @if (vc.$colors) {

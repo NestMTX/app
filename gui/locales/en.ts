@@ -338,12 +338,13 @@ export default {
     systemInfo: {
       title: 'System Information',
       cards: {
+        app: 'Application Information',
         cpu: 'CPU',
-        memory: 'Memory',
-        uptime: 'Uptime',
-        network: 'Network',
         info: 'Host Information',
         logs: 'Logs',
+        memory: 'Memory',
+        network: 'Network',
+        uptime: 'Uptime',
       },
     },
   },
@@ -447,6 +448,17 @@ export default {
     infiniteScroll: {
       loadMore: 'Load more',
       empty: 'No more',
+    },
+  },
+  logs: {
+    levels: {
+      trace: 'Trace',
+      debug: 'Debug',
+      info: 'Info',
+      warn: 'Warn',
+      error: 'Error',
+      fatal: 'Fatal',
+      silent: 'Silent',
     },
   },
 }

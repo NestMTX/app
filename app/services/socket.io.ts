@@ -4,6 +4,7 @@ import type { Socket } from 'socket.io'
 import type User from '#models/user'
 import type { ApiService, CommandContext } from '#services/api'
 import type { LoggerService } from '@adonisjs/core/types'
+import type { Logger } from '@adonisjs/logger'
 import { Server as SocketIoServer } from 'socket.io'
 import { Secret } from '@adonisjs/core/helpers'
 import Joi from 'joi'
@@ -39,8 +40,8 @@ export interface AppSocket extends Socket {
 
 export interface PinoLog {
   [key: string]: any
-  level: string
-  time: string
+  level: number
+  time: number
   pid: number
   hostname: string
   msg: string
@@ -49,7 +50,7 @@ export interface PinoLog {
 
 export class SocketIoService {
   #io: SocketIoServer
-  #logger?: LoggerService
+  #logger?: Logger
   readonly #api: ApiService
   readonly #sockets: Map<string, AppSocket>
   readonly #logs: PinoLog[] = []
@@ -88,7 +89,7 @@ export class SocketIoService {
    * @private
    */
   boot(logger: LoggerServiceWithConfig) {
-    this.#logger = logger
+    this.#logger = logger.child({ service: 'socket.io' })
   }
 
   /**

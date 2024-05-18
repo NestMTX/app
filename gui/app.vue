@@ -24,6 +24,7 @@ import { useVueprint } from '@jakguru/vueprint/utilities'
 import { useTheme } from 'vuetify'
 import { initializeLocale } from '@/utilities/i18n'
 import { getDebugger } from '@jakguru/vueprint/utilities/debug'
+import { onIncomingLog } from '@/stores/systemInfo'
 import type { PushService } from '@jakguru/vueprint/services/push'
 import type { LocalStorageService, BusService } from '@jakguru/vueprint'
 import type { Socket } from 'socket.io-client'
@@ -89,9 +90,7 @@ export default defineComponent({
               io.on('reconnect_failed', () => {
                 iodbg('reconnect_failed')
               })
-              io.on('log', (msg: string) => {
-                iodbg('log', msg)
-              })
+              io.on('log', onIncomingLog)
             }
           },
           onFalse: () => {
@@ -106,7 +105,7 @@ export default defineComponent({
               io.off('reconnect_attempt')
               io.off('reconnect_error')
               io.off('reconnect_failed')
-              io.off('log')
+              io.off('log', onIncomingLog)
             }
           },
         },
