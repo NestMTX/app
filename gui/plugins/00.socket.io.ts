@@ -15,7 +15,7 @@ declare module 'vue' {
 
 export default defineNuxtPlugin((nuxtApp) => {
   const IO = io({
-    transports: ['polling'],    // @todo: re-enable websocket
+    transports: ['polling'], // @todo: re-enable websocket
     autoConnect: false,
   })
   nuxtApp.vueApp.provide('io', IO)

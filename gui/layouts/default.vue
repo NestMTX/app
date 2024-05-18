@@ -9,18 +9,32 @@
         <ThemeToggle />
       </v-app-bar>
       <v-main>
-        <v-container v-if="!authenticated" class="fill-height">
+        <v-container v-if="!authenticated && !showSystemInfo" class="fill-height">
           <v-row justify="center">
             <v-col cols="12" sm="6" md="5" lg="4" xl="3">
               <LoginForm />
             </v-col>
           </v-row>
         </v-container>
-        <v-container v-else fluid>
+        <v-container v-else-if="!showSystemInfo" fluid>
           <slot />
         </v-container>
       </v-main>
+      <SystemInfoDialog v-if="showSystemInfo" class="glass-surface" @close="showSystemInfo = false">
+        <template #toolbar>
+          <I18nPicker />
+          <ThemeToggle />
+        </template>
+      </SystemInfoDialog>
     </v-locale-provider>
+    <v-fab
+      v-if="!showSystemInfo"
+      app
+      icon="mdi-server"
+      fixed
+      color="secondary"
+      @click="showSystemInfo = true"
+    ></v-fab>
   </v-app>
 </template>
 
@@ -28,12 +42,13 @@
 import { defineComponent } from 'vue'
 import { useVueprint } from '@jakguru/vueprint/utilities'
 import LoginForm from '@/components/forms/login.vue'
+import SystemInfoDialog from '@/components/dialogs/systemInfo.vue'
 import { useI18n } from 'vue-i18n'
 import languages from '@/constants/languages'
 import type { IdentityService } from '@jakguru/vueprint'
 export default defineComponent({
   name: 'DefaultLayout',
-  components: { LoginForm },
+  components: { LoginForm, SystemInfoDialog },
   setup() {
     const { locale } = useI18n()
     const { mounted, booted, ready } = useVueprint({}, true)
@@ -44,7 +59,8 @@ export default defineComponent({
       const lang = languages[locale.value]
       return lang ? lang.rtl : false
     })
-    return { complete, identity, authenticated, locale, rtl }
+    const showSystemInfo = ref(false)
+    return { complete, identity, authenticated, locale, rtl, showSystemInfo }
   },
 })
 </script>

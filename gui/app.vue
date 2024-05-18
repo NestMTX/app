@@ -56,68 +56,71 @@ export default defineComponent({
       }
     }
 
-    const { mounted, booted, ready, updateable } = useVueprint({
-      onReady: {
-        onTrue: () => {
-          updateSocketConnection()
-          if (io) {
-            io.on('connect', () => {
-              iodbg('connect')
-            })
-            io.on('connect_error', () => {
-              iodbg('connect_error')
-            })
-            io.on('disconnect', () => {
-              iodbg('disconnect')
-            })
-            io.on('error', () => {
-              iodbg('error')
-            })
-            io.on('ping', () => {
-              iodbg('ping')
-            })
-            io.on('reconnect', () => {
-              iodbg('reconnect')
-            })
-            io.on('reconnect_attempt', () => {
-              iodbg('reconnect_attempt')
-            })
-            io.on('reconnect_error', () => {
-              iodbg('reconnect_error')
-            })
-            io.on('reconnect_failed', () => {
-              iodbg('reconnect_failed')
-            })
-            io.on('log', (msg: string) => {
-              iodbg('log', msg)
-            })
-          }
+    const { mounted, booted, ready, updateable } = useVueprint(
+      {
+        onReady: {
+          onTrue: () => {
+            updateSocketConnection()
+            if (io) {
+              io.on('connect', () => {
+                iodbg('connect')
+              })
+              io.on('connect_error', () => {
+                iodbg('connect_error')
+              })
+              io.on('disconnect', () => {
+                iodbg('disconnect')
+              })
+              io.on('error', () => {
+                iodbg('error')
+              })
+              io.on('ping', () => {
+                iodbg('ping')
+              })
+              io.on('reconnect', () => {
+                iodbg('reconnect')
+              })
+              io.on('reconnect_attempt', () => {
+                iodbg('reconnect_attempt')
+              })
+              io.on('reconnect_error', () => {
+                iodbg('reconnect_error')
+              })
+              io.on('reconnect_failed', () => {
+                iodbg('reconnect_failed')
+              })
+              io.on('log', (msg: string) => {
+                iodbg('log', msg)
+              })
+            }
+          },
+          onFalse: () => {
+            updateSocketConnection()
+            if (io) {
+              io.off('connect')
+              io.off('connect_error')
+              io.off('disconnect')
+              io.off('error')
+              io.off('ping')
+              io.off('reconnect')
+              io.off('reconnect_attempt')
+              io.off('reconnect_error')
+              io.off('reconnect_failed')
+              io.off('log')
+            }
+          },
         },
-        onFalse: () => {
-          updateSocketConnection()
-          if (io) {
-            io.off('connect')
-            io.off('connect_error')
-            io.off('disconnect')
-            io.off('error')
-            io.off('ping')
-            io.off('reconnect')
-            io.off('reconnect_attempt')
-            io.off('reconnect_error')
-            io.off('reconnect_failed')
-            io.off('log')
-          }
+        onAuthenticated: {
+          onTrue: () => {
+            updateSocketConnection()
+          },
+          onFalse: () => {
+            updateSocketConnection()
+          },
         },
       },
-      onAuthenticated: {
-        onTrue: () => {
-          updateSocketConnection()
-        },
-        onFalse: () => {
-          updateSocketConnection()
-        },
-      },
-    }, true)
+      true
+    )
     const complete = computed(() => mounted.value && booted.value && ready.value)
     const updating = ref(false)
     const push = inject<PushService>('push')

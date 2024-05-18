@@ -334,7 +334,19 @@ export default {
       title: 'Login Failed',
     },
   },
-  dialogs: {},
+  dialogs: {
+    systemInfo: {
+      title: 'System Information',
+      cards: {
+        cpu: 'CPU',
+        memory: 'Memory',
+        uptime: 'Uptime',
+        network: 'Network',
+        info: 'Host Information',
+        logs: 'Logs',
+      },
+    },
+  },
   $vuetify: {
     badge: 'Badge',
     open: 'Open',
