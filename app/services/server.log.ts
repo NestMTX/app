@@ -1,3 +1,4 @@
+import app from '@adonisjs/core/services/app'
 import env from '#start/env'
 import { createServer } from 'node:net'
 import logEmitter from '#services/emitter.log'
@@ -15,6 +16,8 @@ const logServer = createServer({ keepAlive: true }, (socket: Socket) => {
   })
 })
 
-logServer.listen(pinoPort, '0.0.0.0')
+if ('web' === app.getEnvironment()) {
+  logServer.listen(pinoPort, '0.0.0.0')
+}
 
 export default logServer

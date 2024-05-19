@@ -333,6 +333,11 @@ export default {
     login: {
       title: 'Login Failed',
     },
+    auth: {
+      create: {
+        loggedIn: 'You are already logged in',
+      }
+    }
   },
   dialogs: {
     systemInfo: {
@@ -461,4 +466,27 @@ export default {
       silent: 'Silent',
     },
   },
+  pages: {
+    undefined: {
+      nav: 'Unknown Page',
+      title: 'NestMTX',
+      description: 'NestMTX Control Panel',
+      header: 'Unknown Page',
+      subtitle: 'The page you are looking for does not exist.',
+    },
+    index: {
+      nav: 'Home',
+      title: 'NestMTX',
+      description: 'NestMTX Control Panel',
+      header: 'Control Panel',
+      subtitle: 'View and manage your NestMTX instance',
+    },
+    credentials: {
+      nav: 'Credentials',
+      title: 'Credentials - NestMTX',
+      description: 'Manage NestMTX Credentials',
+      header: 'Credentials',
+      subtitle: 'Manage your Google Cloud Platform and Google Device Access Console credentials',
+    },
+  }
 }

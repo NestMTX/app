@@ -1,7 +1,7 @@
 <template>
   <v-app v-if="complete">
     <v-locale-provider :locale="locale" :rtl="rtl">
-      <v-app-bar v-if="complete && authenticated" app color="transparent" class="glass-surface">
+      <v-app-bar v-if="complete && authenticated && !showSystemInfo" app color="transparent" class="glass-surface">
         <img src="~/assets/icon.png" alt="NestMTX" class="ms-4" height="32" width="32" />
         <v-toolbar-title class="font-raleway font-weight-bold">NestMTX</v-toolbar-title>
         <v-spacer />
@@ -13,6 +13,11 @@
           </v-btn>
         </v-toolbar-items>
       </v-app-bar>
+      <v-navigation-drawer app color="transparent" class="glass-surface" v-if="complete && authenticated && !showSystemInfo">
+        <template v-for="(nav, i) in navs" :key="`nav-${i}`">
+          <v-list-item v-bind="nav" />
+        </template>
+      </v-navigation-drawer>
       <v-main>
         <v-container v-if="!authenticated && !showSystemInfo" class="fill-height">
           <v-row justify="center">
@@ -22,9 +27,27 @@
           </v-row>
         </v-container>
         <v-container v-else-if="!showSystemInfo" fluid>
+          <v-row justify="center">
+            <v-col cols="12">
+              <h1>{{ header }}</h1>
+              <p class="text-subtitle mb-3">{{ subtitle }}</p>
+            </v-col>
+          </v-row>
+          <v-divider />
           <slot />
         </v-container>
       </v-main>
+      <v-footer app color="transparent" class="glass-surface" v-if="complete && authenticated && !showSystemInfo">
+        <v-row justify="center">
+          <v-col cols="12" sm="6" md="5" lg="4" xl="3">
+            <v-row justify="center">
+              <v-col cols="12" sm="6" md="5" lg="4" xl="3">
+                <small><code>{{ rawRouteName }}</code></small>
+              </v-col>
+            </v-row>
+          </v-col>
+        </v-row>
+      </v-footer>
       <SystemInfoDialog v-if="showSystemInfo" class="glass-surface" @close="showSystemInfo = false">
         <template #toolbar>
           <I18nPicker />
@@ -50,12 +73,14 @@ import LoginForm from '@/components/forms/login.vue'
 import SystemInfoDialog from '@/components/dialogs/systemInfo.vue'
 import { useI18n } from 'vue-i18n'
 import languages from '@/constants/languages'
+import { useRoute } from 'vue-router'
 import type { IdentityService } from '@jakguru/vueprint'
 export default defineComponent({
   name: 'DefaultLayout',
   components: { LoginForm, SystemInfoDialog },
   setup() {
-    const { locale } = useI18n()
+    const localeRoute = useLocaleRoute()
+    const { locale, t } = useI18n()
     const { mounted, booted, ready } = useVueprint({}, true)
     const complete = computed(() => mounted.value && booted.value && ready.value)
     const identity = inject<IdentityService>('identity')!
@@ -65,7 +90,21 @@ export default defineComponent({
       return lang ? lang.rtl : false
     })
     const showSystemInfo = ref(false)
-    return { complete, identity, authenticated, locale, rtl, showSystemInfo }
+    const route = useRoute()
+    const rawRouteName = computed(() => route.name ? route.name.toString().replace(`___${locale.value}`, "") : 'undefined')
+    const navs = computed(() => ([
+      { icon: 'mdi-view-dashboard', value: 'index' },
+      { icon: 'mdi-key-chain', value: 'credentials' },
+    ].map((n) => ({
+      active: rawRouteName.value === n.value,
+      'prepend-icon': n.icon,
+      nav: true,
+      title: t(`pages.${n.value}.nav`),
+      to: { name: localeRoute({ name: n.value })?.name || 'index___en' }
+    }))))
+    const header = computed(() => t(`pages.${rawRouteName.value}.header`))
+    const subtitle = computed(() => t(`pages.${rawRouteName.value}.subtitle`))
+    return { complete, identity, authenticated, locale, rtl, showSystemInfo, route, rawRouteName, navs, header, subtitle }
   },
 })
 </script>

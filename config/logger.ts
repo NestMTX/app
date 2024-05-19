@@ -17,7 +17,7 @@ const loggerConfig = defineConfig({
       level: env.get('LOG_LEVEL'),
       transport: {
         targets: targets()
-          .push({
+          .pushIf('web' === app.getEnvironment(), {
             target: app.makePath('logger-transports', 'event_emitter.mjs'),
             options: {
               destination: env.get('PINO_PORT', 62000),
