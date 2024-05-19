@@ -7,6 +7,11 @@
         <v-spacer />
         <I18nPicker />
         <ThemeToggle />
+        <v-toolbar-items v-if="authenticated">
+          <v-btn icon @click="() => identity.logout()">
+            <v-icon>mdi-logout</v-icon>
+          </v-btn>
+        </v-toolbar-items>
       </v-app-bar>
       <v-main>
         <v-container v-if="!authenticated && !showSystemInfo" class="fill-height">

@@ -117,7 +117,7 @@ export default defineComponent({
     const swal = inject<SwalService>('swal')!
     const submit = handleFormSubmit(async (values) => {
       const { status, data } = await api.post('/api/auth/', values)
-      if (status === 200) {
+      if (status === 201) {
         identity.login(data.bearer, data.expiration, data.user)
       } else {
         swal.fire({

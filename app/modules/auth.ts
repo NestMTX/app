@@ -1,6 +1,9 @@
 import { ApiServiceModule } from '#services/api'
 import type { CreateCommandContext } from '#services/api'
 import Joi from 'joi'
+import User from '#models/user'
+import { DateTime } from 'luxon'
+import I18NException from '#exceptions/i18n'
 
 export default class AuthModule implements ApiServiceModule {
   get schemas() {
@@ -22,35 +25,23 @@ export default class AuthModule implements ApiServiceModule {
   }
 
   async create(context: CreateCommandContext) {
-    console.log(context)
-    throw Error('Not implemented')
+    if (context.user) {
+      throw new I18NException('errors.auth.create.loggedIn')
+    }
+    const { username, password } = context.payload
+    const user = await User.verifyCredentials(username, password)
+    const token = await User.accessTokens.create(user)
+    const ret = {
+      bearer: token.value!.release(),
+      expiration: token.expiresAt
+        ? DateTime.fromJSDate(token.expiresAt).toISO()
+        : DateTime.now().plus({ days: 1 }).toISO(),
+      user: user.serialize(),
+    }
+    return ret
   }
 
   get $descriptionOfCreate() {
     return 'Authenticate a user'
-  }
-
-  async read() {
-    throw Error('Not implemented')
-  }
-
-  get $descriptionOfRead() {
-    return 'Get the authenticated user'
-  }
-
-  async update() {
-    throw Error('Not implemented')
-  }
-
-  get $descriptionOfUpdate() {
-    return 'Refresh the authentication token'
-  }
-
-  async delete() {
-    throw Error('Not implemented')
-  }
-
-  get $descriptionOfDelete() {
-    return 'Logout the user'
   }
 }

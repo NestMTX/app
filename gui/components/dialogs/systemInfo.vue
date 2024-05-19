@@ -16,7 +16,7 @@
       <v-divider />
       <v-container fluid>
         <v-row>
-          <v-col cols="12" md="3" lg="4">
+          <!-- <v-col cols="12" md="3" lg="4">
             <v-row>
               <v-col cols="12">
                 <v-card color="transparent" class="glass-surface">
@@ -71,8 +71,9 @@
                 </v-card>
               </v-col>
             </v-row>
-          </v-col>
-          <v-col cols="12" md="9" lg="8">
+          </v-col> -->
+          <!-- <v-col cols="12" md="9" lg="8"> -->
+            <v-col cols="12">
             <v-card color="transparent" class="glass-surface d-flex flex-column" max-height="1014">
               <v-card-title class="flex-grow-0">{{
                 $t('dialogs.systemInfo.cards.logs')
@@ -84,6 +85,7 @@
                 class="flex-grow-1"
                 style="overflow-y: auto"
               >
+                <v-locale-provider :rtl="false">
                 <v-table density="compact" class="nestmtx-system-info-log-table bg-transparent">
                   <tbody>
                     <tr v-for="log in toShow" :key="log.checksum">
@@ -100,14 +102,13 @@
                       <td class="wrappable">{{ log.msg }}</td>
                       <td style="text-align: end">
                         {{
-                          log.datetime.toLocaleString(DateTime.DATETIME_SHORT, {
-                            locale: locale,
-                          })
+                          log.datetime.toFormat('yyyy-MM-dd HH:mm:ss')
                         }}
                       </td>
                     </tr>
                   </tbody>
                 </v-table>
+                </v-locale-provider>
               </v-sheet>
             </v-card>
           </v-col>
@@ -137,6 +138,8 @@ export default defineComponent({
       'persistent': true,
       'no-click-animation': true,
     }))
+    const levelsToShow = ref<string[]>([...logLevels.value].map((l) => l.key))
+    const servicesToShow = ref<string[]>([...services.value])
     const toShow = computed(() => [...logs.value])
     let toShowWatcher: WatchStopHandle | undefined
     const logContainer = ref<VSheet | null>(null)
@@ -171,6 +174,8 @@ export default defineComponent({
       toShow,
       locale,
       logContainer,
+      levelsToShow,
+      servicesToShow,
     }
   },
 })
@@ -180,6 +185,7 @@ export default defineComponent({
 .nestmtx-system-info-log-table {
   font-family: 'Courier New', Courier, monospace;
   font-weight: 600;
+  direction: ltr !important;
 
   td:not(.wrappable) {
     white-space: nowrap;
