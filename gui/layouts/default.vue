@@ -14,9 +14,11 @@
         </v-toolbar-items>
       </v-app-bar>
       <v-navigation-drawer app color="transparent" class="glass-surface" v-if="complete && authenticated && !showSystemInfo">
-        <template v-for="(nav, i) in navs" :key="`nav-${i}`">
-          <v-list-item v-bind="nav" />
-        </template>
+        <v-container>
+          <template v-for="(nav, i) in navs" :key="`nav-${i}`">
+            <v-list-item v-bind="nav" />
+          </template>
+        </v-container>
       </v-navigation-drawer>
       <v-main>
         <v-container v-if="!authenticated && !showSystemInfo" class="fill-height">
@@ -29,7 +31,7 @@
         <v-container v-else-if="!showSystemInfo" fluid>
           <v-row justify="center">
             <v-col cols="12">
-              <h1>{{ header }}</h1>
+              <h1 :title="rawRouteName">{{ header }}</h1>
               <p class="text-subtitle mb-3">{{ subtitle }}</p>
             </v-col>
           </v-row>
@@ -37,17 +39,6 @@
           <slot />
         </v-container>
       </v-main>
-      <v-footer app color="transparent" class="glass-surface" v-if="complete && authenticated && !showSystemInfo">
-        <v-row justify="center">
-          <v-col cols="12" sm="6" md="5" lg="4" xl="3">
-            <v-row justify="center">
-              <v-col cols="12" sm="6" md="5" lg="4" xl="3">
-                <small><code>{{ rawRouteName }}</code></small>
-              </v-col>
-            </v-row>
-          </v-col>
-        </v-row>
-      </v-footer>
       <SystemInfoDialog v-if="showSystemInfo" class="glass-surface" @close="showSystemInfo = false">
         <template #toolbar>
           <I18nPicker />
@@ -104,6 +95,10 @@ export default defineComponent({
     }))))
     const header = computed(() => t(`pages.${rawRouteName.value}.header`))
     const subtitle = computed(() => t(`pages.${rawRouteName.value}.subtitle`))
+    useSeoMeta({
+      title: () => t(`pages.${rawRouteName.value}.title`),
+      description: () => t(`pages.${rawRouteName.value}.description`),
+    })
     return { complete, identity, authenticated, locale, rtl, showSystemInfo, route, rawRouteName, navs, header, subtitle }
   },
 })

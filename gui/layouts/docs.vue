@@ -8,9 +8,9 @@
         <I18nPicker />
         <ThemeToggle />
       </v-app-bar>
-      <v-navigation-drawer app color="transparent" class="glass-surface">
+      <!-- <v-navigation-drawer app color="transparent" class="glass-surface">
         lala
-      </v-navigation-drawer>
+      </v-navigation-drawer> -->
       <v-main>
         <v-container fluid>
           <slot />

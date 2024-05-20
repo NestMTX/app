@@ -3,7 +3,9 @@
     <v-row justify="center">
       <v-col cols="12">
         <v-card color="transparent" class="glass-surface" min-height="100">
-          <v-card-text ref="swagger" />
+          <v-card-text ref="swagger">
+            <p>Check back soon!</p>
+          </v-card-text>
         </v-card>
       </v-col>
     </v-row>
