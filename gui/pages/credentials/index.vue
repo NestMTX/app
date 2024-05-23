@@ -48,9 +48,13 @@
       <v-row>
         <v-col cols="12">
           <v-card color="transparent" class="glass-surface" min-height="100">
-            <v-card-text>
-              <p>Check back soon!</p>
-            </v-card-text>
+            <v-container fluid>
+              <v-row>
+                <v-col cols="12">
+                  <ModelIndex />
+                </v-col>
+              </v-row>
+            </v-container>
           </v-card>
         </v-col>
       </v-row>
@@ -62,11 +66,13 @@
 import { defineComponent, ref, computed, onMounted, onBeforeUnmount, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 import VTextFieldWithCopy from '../../components/fields/VTextFieldWithCopy.vue'
+import ModelIndex from '../../components/forms/modelIndex.vue'
 import type { ToastService } from '@jakguru/vueprint'
 export default defineComponent({
   name: 'Credentials',
   components: {
     VTextFieldWithCopy,
+    ModelIndex,
   },
   setup() {
     const { t } = useI18n({ useScope: 'global' })
