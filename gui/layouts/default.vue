@@ -1,7 +1,12 @@
 <template>
   <v-app v-if="complete">
     <v-locale-provider :locale="locale" :rtl="rtl">
-      <v-app-bar v-if="complete && authenticated && !showSystemInfo" app color="transparent" class="glass-surface">
+      <v-app-bar
+        v-if="complete && authenticated && !showSystemInfo"
+        app
+        color="transparent"
+        class="glass-surface"
+      >
         <img src="~/assets/icon.png" alt="NestMTX" class="ms-4" height="32" width="32" />
         <v-toolbar-title class="font-raleway font-weight-bold">NestMTX</v-toolbar-title>
         <v-spacer />
@@ -13,7 +18,12 @@
           </v-btn>
         </v-toolbar-items>
       </v-app-bar>
-      <v-navigation-drawer app color="transparent" class="glass-surface" v-if="complete && authenticated && !showSystemInfo">
+      <v-navigation-drawer
+        v-if="complete && authenticated && !showSystemInfo"
+        app
+        color="transparent"
+        class="glass-surface"
+      >
         <v-container>
           <template v-for="(nav, i) in navs" :key="`nav-${i}`">
             <v-list-item v-bind="nav" />
@@ -82,24 +92,40 @@ export default defineComponent({
     })
     const showSystemInfo = ref(false)
     const route = useRoute()
-    const rawRouteName = computed(() => route.name ? route.name.toString().replace(`___${locale.value}`, "") : 'undefined')
-    const navs = computed(() => ([
-      { icon: 'mdi-view-dashboard', value: 'index' },
-      { icon: 'mdi-key-chain', value: 'credentials' },
-    ].map((n) => ({
-      active: rawRouteName.value === n.value,
-      'prepend-icon': n.icon,
-      nav: true,
-      title: t(`pages.${n.value}.nav`),
-      to: { name: localeRoute({ name: n.value })?.name || 'index___en' }
-    }))))
+    const rawRouteName = computed(() =>
+      route.name ? route.name.toString().replace(`___${locale.value}`, '') : 'undefined'
+    )
+    const navs = computed(() =>
+      [
+        { icon: 'mdi-view-dashboard', value: 'index' },
+        { icon: 'mdi-key-chain', value: 'credentials' },
+      ].map((n) => ({
+        'active': rawRouteName.value === n.value,
+        'prepend-icon': n.icon,
+        'nav': true,
+        'title': t(`pages.${n.value}.nav`),
+        'to': { name: localeRoute({ name: n.value })?.name || 'index___en' },
+      }))
+    )
     const header = computed(() => t(`pages.${rawRouteName.value}.header`))
     const subtitle = computed(() => t(`pages.${rawRouteName.value}.subtitle`))
     useSeoMeta({
       title: () => t(`pages.${rawRouteName.value}.title`),
       description: () => t(`pages.${rawRouteName.value}.description`),
     })
-    return { complete, identity, authenticated, locale, rtl, showSystemInfo, route, rawRouteName, navs, header, subtitle }
+    return {
+      complete,
+      identity,
+      authenticated,
+      locale,
+      rtl,
+      showSystemInfo,
+      route,
+      rawRouteName,
+      navs,
+      header,
+      subtitle,
+    }
   },
 })
 </script>

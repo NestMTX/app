@@ -57,7 +57,7 @@ export const vueprintModuleOptions: VueprintModuleOptions = {
           cancel: '#f44336',
           error: '#B71C1C',
           highlight: '#0684c2',
-          info: '#8bb4e7',
+          info: '#2eccca',
           notify: '#F6AD01',
           primary: '#0684c2',
           question: '#3174F1',
@@ -143,6 +143,7 @@ export default defineNuxtConfig({
   },
   modules: [
     '@nuxt/eslint',
+    '@vueuse/nuxt',
     '@vee-validate/nuxt',
     '@nuxtjs/i18n',
     '@jakguru/vueprint/nuxt',

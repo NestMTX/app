@@ -3,6 +3,7 @@ export default {
     generic: 'This field',
     username: 'Username',
     password: 'Password',
+    redirectUrl: 'Redirect URL',
   },
   actions: {
     login: 'Log In',
@@ -336,8 +337,8 @@ export default {
     auth: {
       create: {
         loggedIn: 'You are already logged in',
-      }
-    }
+      },
+    },
   },
   dialogs: {
     systemInfo: {
@@ -488,5 +489,21 @@ export default {
       header: 'Credentials',
       subtitle: 'Manage your Google Cloud Platform and Google Device Access Console credentials',
     },
-  }
+  },
+  credentials: {
+    redirectUrl: {
+      title: 'Google OAuth Redirection URL',
+      cta: 'Please ensure that the following URL is added to your Google OAuth2.0 Redirect URIs',
+      actions: {
+        copy: {
+          success: 'Redirect URL copied to clipboard',
+          failure: 'Failed to copy redirect URL to clipboard',
+        },
+      },
+      insecure: {
+        title: 'Insecure Connection',
+        message: 'You are currently accessing NestMTX from an insecure connection. The redirect URL provided uses a secure protocol. If you have not configured your server to use HTTPS, you will need to manually change the address after redirection from {https} to {http}.',
+      }
+    },
+  },
 }

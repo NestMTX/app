@@ -73,7 +73,7 @@
             </v-row>
           </v-col> -->
           <!-- <v-col cols="12" md="9" lg="8"> -->
-            <v-col cols="12">
+          <v-col cols="12">
             <v-card color="transparent" class="glass-surface d-flex flex-column" max-height="1014">
               <v-card-title class="flex-grow-0">{{
                 $t('dialogs.systemInfo.cards.logs')
@@ -86,28 +86,26 @@
                 style="overflow-y: auto"
               >
                 <v-locale-provider :rtl="false">
-                <v-table density="compact" class="nestmtx-system-info-log-table bg-transparent">
-                  <tbody>
-                    <tr v-for="log in toShow" :key="log.checksum">
-                      <td>
-                        <v-chip size="small" :color="log.meta.color" variant="flat">
-                          <span class="font-weight-bold">{{ $t(log.meta.key) }}</span>
-                        </v-chip>
-                      </td>
-                      <td>
-                        <v-chip size="small" color="surface" variant="flat" label>
-                          {{ log.service }}
-                        </v-chip>
-                      </td>
-                      <td class="wrappable">{{ log.msg }}</td>
-                      <td style="text-align: end">
-                        {{
-                          log.datetime.toFormat('yyyy-MM-dd HH:mm:ss')
-                        }}
-                      </td>
-                    </tr>
-                  </tbody>
-                </v-table>
+                  <v-table density="compact" class="nestmtx-system-info-log-table bg-transparent">
+                    <tbody>
+                      <tr v-for="log in toShow" :key="log.checksum">
+                        <td>
+                          <v-chip size="small" :color="log.meta.color" variant="flat">
+                            <span class="font-weight-bold">{{ $t(log.meta.key) }}</span>
+                          </v-chip>
+                        </td>
+                        <td>
+                          <v-chip size="small" color="surface" variant="flat" label>
+                            {{ log.service }}
+                          </v-chip>
+                        </td>
+                        <td class="wrappable">{{ log.msg }}</td>
+                        <td style="text-align: end">
+                          {{ log.datetime.toFormat('yyyy-MM-dd HH:mm:ss') }}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </v-table>
                 </v-locale-provider>
               </v-sheet>
             </v-card>
@@ -149,11 +147,14 @@ export default defineComponent({
       } else {
       }
     }
-    watch(() => logContainer.value, () => {
-      nextTick(() => {
-        scrollLogContainerToBottom()
-      })
-    })
+    watch(
+      () => logContainer.value,
+      () => {
+        nextTick(() => {
+          scrollLogContainerToBottom()
+        })
+      }
+    )
     onMounted(() => {
       nextTick(() => {
         scrollLogContainerToBottom()

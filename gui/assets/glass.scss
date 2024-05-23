@@ -34,6 +34,19 @@ $themeColors: (
     "warning"
 ) !default;
 
+$themeColorVariations: (
+    "lighten-5",
+    "lighten-4",
+    "lighten-3",
+    "lighten-2",
+    "lighten-1",
+    "darken-1",
+    "darken-2",
+    "darken-3",
+    "darken-4",
+    "darken-5"
+) !default;
+
 @each $color in $themeColors {
     [class*="bg-"].glass-#{$color},
     .glass-#{$color} {
@@ -45,6 +58,20 @@ $themeColors: (
 
     .glass-#{$color} .bg-transparent {
         color: rgb(var(--v-theme-on-#{$color})) !important;
+    }
+
+    @each $variant in $themeColorVariations {
+        [class*="bg-"].glass-#{$color}-#{$variant},
+        .glass-#{$color}-#{$variant} {
+            background-color: rgb(var(--v-theme-#{$color}-#{$variant}), 0.15) !important;
+            backdrop-filter: blur(15px);
+            --v-theme-on-surface: var(--v-theme-on-#{$color}-#{$variant}) !important;
+            color: rgb(var(--v-theme-on-#{$color}-#{$variant})) !important;
+        }
+
+        .glass-#{$color}-#{$variant} .bg-transparent {
+            color: rgb(var(--v-theme-on-#{$color}-#{$variant})) !important;
+        }
     }
 }
 
