@@ -329,6 +329,22 @@ export default {
       single: 'a country',
       plural: 'countries',
     },
+    credentials: {
+      single: 'credentials',
+      plural: 'credentials',
+    },
+  },
+  components: {
+    modelIndex: {
+      placeholder: 'Search for {model}',
+      loading: 'Loading {model}...',
+      noData: 'No {model} available',
+      noResults: 'No matching {model} found',
+      itemsPerPage: '{model} per page',
+      errors: {
+        loadItems: 'Failed to load {model}',
+      },
+    },
   },
   errors: {
     login: {
@@ -502,8 +518,9 @@ export default {
       },
       insecure: {
         title: 'Insecure Connection',
-        message: 'You are currently accessing NestMTX from an insecure connection. The redirect URL provided uses a secure protocol. If you have not configured your server to use HTTPS, you will need to manually change the address after redirection from {https} to {http}.',
-      }
+        message:
+          'You are currently accessing NestMTX from an insecure connection. The redirect URL provided uses a secure protocol. If you have not configured your server to use HTTPS, you will need to manually change the address after redirection from {https} to {http}.',
+      },
     },
   },
 }

@@ -5,7 +5,7 @@
         <v-col cols="12">
           <v-card color="transparent" class="glass-surface mt-3" min-height="100">
             <v-card-text>
-              <v-alert color="info" icon="mdi-information" border="left">
+              <v-alert color="info" icon="mdi-information">
                 <p>
                   <strong>{{ $t('credentials.redirectUrl.title') }}</strong>
                 </p>
@@ -28,7 +28,7 @@
               </v-row>
             </v-container>
             <v-card-text v-if="!https">
-              <v-alert color="warning" icon="mdi-alert" border="left">
+              <v-alert color="warning" icon="mdi-alert">
                 <p>
                   <strong>{{ $t('credentials.redirectUrl.insecure.title') }}</strong>
                 </p>
@@ -51,7 +51,10 @@
             <v-container fluid>
               <v-row>
                 <v-col cols="12">
-                  <ModelIndex />
+                  <ModelIndex
+                    model-i18n-key="models.credentials"
+                    search-end-point="/api/credentials/"
+                  />
                 </v-col>
               </v-row>
             </v-container>
