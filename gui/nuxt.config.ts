@@ -23,7 +23,7 @@ export const vueprintModuleOptions: VueprintModuleOptions = {
         throw new Error('Failed to refresh token')
       }
     },
-    tokenRefreshBuffer: 24 * 60 * 60 * 1000,
+    tokenRefreshBuffer: 60 * 5,
   },
   ls: {
     namespace: 'nestmtx',

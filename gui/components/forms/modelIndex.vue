@@ -1,6 +1,7 @@
 <template>
   <div class="model-index">
     <v-data-table-server
+        ref="table"
       v-model:items-per-page="itemsPerPage"
       :headers="headers"
       :items="items"
@@ -67,10 +68,12 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, ref } from 'vue'
+import { defineComponent, computed, ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { capitalCase } from 'change-case'
 import type { ApiService, SwalService } from '@jakguru/vueprint'
+import type { VDataTableServer } from 'vuetify/components/VDataTable/'
+
 export default defineComponent({
   name: 'ModelIndex',
   props: {
@@ -84,11 +87,13 @@ export default defineComponent({
     },
   },
   setup(props) {
+    const table = ref<VDataTableServer | undefined>(undefined)
     const modelI18nKey = computed(() => props.modelI18nKey)
     const searchEndPoint = computed(() => props.searchEndPoint)
     const { t } = useI18n({ useScope: 'global' })
     const api = inject<ApiService>('api')!
     const swal = inject<SwalService>('swal')!
+    const mounted = ref(false)
     const returned = ref<Array<any>>([])
     const itemsPerPage = ref(10)
     const headers = computed(() => [])
@@ -99,6 +104,9 @@ export default defineComponent({
     const searchField = ref<string | undefined>(undefined)
     const classes = computed(() => ['bg-transparent'])
     const loadItems = async (options: any) => {
+        if (!mounted.value) {
+            return
+        }
       loading.value = true
       const payload = {
         search: options.search,
@@ -122,8 +130,24 @@ export default defineComponent({
       }
       loading.value = false
     }
+    const manualLoadItems = async () => {
+        if (!table.value) {
+            return
+        }
+        const options = {
+            page: table.value.page,
+            itemsPerPage: table.value.itemsPerPage,
+            sortBy: table.value.sortBy,
+            search: search.value,
+            groupBy: table.value.groupBy,
+        }
+        return await loadItems(options)
+    }
     const onSearchSubmit = (e: Event) => {
       e.preventDefault()
+      if (search.value === searchField.value) {
+        manualLoadItems()
+      }
       search.value = searchField.value
     }
     const modelI18nSingular = computed(() => t(`${modelI18nKey.value}.singular`))
@@ -131,6 +155,11 @@ export default defineComponent({
 
     const modelI18nSingularCapitalized = computed(() => capitalCase(modelI18nSingular.value))
     const modelI18nPluralCapitalized = computed(() => capitalCase(modelI18nPlural.value))
+
+    onMounted(() => {
+      mounted.value = true
+      manualLoadItems()
+    })
     return {
       itemsPerPage,
       headers,
@@ -146,6 +175,7 @@ export default defineComponent({
       modelI18nPlural,
       modelI18nSingularCapitalized,
       modelI18nPluralCapitalized,
+      table,
     }
   },
 })
