@@ -54,7 +54,13 @@
                   <ModelIndex
                     model-i18n-key="models.credentials"
                     search-end-point="/api/credentials/"
-                  />
+                  >
+                    <template #action-buttons>
+                      <v-btn icon color="secondary" variant="elevated" size="38">
+                        <v-icon>mdi-key-plus</v-icon>
+                      </v-btn>
+                    </template>
+                  </ModelIndex>
                 </v-col>
               </v-row>
             </v-container>

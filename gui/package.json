@@ -16,6 +16,7 @@
     "@nuxt/eslint": "^0.3.12",
     "change-case": "^5.4.4",
     "nuxt": "^3.11.2",
+    "qs": "^6.12.1",
     "socket.io-client": "^4.7.5",
     "vue": "^3.4.27",
     "vue-router": "^4.3.2"

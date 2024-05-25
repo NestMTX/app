@@ -1,7 +1,7 @@
 <template>
   <div class="model-index">
     <v-data-table-server
-        ref="table"
+      ref="table"
       v-model:items-per-page="itemsPerPage"
       :headers="headers"
       :items="items"
@@ -9,7 +9,7 @@
       :loading="loading"
       :search="search"
       :class="classes"
-      :hover="true"
+      :hover="totalItems > 0"
       :items-per-page-text="
         $t('components.modelIndex.itemsPerPage', { model: modelI18nPluralCapitalized })
       "
@@ -59,6 +59,10 @@
                 </template>
               </v-text-field>
             </v-col>
+            <v-spacer />
+            <v-col cols="12" md="6" lg="4" xxl="3" class="d-flex justify-end">
+              <slot name="action-buttons"></slot>
+            </v-col>
           </v-row>
         </form>
         <v-divider />
@@ -71,6 +75,7 @@
 import { defineComponent, computed, ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { capitalCase } from 'change-case'
+import qs from 'qs'
 import type { ApiService, SwalService } from '@jakguru/vueprint'
 import type { VDataTableServer } from 'vuetify/components/VDataTable/'
 
@@ -103,10 +108,15 @@ export default defineComponent({
     const search = ref<string | undefined>(undefined)
     const searchField = ref<string | undefined>(undefined)
     const classes = computed(() => ['bg-transparent'])
+    let loadItemsAbortController: AbortController | undefined
     const loadItems = async (options: any) => {
-        if (!mounted.value) {
-            return
-        }
+      if (!mounted.value) {
+        return
+      }
+      if (loadItemsAbortController) {
+        loadItemsAbortController.abort()
+      }
+      loadItemsAbortController = new AbortController()
       loading.value = true
       const payload = {
         search: options.search,
@@ -114,34 +124,38 @@ export default defineComponent({
         itemsPerPage: options.itemsPerPage,
         sortBy: [...options.sortBy],
       }
-      const origin = window ? window.location.origin : 'http://localhost'
-      const url = new URL(searchEndPoint.value, origin)
-      for (const [key, value] of Object.entries(payload)) {
-        url.searchParams.append(key, value)
-      }
-      const { status, data } = await api.get(url.toString())
+      const url = `${searchEndPoint.value}?${qs.stringify(payload)}`
+      const { status, data } = await api.get(url.toString(), {
+        signal: loadItemsAbortController.signal,
+      })
       if (status < 200 || status >= 300) {
-        const { message } = data.error
-        swal.fire({
-          title: t('components.modelIndex.errors.loadItems', { model: modelI18nPlural.value }),
-          text: t(message),
-          icon: 'error',
-        })
+        if (!loadItemsAbortController.signal.aborted) {
+          const { message } = data.error
+          swal.fire({
+            title: t('components.modelIndex.errors.loadItems', { model: modelI18nPlural.value }),
+            text: t(message),
+            icon: 'error',
+          })
+        }
+      } else {
+        const { total, items } = data
+        returned.value = items
+        totalItems.value = total
       }
       loading.value = false
     }
     const manualLoadItems = async () => {
-        if (!table.value) {
-            return
-        }
-        const options = {
-            page: table.value.page,
-            itemsPerPage: table.value.itemsPerPage,
-            sortBy: table.value.sortBy,
-            search: search.value,
-            groupBy: table.value.groupBy,
-        }
-        return await loadItems(options)
+      if (!table.value) {
+        return
+      }
+      const options = {
+        page: table.value.page,
+        itemsPerPage: table.value.itemsPerPage,
+        sortBy: table.value.sortBy,
+        search: search.value,
+        groupBy: table.value.groupBy,
+      }
+      return await loadItems(options)
     }
     const onSearchSubmit = (e: Event) => {
       e.preventDefault()

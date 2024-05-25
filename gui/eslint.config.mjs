@@ -100,12 +100,14 @@ const tsRules = {
   'no-unreachable': ['error'],
   'no-multi-spaces': ['error'],
   'no-unused-vars': ['error', { varsIgnorePattern: '^_', argsIgnorePattern: '^_' }],
+  'no-undef': 'off',
 }
 
 export default withNuxt([
   {
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
+      'no-undef': 'off',
     },
   },
   {
@@ -131,4 +133,9 @@ export default withNuxt([
   },
   eslintPluginPrettierRecommended,
   eslint.configs.recommended,
+  {
+    rules: {
+      'no-undef': 'off',
+    },
+  },
 ])
