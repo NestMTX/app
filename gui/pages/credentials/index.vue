@@ -56,7 +56,13 @@
                     search-end-point="/api/credentials/"
                   >
                     <template #action-buttons>
-                      <v-btn icon color="secondary" variant="elevated" size="38">
+                      <v-btn
+                        icon
+                        color="secondary"
+                        variant="elevated"
+                        size="38"
+                        @click="showAddDialog = true"
+                      >
                         <v-icon>mdi-key-plus</v-icon>
                       </v-btn>
                     </template>
@@ -68,6 +74,27 @@
         </v-col>
       </v-row>
     </v-col>
+    <v-dialog
+      v-model="showAddDialog"
+      :persistent="persistShowAddDialog"
+      max-width="500"
+      scrim="surface"
+      opacity="0.38"
+    >
+      <v-card color="transparent" class="glass-surface">
+        <v-toolbar color="transparent" density="compact">
+          <v-toolbar-title class="font-raleway font-weight-bold">{{
+            $t('dialogs.credentials.add.title')
+          }}</v-toolbar-title>
+          <v-toolbar-items>
+            <v-btn icon :disabled="persistShowAddDialog" @click="showAddDialog = false">
+              <v-icon>mdi-close</v-icon>
+            </v-btn>
+          </v-toolbar-items>
+        </v-toolbar>
+        <v-divider />
+      </v-card>
+    </v-dialog>
   </v-row>
 </template>
 
@@ -125,11 +152,19 @@ export default defineComponent({
     onBeforeUnmount(() => {
       origin.value = undefined
     })
+    const showAddDialog = ref(false)
+    const persistShowAddDialog = ref(false)
+    const onAddDialogPersist = (persist: boolean) => {
+      persistShowAddDialog.value = persist
+    }
     return {
       https,
       authUrl,
       onCopySuccess,
       onCopyFail,
+      showAddDialog,
+      persistShowAddDialog,
+      onAddDialogPersist,
     }
   },
 })

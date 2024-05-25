@@ -369,6 +369,11 @@ export default {
         uptime: 'Uptime',
       },
     },
+    credentials: {
+      add: {
+        title: 'Add Credentials',
+      }
+    },
   },
   $vuetify: {
     badge: 'Badge',
