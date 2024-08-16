@@ -14,7 +14,7 @@ $family:
 );
 
 @use "@jakguru/vueprint/vueprint-no-vuetify.scss" as *;
-@use "sweetalert2/src/sweetalert2.scss" as *;
+@use "sweetalert2.scss" as *;
 .v-application {
     &[class*="v-theme--nestmtx-"] {
         background-color: rgb(var(--v-theme-background));

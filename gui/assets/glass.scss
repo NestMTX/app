@@ -1,10 +1,31 @@
+/// Frosted Glass Utility Classes
+/// Adds frosted glass effect to elements using backdrop-filter and rgba colors
+/// Changes text color based on background color
+
 @use "sass:map";
 @use "vuetify/lib/styles/tools/_functions.sass" as *;
 @use "vuetify/lib/styles/settings/_colors.scss" as vc;
 
-@mixin background-color($color_value) {
-    background-color: rgba($color_value, 0.15) !important;
-    backdrop-filter: blur(15px);
+$glass_color_alpha_base: 0.15 !default;
+$glass_blur_base: 15px !default;
+
+$glassAlphaVariations: (
+    "soften-5": 0.05,
+    "soften-4": 0.1,
+    "soften-3": 0.125,
+    "soften-2": 0.15,
+    "soften-1": 0.175,
+    "base": 0.15,
+    "intensify-1": 0.2,
+    "intensify-2": 0.25,
+    "intensify-3": 0.3,
+    "intensify-4": 0.35,
+    "intensify-5": 0.4
+) !default;
+
+@mixin background-color($color_value, $alpha) {
+    background-color: rgba($color_value, $alpha) !important;
+    backdrop-filter: blur($glass_blur_base);
 }
 
 @mixin text-color($color_value) {
@@ -48,10 +69,11 @@ $themeColorVariations: (
 ) !default;
 
 @each $color in $themeColors {
+    // Base alpha variation
     [class*="bg-"].glass-#{$color},
     .glass-#{$color} {
-        background-color: rgb(var(--v-theme-#{$color}), 0.15) !important;
-        backdrop-filter: blur(15px);
+        background-color: rgb(var(--v-theme-#{$color}), $glass_color_alpha_base) !important;
+        backdrop-filter: blur($glass_blur_base);
         --v-theme-on-surface: var(--v-theme-on-#{$color}) !important;
         color: rgb(var(--v-theme-on-#{$color})) !important;
     }
@@ -60,11 +82,29 @@ $themeColorVariations: (
         color: rgb(var(--v-theme-on-#{$color})) !important;
     }
 
+    // Other alpha variations
+    @each $alphaName, $alphaValue in $glassAlphaVariations {
+        @if $alphaName != "base" {
+            [class*="bg-"].glass-#{$color}-#{$alphaName},
+            .glass-#{$color}-#{$alphaName} {
+                background-color: rgb(var(--v-theme-#{$color}), $alphaValue) !important;
+                backdrop-filter: blur($glass_blur_base);
+                --v-theme-on-surface: var(--v-theme-on-#{$color}) !important;
+                color: rgb(var(--v-theme-on-#{$color})) !important;
+            }
+
+            .glass-#{$color}-#{$alphaName} .bg-transparent {
+                color: rgb(var(--v-theme-on-#{$color})) !important;
+            }
+        }
+    }
+
     @each $variant in $themeColorVariations {
+        // Base alpha variation
         [class*="bg-"].glass-#{$color}-#{$variant},
         .glass-#{$color}-#{$variant} {
-            background-color: rgb(var(--v-theme-#{$color}-#{$variant}), 0.15) !important;
-            backdrop-filter: blur(15px);
+            background-color: rgb(var(--v-theme-#{$color}-#{$variant}), $glass_color_alpha_base) !important;
+            backdrop-filter: blur($glass_blur_base);
             --v-theme-on-surface: var(--v-theme-on-#{$color}-#{$variant}) !important;
             color: rgb(var(--v-theme-on-#{$color}-#{$variant})) !important;
         }
@@ -72,26 +112,71 @@ $themeColorVariations: (
         .glass-#{$color}-#{$variant} .bg-transparent {
             color: rgb(var(--v-theme-on-#{$color}-#{$variant})) !important;
         }
+
+        // Other alpha variations
+        @each $alphaName, $alphaValue in $glassAlphaVariations {
+            @if $alphaName != "base" {
+                [class*="bg-"].glass-#{$color}-#{$variant}-#{$alphaName},
+                .glass-#{$color}-#{$variant}-#{$alphaName} {
+                    background-color: rgb(var(--v-theme-#{$color}-#{$variant}), $alphaValue) !important;
+                    backdrop-filter: blur($glass_blur_base);
+                    --v-theme-on-surface: var(--v-theme-on-#{$color}-#{$variant}) !important;
+                    color: rgb(var(--v-theme-on-#{$color}-#{$variant})) !important;
+                }
+
+                .glass-#{$color}-#{$variant}-#{$alphaName} .bg-transparent {
+                    color: rgb(var(--v-theme-on-#{$color}-#{$variant})) !important;
+                }
+            }
+        }
     }
 }
 
 @if (vc.$colors) {
     @each $color_name, $color_color in vc.$colors {
         @each $color_type, $color_value in $color_color {
+            // Base alpha variation
             @if ($color_type == "base") {
+                [class*="bg-"].glass-#{$color_name},
                 .glass-#{$color_name} {
-                    @include background-color($color_value);
+                    @include background-color($color_value, $glass_color_alpha_base);
 
                     @if (map.has-key(vc.$text-on-colors, $color_name)) {
                         @include background-text-color($color_name, $color_type);
                     }
                 }
             } @else if ($color_type != "shades") {
+                [class*="bg-"].glass-#{$color_name}-#{$color_type},
                 .glass-#{$color_name}-#{$color_type} {
-                    @include background-color($color_value);
+                    @include background-color($color_value, $glass_color_alpha_base);
 
                     @if (map.has-key(vc.$text-on-colors, $color_name)) {
                         @include background-text-color($color_name, $color_type);
+                    }
+                }
+            }
+
+            // Other alpha variations
+            @each $alphaName, $alphaValue in $glassAlphaVariations {
+                @if $alphaName != "base" {
+                    @if ($color_type == "base") {
+                        [class*="bg-"].glass-#{$color_name}-#{$alphaName},
+                        .glass-#{$color_name}-#{$alphaName} {
+                            @include background-color($color_value, $alphaValue);
+
+                            @if (map.has-key(vc.$text-on-colors, $color_name)) {
+                                @include background-text-color($color_name, $color_type);
+                            }
+                        }
+                    } @else if ($color_type != "shades") {
+                        [class*="bg-"].glass-#{$color_name}-#{$color_type}-#{$alphaName},
+                        .glass-#{$color_name}-#{$color_type}-#{$alphaName} {
+                            @include background-color($color_value, $alphaValue);
+
+                            @if (map.has-key(vc.$text-on-colors, $color_name)) {
+                                @include background-text-color($color_name, $color_type);
+                            }
+                        }
                     }
                 }
             }

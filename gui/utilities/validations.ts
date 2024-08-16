@@ -114,3 +114,9 @@ export const validateUsername = (t: I18nT, value: string, ctx?: FieldValidationM
   const schema = joi.string().min(3).max(255).required().alphanum()
   return getJoiResultForVeeValidate(t, schema, value, ctx)
 }
+
+export const validatorFactory = <ValueType = any>(schema: joi.Schema) => {
+  return (t: I18nT, value: ValueType, ctx?: FieldValidationMetaInfo) => {
+    return getJoiResultForVeeValidate(t, schema, value, ctx)
+  }
+}

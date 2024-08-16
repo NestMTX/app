@@ -1,6 +1,7 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 import type { VueprintModuleOptions } from '@jakguru/vueprint/nuxt'
 import * as languages from './locales'
+import { resolve } from 'path'
 
 const locales = Object.keys(languages)
 const messages = Object.assign(
@@ -118,11 +119,13 @@ export const vueprintModuleOptions: VueprintModuleOptions = {
 
 export default defineNuxtConfig({
   devtools: { enabled: true },
-  ssr: true,
+  ssr: false,
+
   devServer: {
     host: '0.0.0.0',
     port: 2001,
   },
+
   vite: {
     server: {
       proxy: {
@@ -140,7 +143,11 @@ export default defineNuxtConfig({
         },
       },
     },
+    optimizeDeps: {
+      // exclude: ['sweetalert2'],
+    },
   },
+
   modules: [
     '@nuxt/eslint',
     '@vueuse/nuxt',
@@ -149,20 +156,30 @@ export default defineNuxtConfig({
     '@jakguru/vueprint/nuxt',
     (_options, nuxt) => {
       nuxt.hooks.hook('vite:extendConfig', (config) => {
-        // @ts-expect-error - this is a hack to get around bad types
+        if (!config.resolve) {
+          config.resolve = {}
+        }
         config.resolve.alias = {
-          // @ts-expect-error - this is a hack to get around bad types
           ...config.resolve.alias,
-          joi: 'joi/lib',
+          'joi': 'joi/lib',
+          'sweetalert2.scss': resolve(__dirname, 'node_modules/sweetalert2/src/sweetalert2.scss'),
+          'sweetalert2': 'sweetalert2/src/sweetalert2.js',
         }
       })
     },
   ],
+
   vueprint: vueprintModuleOptions,
+
   build: {
-    transpile: ['@jakguru/vueprint'],
+    transpile: [
+      '@jakguru/vueprint',
+      // 'sweetalert2'
+    ],
   },
+
   css: ['@/assets/glass.scss', '@/assets/fonts.scss', '@/assets/main.scss'],
+
   app: {
     head: {
       title: 'NestMTX',
@@ -190,15 +207,19 @@ export default defineNuxtConfig({
       ],
     },
   },
+
   veeValidate: {
     autoImports: true,
   },
+
   i18n: {
     differentDomains: false,
     defaultLocale: 'en',
     locales: locales,
     strategy: 'prefix_except_default',
   },
+
+  compatibilityDate: '2024-08-15',
 })
 
 declare module '@jakguru/vueprint' {

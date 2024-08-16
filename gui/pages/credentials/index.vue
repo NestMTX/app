@@ -93,6 +93,7 @@
           </v-toolbar-items>
         </v-toolbar>
         <v-divider />
+        <ModelAdd v-bind="modelAddBindings" />
       </v-card>
     </v-dialog>
   </v-row>
@@ -101,14 +102,18 @@
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted, onBeforeUnmount, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { validatorFactory } from '@/utilities/validations'
+import Joi from 'joi'
 import VTextFieldWithCopy from '../../components/fields/VTextFieldWithCopy.vue'
 import ModelIndex from '../../components/forms/modelIndex.vue'
+import ModelAdd from '../../components/forms/modelAdd.vue'
 import type { ToastService } from '@jakguru/vueprint'
 export default defineComponent({
   name: 'Credentials',
   components: {
     VTextFieldWithCopy,
     ModelIndex,
+    ModelAdd,
   },
   setup() {
     const { t } = useI18n({ useScope: 'global' })
@@ -157,6 +162,42 @@ export default defineComponent({
     const onAddDialogPersist = (persist: boolean) => {
       persistShowAddDialog.value = persist
     }
+    const modelAddBindings = computed(() => ({
+      fields: [
+        {
+          key: 'description',
+          label: t('fields.description'),
+          validator: validatorFactory(Joi.string().required()),
+          default: '',
+          component: 'VTextField',
+          bindings: {},
+        },
+        {
+          key: 'oauth_client_id',
+          label: t('fields.oauth_client_id'),
+          validator: validatorFactory(Joi.string().required()),
+          default: '',
+          component: 'VTextField',
+          bindings: {},
+        },
+        {
+          key: 'oauth_client_secret',
+          label: t('fields.oauth_client_secret'),
+          validator: validatorFactory(Joi.string().required()),
+          default: '',
+          component: 'VPasswordField',
+          bindings: {},
+        },
+        {
+          key: 'dac_project_id',
+          label: t('fields.dac_project_id'),
+          validator: validatorFactory(Joi.string().allow(null)),
+          default: null,
+          component: 'VTextField',
+          bindings: {},
+        },
+      ],
+    }))
     return {
       https,
       authUrl,
@@ -165,6 +206,7 @@ export default defineComponent({
       showAddDialog,
       persistShowAddDialog,
       onAddDialogPersist,
+      modelAddBindings,
     }
   },
 })
