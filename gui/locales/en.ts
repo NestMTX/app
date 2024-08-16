@@ -4,9 +4,14 @@ export default {
     username: 'Username',
     password: 'Password',
     redirectUrl: 'Redirect URL',
+    description: 'Description',
+    oauth_client_id: 'OAuth Client ID',
+    oauth_client_secret: 'OAuth Client Secret',
+    dac_project_id: 'Google Device Access Console Project ID',
   },
   actions: {
     login: 'Log In',
+    add: 'Add',
   },
   validation: {
     bad: 'The value is not a valid {label}',
@@ -350,6 +355,9 @@ export default {
     login: {
       title: 'Login Failed',
     },
+    add: {
+      title: 'Creation Failed',
+    },
     auth: {
       create: {
         loggedIn: 'You are already logged in',
@@ -372,7 +380,12 @@ export default {
     credentials: {
       add: {
         title: 'Add Credentials',
-      }
+      },
+    },
+    add: {
+      success: {
+        title: 'Created Successfully',
+      },
     },
   },
   $vuetify: {

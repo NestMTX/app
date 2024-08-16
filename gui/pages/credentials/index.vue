@@ -52,6 +52,7 @@
               <v-row>
                 <v-col cols="12">
                   <ModelIndex
+                    ref="modelIndex"
                     model-i18n-key="models.credentials"
                     search-end-point="/api/credentials/"
                   >
@@ -93,7 +94,7 @@
           </v-toolbar-items>
         </v-toolbar>
         <v-divider />
-        <ModelAdd v-bind="modelAddBindings" />
+        <ModelAdd v-bind="modelAddBindings" @submitted="onModelAddSubmitted" />
       </v-card>
     </v-dialog>
   </v-row>
@@ -116,6 +117,7 @@ export default defineComponent({
     ModelAdd,
   },
   setup() {
+    const modelIndex = ref<ModelIndex | undefined>(undefined)
     const { t } = useI18n({ useScope: 'global' })
     const toast = inject<ToastService>('toast')!
     const origin = ref<string | undefined>(undefined)
@@ -197,7 +199,14 @@ export default defineComponent({
           bindings: {},
         },
       ],
+      addEndPoint: '/api/credentials/',
     }))
+    const onModelAddSubmitted = () => {
+      showAddDialog.value = false
+      if (modelIndex.value) {
+        modelIndex.value.loadItems()
+      }
+    }
     return {
       https,
       authUrl,
@@ -207,6 +216,8 @@ export default defineComponent({
       persistShowAddDialog,
       onAddDialogPersist,
       modelAddBindings,
+      modelIndex,
+      onModelAddSubmitted,
     }
   },
 })
