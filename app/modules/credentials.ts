@@ -1,6 +1,7 @@
 import { ApiServiceModule } from '#services/api'
 import type {
   CreateCommandContext,
+  ReadCommandContext,
   UpdateCommandContext,
   DeleteCommandContext,
 } from '#services/api'
@@ -8,6 +9,24 @@ import Credential from '#models/credential'
 import Joi from 'joi'
 import I18NException from '#exceptions/i18n'
 import db from '@adonisjs/lucid/services/db'
+
+interface AuthorizationData {
+  state: string
+  code: string
+  scope: string
+  authuser: string
+  prompt: string
+  origin: string
+}
+
+const authorizationDataSchema = Joi.object<AuthorizationData>({
+  state: Joi.string().required(),
+  code: Joi.string().required(),
+  scope: Joi.string().required(),
+  authuser: Joi.number().optional(),
+  prompt: Joi.string().required().allow('consent'),
+  origin: Joi.string().required().uri(),
+})
 
 export default class CredentialsModule implements ApiServiceModule {
   get schemas() {
@@ -33,9 +52,9 @@ export default class CredentialsModule implements ApiServiceModule {
     const query = db.from(Credential.table)
     if (search) {
       query.where((builder) => {
-        builder.where('description', 'ilike', `%${search}%`)
-        builder.orWhere('oauth_client_id', 'ilike', `%${search}%`)
-        builder.orWhere('dac_project_id', 'ilike', `%${search}%`)
+        builder.where('description', 'like', `%${search}%`)
+        builder.orWhere('oauth_client_id', 'like', `%${search}%`)
+        builder.orWhere('dac_project_id', 'like', `%${search}%`)
       })
     }
     if (sortBy) {
@@ -78,12 +97,43 @@ export default class CredentialsModule implements ApiServiceModule {
     return credential.id
   }
 
+  async read(context: ReadCommandContext) {
+    const decoded = Buffer.from(context.entity, 'base64').toString()
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(decoded)
+    } catch {
+      throw new I18NException('errors.credentials.authorize.malformed')
+    }
+    const { error, value: authorizationData } = authorizationDataSchema.validate(parsed)
+    if (error) {
+      throw new I18NException('errors.credentials.authorize.malformed')
+    }
+    const idJsonString = Buffer.from(authorizationData.state, 'base64').toString()
+    let idJsonObject: { id: number }
+    try {
+      idJsonObject = JSON.parse(idJsonString)
+    } catch {
+      throw new I18NException('errors.credentials.authorize.invalidState')
+    }
+    const { id } = idJsonObject
+    const { origin } = authorizationData
+    const redirectUrl = new URL('/credentials/authorize', origin)
+    redirectUrl.protocol = 'https:'
+    const credential = await Credential.findOrFail(id)
+    const client = await credential.getOauthClient(redirectUrl.toString())
+    const { tokens } = await client.getToken(authorizationData.code)
+    credential.tokens = JSON.stringify(tokens)
+    await credential.save()
+    return { success: true }
+  }
+
   async update(context: UpdateCommandContext) {
     const credential = await Credential.findOrFail(Number.parseInt(context.entity))
     const { origin } = context.payload
     if (null === credential.tokens) {
       // we are generating an authorization URL and returning it
-      const redirectUrl = new URL('/credentials/authorize/', origin)
+      const redirectUrl = new URL('/credentials/authorize', origin)
       redirectUrl.protocol = 'https:'
       const client = await credential.getOauthClient(redirectUrl.toString())
       return client.generateAuthUrl({

@@ -25,6 +25,23 @@
                     @copy-failed="onCopyFail"
                   />
                 </v-col>
+                <v-col cols="12">
+                  <v-btn
+                    variant="elevated"
+                    height="38"
+                    href="https://console.cloud.google.com/apis/credentials"
+                    target="_blank"
+                  >
+                    <img
+                      :src="gcpcSvg"
+                      alt="Google Cloud Platform Console"
+                      width="16px"
+                      height="16px"
+                      class="me-2"
+                    />
+                    <span>Google Cloud Platform Console</span>
+                  </v-btn>
+                </v-col>
               </v-row>
             </v-container>
             <v-card-text v-if="!https">
@@ -59,6 +76,22 @@
                     :actions="modelIndexActions"
                   >
                     <template #action-buttons>
+                      <v-btn
+                        :icon="true"
+                        variant="elevated"
+                        size="38"
+                        title="Google Cloud Platform Console"
+                        class="me-2"
+                        href="https://console.cloud.google.com/"
+                        target="_blank"
+                      >
+                        <img
+                          :src="gcpcSvg"
+                          alt="Google Cloud Platform Console"
+                          width="16px"
+                          height="16px"
+                        />
+                      </v-btn>
                       <v-btn
                         icon
                         color="secondary"
@@ -110,6 +143,7 @@ import Joi from 'joi'
 import VTextFieldWithCopy from '../../components/fields/VTextFieldWithCopy.vue'
 import ModelIndex from '../../components/forms/modelIndex.vue'
 import ModelAdd from '../../components/forms/modelAdd.vue'
+import gcpcSvg from '../../assets/brand-icons/cloud-platform-console.google.svg'
 import type { ToastService, ApiService } from '@jakguru/vueprint'
 export default defineComponent({
   name: 'Credentials',
@@ -285,6 +319,7 @@ export default defineComponent({
       onModelAddSubmitted,
       modelIndexColumns,
       modelIndexActions,
+      gcpcSvg,
     }
   },
 })

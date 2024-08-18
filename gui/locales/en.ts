@@ -12,6 +12,9 @@ export default {
   actions: {
     login: 'Log In',
     add: 'Add',
+    delete: 'Delete',
+    authorize: 'Authorize',
+    manage: 'Manage',
   },
   validation: {
     bad: 'The value is not a valid {label}',
@@ -363,6 +366,19 @@ export default {
         loggedIn: 'You are already logged in',
       },
     },
+    credentials: {
+      authorize: {
+        unexpected: {
+          title: 'An unexpected error occurred',
+          text: 'Check console for more information',
+        },
+        unhandled: {
+          title: 'Unable to complete authorization',
+        },
+        malformed: 'The authorization data is malformed',
+        invalidState: 'The authorization state is invalid',
+      },
+    },
   },
   dialogs: {
     systemInfo: {
@@ -380,6 +396,12 @@ export default {
     credentials: {
       add: {
         title: 'Add Credentials',
+      },
+      authorize: {
+        title: 'Authorizing Credentials',
+        text: 'Do not close this page',
+        postText: 'You will be redirected once the process is complete',
+        success: 'Credentials authorized successfully',
       },
     },
     add: {
@@ -502,26 +524,34 @@ export default {
     },
   },
   pages: {
-    undefined: {
+    'undefined': {
       nav: 'Unknown Page',
       title: 'NestMTX',
       description: 'NestMTX Control Panel',
       header: 'Unknown Page',
       subtitle: 'The page you are looking for does not exist.',
     },
-    index: {
+    'index': {
       nav: 'Home',
       title: 'NestMTX',
       description: 'NestMTX Control Panel',
       header: 'Control Panel',
       subtitle: 'View and manage your NestMTX instance',
     },
-    credentials: {
+    'credentials': {
       nav: 'Credentials',
       title: 'Credentials - NestMTX',
       description: 'Manage NestMTX Credentials',
       header: 'Credentials',
       subtitle: 'Manage your Google Cloud Platform and Google Device Access Console credentials',
+    },
+    'credentials-authorize': {
+      nav: 'Credentials',
+      title: 'Authorizing Credentials - NestMTX',
+      description: 'Authorizing NestMTX Credentials',
+      header: 'Authorizing Credentials',
+      subtitle:
+        'Authorizing your Google Cloud Platform and Google Device Access Console credentials',
     },
   },
   credentials: {
