@@ -55,6 +55,8 @@
                     ref="modelIndex"
                     model-i18n-key="models.credentials"
                     search-end-point="/api/credentials/"
+                    :columns="modelIndexColumns"
+                    :actions="modelIndexActions"
                   >
                     <template #action-buttons>
                       <v-btn
@@ -108,7 +110,7 @@ import Joi from 'joi'
 import VTextFieldWithCopy from '../../components/fields/VTextFieldWithCopy.vue'
 import ModelIndex from '../../components/forms/modelIndex.vue'
 import ModelAdd from '../../components/forms/modelAdd.vue'
-import type { ToastService } from '@jakguru/vueprint'
+import type { ToastService, ApiService } from '@jakguru/vueprint'
 export default defineComponent({
   name: 'Credentials',
   components: {
@@ -120,6 +122,7 @@ export default defineComponent({
     const modelIndex = ref<ModelIndex | undefined>(undefined)
     const { t } = useI18n({ useScope: 'global' })
     const toast = inject<ToastService>('toast')!
+    const api = inject<ApiService>('api')!
     const origin = ref<string | undefined>(undefined)
     const url = computed<URL | undefined>(() => {
       if (origin.value) {
@@ -164,6 +167,68 @@ export default defineComponent({
     const onAddDialogPersist = (persist: boolean) => {
       persistShowAddDialog.value = persist
     }
+    const modelIndexColumns = computed(() => [
+      {
+        key: 'description',
+        label: t('fields.description'),
+        formatter: (value: unknown) => value as string,
+        sortable: true,
+      },
+    ])
+    const modelIndexActions = computed(() => [
+      {
+        icon: 'mdi-delete',
+        label: t('actions.delete'),
+        callback: async (row: Record<string, unknown>) => {
+          const { status } = await api.delete(`/api/credentials/${row.id}/`)
+          if (status === 204) {
+            toast.fire({
+              title: t('dialogs.credentials.delete.success.title'),
+              icon: 'success',
+            })
+          } else {
+            toast.fire({
+              title: t('dialogs.credentials.delete.failure.title'),
+              icon: 'error',
+            })
+          }
+        },
+      },
+      {
+        icon: 'mdi-shield-check',
+        label: t('actions.authorize'),
+        callback: async (row: Record<string, unknown>) => {
+          const { status, data } = await api.put(`/api/credentials/${row.id}/`, {
+            origin: window.location.origin,
+          })
+          if (201 !== status) {
+            toast.fire({
+              title: t('dialogs.credentials.authorize.failure.title'),
+              icon: 'error',
+            })
+          }
+          window.location.href = data
+        },
+        condition: (row: Record<string, unknown>) => row.tokens === null,
+      },
+      {
+        icon: 'mdi-pencil',
+        label: t('actions.manage'),
+        callback: async (row: Record<string, unknown>) => {
+          const { status, data } = await api.put(`/api/credentials/${row.id}/`, {
+            origin: window.location.origin,
+          })
+          if (201 !== status) {
+            toast.fire({
+              title: t('dialogs.credentials.manage.failure.title'),
+              icon: 'error',
+            })
+          }
+          window.location.href = data
+        },
+        condition: (row: Record<string, unknown>) => row.tokens !== null,
+      },
+    ])
     const modelAddBindings = computed(() => ({
       fields: [
         {
@@ -218,6 +283,8 @@ export default defineComponent({
       modelAddBindings,
       modelIndex,
       onModelAddSubmitted,
+      modelIndexColumns,
+      modelIndexActions,
     }
   },
 })

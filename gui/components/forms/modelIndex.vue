@@ -67,6 +67,12 @@
         </form>
         <v-divider />
       </template>
+      <!-- eslint-disable-next-line vue/valid-v-slot -->
+      <template #item.__actions="{ value }">
+        <v-toolbar-items class="h-100 px-0">
+          <v-btn v-for="(a, i) in value" :key="`item-${value.id}-action-${i}`" v-bind="a" />
+        </v-toolbar-items>
+      </template>
     </v-data-table-server>
   </div>
 </template>
@@ -76,8 +82,44 @@ import { defineComponent, computed, ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { capitalCase } from 'change-case'
 import qs from 'qs'
+import type { PropType } from 'vue'
 import type { ApiService, SwalService } from '@jakguru/vueprint'
 import type { VDataTableServer } from 'vuetify/components/VDataTable/'
+
+interface ModelIndexFieldTextFormatter {
+  // eslint-disable-next-line no-unused-vars
+  (value: unknown, row: Record<string, unknown>): string
+}
+
+interface ModelIndexActionCallback {
+  // eslint-disable-next-line no-unused-vars
+  (row: Record<string, unknown>): void | Promise<void>
+}
+
+interface ModelIndexActionCondition {
+  // eslint-disable-next-line no-unused-vars
+  (row: Record<string, unknown>): boolean
+}
+
+interface ModelIndexAction {
+  icon: string
+  color?: undefined | string
+  label: string
+  callback: ModelIndexActionCallback
+  condition?: ModelIndexActionCondition
+}
+
+interface ModelIndexField {
+  key: string
+  label: string
+  formatter: ModelIndexFieldTextFormatter
+  align?: 'start' | 'end' | 'center' | undefined
+  width?: string | number | undefined
+  minWidth?: string | undefined
+  maxWidth?: string | undefined
+  sortable?: boolean | undefined
+  cellProps?: Record<string, any> | undefined
+}
 
 export default defineComponent({
   name: 'ModelIndex',
@@ -90,19 +132,55 @@ export default defineComponent({
       type: String,
       required: true,
     },
+    columns: {
+      type: Array as PropType<ModelIndexField[]>,
+      default: () => [] as ModelIndexField[],
+    },
+    actions: {
+      type: Array as PropType<ModelIndexAction[]>,
+      default: () => [] as ModelIndexAction[],
+    },
   },
   setup(props) {
     const table = ref<VDataTableServer | undefined>(undefined)
     const modelI18nKey = computed(() => props.modelI18nKey)
     const searchEndPoint = computed(() => props.searchEndPoint)
+    const columns = computed(() => props.columns)
+    const actions = computed(() => props.actions)
+    const hasActions = computed(() => actions.value.length > 0)
+    const processingActions = ref<Array<string>>([])
     const { t } = useI18n({ useScope: 'global' })
     const api = inject<ApiService>('api')!
     const swal = inject<SwalService>('swal')!
     const mounted = ref(false)
     const returned = ref<Array<any>>([])
     const itemsPerPage = ref(10)
-    const headers = computed(() => [])
-    const items = computed(() => [])
+    const headers = computed(() =>
+      [
+        hasActions.value
+          ? {
+              label: '',
+              key: '__actions',
+              sortable: false,
+              width: '100px',
+              cellProps: { class: 'px-0' },
+            }
+          : undefined,
+        ...columns.value,
+      ]
+        .filter((c) => 'object' === typeof c && c !== null)
+        .map((c) => ({
+          value: c.key,
+          title: c.label,
+          nowrap: true,
+          align: c.align,
+          width: c.width,
+          minWidth: c.minWidth,
+          maxWidth: c.maxWidth,
+          sortable: c.sortable,
+          cellProps: c.cellProps,
+        }))
+    )
     const totalItems = ref(0)
     const loading = ref(false)
     const search = ref<string | undefined>(undefined)
@@ -157,6 +235,43 @@ export default defineComponent({
       }
       return await loadItems(options)
     }
+    const processAction = async (action: ModelIndexAction, row: Record<string, unknown>) => {
+      const actionKey = [row.id, action.label].join(':')
+      if (processingActions.value.includes(actionKey)) {
+        return
+      }
+      processingActions.value.push(actionKey)
+      try {
+        await action.callback(row)
+      } catch (e) {
+        console.error(e)
+        // Do nothing
+      }
+      processingActions.value = processingActions.value.filter((a) => a !== actionKey)
+      manualLoadItems()
+    }
+    const items = computed(() =>
+      [...returned.value].map((item) => {
+        for (const key in item) {
+          const column = columns.value.find((c) => c.key === key)
+          if (column) {
+            item[key] = column.formatter(item[key], item)
+          }
+        }
+        if (hasActions.value) {
+          item.__actions = actions.value
+            .filter((action) => (action.condition ? action.condition(item) : true))
+            .map((a) => ({
+              icon: a.icon,
+              color: a.color,
+              title: a.label,
+              onClick: () => processAction(a, item),
+              loading: processingActions.value.includes([item.id, a.label].join(':')),
+            }))
+        }
+        return item
+      })
+    )
     const onSearchSubmit = (e: Event) => {
       e.preventDefault()
       if (search.value === searchField.value) {
@@ -190,6 +305,7 @@ export default defineComponent({
       modelI18nSingularCapitalized,
       modelI18nPluralCapitalized,
       table,
+      hasActions,
     }
   },
 })

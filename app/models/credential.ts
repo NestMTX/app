@@ -87,13 +87,12 @@ export default class Credential extends BaseModel {
     }
   }
 
-  getOauthClient(redirectUrl: string) {
-    // eslint-disable-next-line unicorn/prefer-module
-    const { google } = require('googleapis') as typeof import('googleapis')
+  async getOauthClient(redirectUrl: string) {
+    const { google } = await import('googleapis')
     return new google.auth.OAuth2(this.oauthClientId, this.oauthClientSecret, redirectUrl)
   }
 
-  getSDMClient(redirectUrl: string) {
+  async getSDMClient(redirectUrl: string) {
     if ('string' === typeof this.tokens) {
       try {
         this.tokens = JSON.parse(this.tokens)
@@ -104,9 +103,8 @@ export default class Credential extends BaseModel {
     if (!this.tokens || 'object' !== typeof this.tokens) {
       throw new Error('No tokens found')
     }
-    // eslint-disable-next-line unicorn/prefer-module
-    const { google } = require('googleapis') as typeof import('googleapis')
-    const oac = this.getOauthClient(redirectUrl)
+    const { google } = await import('googleapis')
+    const oac = await this.getOauthClient(redirectUrl)
     oac.setCredentials(this.tokens)
     return google.smartdevicemanagement({
       version: 'v1',

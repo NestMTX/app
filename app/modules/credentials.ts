@@ -1,5 +1,9 @@
 import { ApiServiceModule } from '#services/api'
-import type { CreateCommandContext } from '#services/api'
+import type {
+  CreateCommandContext,
+  UpdateCommandContext,
+  DeleteCommandContext,
+} from '#services/api'
 import Credential from '#models/credential'
 import Joi from 'joi'
 import I18NException from '#exceptions/i18n'
@@ -15,7 +19,7 @@ export default class CredentialsModule implements ApiServiceModule {
         dac_project_id: Joi.string().allow(null),
       }),
       update: Joi.object({
-        description: Joi.string().required(),
+        origin: Joi.string().required(),
       }),
     }
   }
@@ -72,6 +76,31 @@ export default class CredentialsModule implements ApiServiceModule {
     credential.dacProjectId = dacProjectId
     await credential.save()
     return credential.id
+  }
+
+  async update(context: UpdateCommandContext) {
+    const credential = await Credential.findOrFail(Number.parseInt(context.entity))
+    const { origin } = context.payload
+    if (null === credential.tokens) {
+      // we are generating an authorization URL and returning it
+      const redirectUrl = new URL('/credentials/authorize/', origin)
+      redirectUrl.protocol = 'https:'
+      const client = await credential.getOauthClient(redirectUrl.toString())
+      return client.generateAuthUrl({
+        access_type: 'offline',
+        scope: ['openid', 'https://www.googleapis.com/auth/sdm.service'],
+        prompt: 'consent',
+        include_granted_scopes: true,
+        state: Buffer.from(JSON.stringify({ id: credential.id })).toString('base64'),
+      })
+    } else {
+      return `https://nestservices.google.com/partnerconnections/${credential.dacProjectId}`
+    }
+  }
+
+  async delete(context: DeleteCommandContext) {
+    const credential = await Credential.findOrFail(Number.parseInt(context.entity))
+    await credential.delete()
   }
 
   get $descriptionOfCreate() {
