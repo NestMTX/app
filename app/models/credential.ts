@@ -7,9 +7,13 @@ import {
   afterSave,
   afterFind,
   afterFetch,
+  hasMany,
 } from '@adonisjs/lucid/orm'
 import crypto from 'node:crypto'
 import encryption from '@adonisjs/core/services/encryption'
+import Camera from '#models/camera'
+
+import type { HasMany } from '@adonisjs/lucid/types/relations'
 
 const makeChecksum = (data: string) => {
   const hash = crypto.createHash('sha256')
@@ -38,6 +42,9 @@ export default class Credential extends BaseModel {
 
   @column({ serializeAs: null })
   declare tokens: any | null
+
+  @column()
+  declare tokenRedirectUrl: string | null
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
@@ -87,12 +94,15 @@ export default class Credential extends BaseModel {
     }
   }
 
+  @hasMany(() => Camera)
+  declare cameras: HasMany<typeof Camera>
+
   async getOauthClient(redirectUrl: string) {
     const { google } = await import('googleapis')
     return new google.auth.OAuth2(this.oauthClientId, this.oauthClientSecret, redirectUrl)
   }
 
-  async getSDMClient(redirectUrl: string) {
+  async getSDMClient(redirectUrl?: string | null) {
     if ('string' === typeof this.tokens) {
       try {
         this.tokens = JSON.parse(this.tokens)
@@ -102,6 +112,12 @@ export default class Credential extends BaseModel {
     }
     if (!this.tokens || 'object' !== typeof this.tokens) {
       throw new Error('No tokens found')
+    }
+    if (!redirectUrl) {
+      redirectUrl = this.tokenRedirectUrl
+    }
+    if (!redirectUrl) {
+      throw new Error('No redirect URL found')
     }
     const { google } = await import('googleapis')
     const oac = await this.getOauthClient(redirectUrl)

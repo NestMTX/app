@@ -125,6 +125,7 @@ export default class CredentialsModule implements ApiServiceModule {
     const client = await credential.getOauthClient(redirectUrl.toString())
     const { tokens } = await client.getToken(authorizationData.code)
     credential.tokens = tokens
+    credential.tokenRedirectUrl = redirectUrl.toString()
     await credential.save()
     return { success: true }
   }

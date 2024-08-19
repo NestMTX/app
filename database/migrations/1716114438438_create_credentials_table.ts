@@ -12,6 +12,7 @@ export default class extends BaseSchema {
       table.text('oauth_client_secret').notNullable()
       table.text('dac_project_id').nullable()
       table.text('tokens').nullable()
+      table.text('token_redirect_url').nullable()
       table.timestamp('created_at')
       table.timestamp('updated_at')
     })
