@@ -598,6 +598,13 @@
   resolved "https://registry.yarnpkg.com/@humanwhocodes/object-schema/-/object-schema-2.0.3.tgz#4a2868d75d6d6963e423bcf90b7fd1be343409d3"
   integrity sha512-93zYdMES/c1D69yZiKDBj0V24vqNzB/koF26KPaagAfd3P/4gUlh3Dys5ogAK+Exi9QyzlD8x/08Zt7wIKcDcA==
 
+"@jakguru/milicron@^1.0.0":
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/@jakguru/milicron/-/milicron-1.0.0.tgz#a55ca5b1fc063aada4d6e0ca1790d7a841297b8c"
+  integrity sha512-haLNEpq0k9xMiEglCtfPNQeSeI6nwoHPl+MnhrncEFa6uUkJXkRFELeM/EbE6RPZoM89vAmOWKOsIwegE8JbkQ==
+  dependencies:
+    luxon "^3.3.0"
+
 "@japa/api-client@^2.0.2":
   version "2.0.3"
   resolved "https://registry.yarnpkg.com/@japa/api-client/-/api-client-2.0.3.tgz#40361856f714466a2334b14da2b6d6bdf2394107"
@@ -4363,6 +4370,11 @@ lru-cache@^8.0.0:
   version "8.0.5"
   resolved "https://registry.yarnpkg.com/lru-cache/-/lru-cache-8.0.5.tgz#983fe337f3e176667f8e567cfcce7cb064ea214e"
   integrity sha512-MhWWlVnuab1RG5/zMRRcVGXZLCXrZTgfwMikgzCegsPnG62yDQo5JnqKkrK4jO5iKqDAZGItAqN5CtKBCBWRUA==
+
+luxon@^3.3.0:
+  version "3.5.0"
+  resolved "https://registry.yarnpkg.com/luxon/-/luxon-3.5.0.tgz#6b6f65c5cd1d61d1fd19dbf07ee87a50bf4b8e20"
+  integrity sha512-rh+Zjr6DNfUYR3bPwJEnuwDdqMbxZW7LOQfUN4B54+Cl+0o5zaU9RJ6bcidfDtC1cWCZXQ+nvX8bf6bAji37QQ==
 
 luxon@^3.4.4:
   version "3.4.4"

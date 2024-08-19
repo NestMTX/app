@@ -303,7 +303,7 @@ export default defineComponent({
     const onModelAddSubmitted = () => {
       showAddDialog.value = false
       if (modelIndex.value) {
-        modelIndex.value.loadItems()
+        modelIndex.value.manualLoadItems()
       }
     }
     return {

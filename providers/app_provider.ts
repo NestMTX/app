@@ -17,6 +17,8 @@ import { MediaMTXService } from '#services/mediamtx'
 import { NATService } from '#services/nat'
 import { ICEService } from '#services/ice'
 import { IPCService } from '#services/ipc'
+import { MiliCron } from '@jakguru/milicron'
+import { init } from '#services/cron'
 
 const base = new URL('../', import.meta.url).pathname
 
@@ -30,6 +32,7 @@ declare module '@adonisjs/core/types' {
     'nat/service': NATService
     'ice/service': ICEService
     'ipc/service': IPCService
+    'cron/service': MiliCron
   }
 }
 
@@ -42,6 +45,7 @@ export default class AppProvider {
   #nat: NATService
   #ice: ICEService
   #ipc: IPCService
+  #cron: MiliCron
   constructor(protected app: ApplicationService) {
     this.#api = new ApiService()
     this.#io = new SocketIoService(this.app, this.#api)
@@ -49,6 +53,7 @@ export default class AppProvider {
     this.#nat = new NATService()
     this.#ice = new ICEService()
     this.#ipc = new IPCService(this.app)
+    this.#cron = new MiliCron()
   }
 
   /**
@@ -63,6 +68,7 @@ export default class AppProvider {
     this.app.container.singleton('nat/service', () => this.#nat)
     this.app.container.singleton('ice/service', () => this.#ice)
     this.app.container.singleton('ipc/service', () => this.#ipc)
+    this.app.container.singleton('cron/service', () => this.#cron)
   }
 
   /**
@@ -150,12 +156,20 @@ export default class AppProvider {
       }
       await this.#mediamtx.boot(logger, this.#nat, this.#ice)
     }
+    await init(this.#cron, logger as LoggerServiceWithConfig)
   }
 
   /**
    * The application has been booted
    */
-  async start() {}
+  async start() {
+    const logger = await this.app.container.make('logger')
+    const env = this.app.getEnvironment()
+    if ('web' === env) {
+      logger.info('Starting Cron Service...')
+      this.#cron.start()
+    }
+  }
 
   /**
    * The process has been started
@@ -176,8 +190,11 @@ export default class AppProvider {
    * Preparing to shutdown the app
    */
   async shutdown() {
+    const logger = await this.app.container.make('logger')
     const env = this.app.getEnvironment()
     if ('web' === env) {
+      logger.info('Shutting down Cron Service...')
+      this.#cron.stop()
       await this.#ipc.shutdown()
     }
   }

@@ -58,6 +58,7 @@ export default class CredentialsModule implements ApiServiceModule {
       })
     }
     if (sortBy) {
+      // @todo: implement sorting
       // query.orderBy(sortBy)
     }
     let pageAsInt = Number.parseInt(page)
@@ -123,9 +124,13 @@ export default class CredentialsModule implements ApiServiceModule {
     const credential = await Credential.findOrFail(id)
     const client = await credential.getOauthClient(redirectUrl.toString())
     const { tokens } = await client.getToken(authorizationData.code)
-    credential.tokens = JSON.stringify(tokens)
+    credential.tokens = tokens
     await credential.save()
     return { success: true }
+  }
+
+  get $descriptionOfRead() {
+    return 'Authorize credentials based on the authorization code'
   }
 
   async update(context: UpdateCommandContext) {
@@ -146,6 +151,10 @@ export default class CredentialsModule implements ApiServiceModule {
     } else {
       return `https://nestservices.google.com/partnerconnections/${credential.dacProjectId}`
     }
+  }
+
+  get $descriptionOfUpdate() {
+    return 'Get either the authorization URL or the Device Access Console URL'
   }
 
   async delete(context: DeleteCommandContext) {

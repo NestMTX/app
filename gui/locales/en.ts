@@ -8,6 +8,10 @@ export default {
     oauth_client_id: 'OAuth Client ID',
     oauth_client_secret: 'OAuth Client Secret',
     dac_project_id: 'Google Device Access Console Project ID',
+    name: 'Name',
+    crontab: 'Crontab',
+    last_run_at: 'Last Run At',
+    last_end_at: 'Last End At',
   },
   actions: {
     login: 'Log In',
@@ -341,6 +345,10 @@ export default {
       single: 'credentials',
       plural: 'credentials',
     },
+    cronjobs: {
+      single: 'cronjob',
+      plural: 'cronjobs',
+    },
   },
   components: {
     modelIndex: {
@@ -552,6 +560,13 @@ export default {
       header: 'Authorizing Credentials',
       subtitle:
         'Authorizing your Google Cloud Platform and Google Device Access Console credentials',
+    },
+    'cronjobs': {
+      nav: 'Cronjobs',
+      title: 'Cronjobs - NestMTX',
+      description: 'View & Manually Run System Cronjobs',
+      header: 'Cronjobs',
+      subtitle: 'View & Manually Run System Cronjobs',
     },
   },
   credentials: {

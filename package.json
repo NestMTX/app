@@ -56,6 +56,7 @@
     "@adonisjs/eslint-config": "^1.2.1",
     "@adonisjs/lucid": "^20.1.0",
     "@adonisjs/static": "^1.1.1",
+    "@jakguru/milicron": "^1.0.0",
     "@octokit/rest": "^20.1.0",
     "@vinejs/vine": "^1.7.1",
     "aedes": "^0.51.1",
