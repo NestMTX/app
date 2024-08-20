@@ -12,6 +12,11 @@ export default {
     crontab: 'Crontab',
     last_run_at: 'Last Run At',
     last_end_at: 'Last End At',
+    protocols: 'Protocols',
+    identified_as: 'Identified As',
+    resolution: 'Resolution',
+    codecs_video: 'Video Codecs',
+    codecs_audio: 'Audio Codecs',
   },
   actions: {
     login: 'Log In',
@@ -338,6 +343,10 @@ export default {
     zw: 'Zimbabwe',
   },
   models: {
+    cameras: {
+      single: 'a camera',
+      plural: 'cameras',
+    },
     country: {
       single: 'a country',
       plural: 'countries',
@@ -347,7 +356,7 @@ export default {
       plural: 'credentials',
     },
     cronjobs: {
-      single: 'cronjob',
+      single: 'a cronjob',
       plural: 'cronjobs',
     },
   },

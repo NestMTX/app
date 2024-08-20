@@ -61,10 +61,30 @@ export default defineComponent({
         renderer: renderAsCode,
       },
       {
+        key: 'identified_as',
+        label: t('fields.identified_as'),
+        formatter: (value: unknown) => value as string,
+        sortable: false,
+      },
+      {
         key: 'resolution',
         label: t('fields.resolution'),
         formatter: (value: unknown) => value as string,
         sortable: false,
+      },
+      {
+        key: 'codecs_video',
+        label: t('fields.codecs_video'),
+        formatter: (value: unknown) => value as string,
+        sortable: false,
+        renderer: renderAsCode,
+      },
+      {
+        key: 'codecs_audio',
+        label: t('fields.codecs_audio'),
+        formatter: (value: unknown) => value as string,
+        sortable: false,
+        renderer: renderAsCode,
       },
     ])
     const modelIndexActions = computed(() => [
