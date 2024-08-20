@@ -61,6 +61,7 @@ export default class Camera extends BaseModel {
     item.checksum = makeChecksum(item.uid)
     item.uid = encryption.encrypt(item.uid)
     item.info = item.info ? encryption.encrypt(JSON.stringify(item.info)) : null
+    item.isEnabled = Boolean(item.isEnabled)
   }
 
   @afterSave()
@@ -72,6 +73,7 @@ export default class Camera extends BaseModel {
   static async decrypt(item: Camera) {
     item.uid = encryption.decrypt(item.uid)!
     item.info = item.info ? JSON.parse(encryption.decrypt(item.info)!) : null
+    item.isEnabled = Boolean(item.isEnabled)
   }
 
   @afterFetch()
