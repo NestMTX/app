@@ -99,6 +99,7 @@ export default defineComponent({
       [
         { icon: 'mdi-view-dashboard', value: 'index' },
         { icon: 'mdi-key-chain', value: 'credentials' },
+        { icon: 'mdi-cctv', value: 'cameras' },
         { icon: 'mdi-clock', value: 'cronjobs' },
       ].map((n) => ({
         'active': rawRouteName.value === n.value,

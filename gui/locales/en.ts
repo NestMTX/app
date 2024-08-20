@@ -19,6 +19,7 @@ export default {
     delete: 'Delete',
     authorize: 'Authorize',
     manage: 'Manage',
+    run: 'Run',
   },
   validation: {
     bad: 'The value is not a valid {label}',
@@ -567,6 +568,13 @@ export default {
       description: 'View & Manually Run System Cronjobs',
       header: 'Cronjobs',
       subtitle: 'View & Manually Run System Cronjobs',
+    },
+    'cameras': {
+      nav: 'Cameras',
+      title: 'Cameras - NestMTX',
+      description: 'View & Manage Camera Streams',
+      header: 'Cameras',
+      subtitle: 'View & Manage Camera Streams',
     },
   },
   credentials: {

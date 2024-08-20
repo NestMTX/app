@@ -7,10 +7,12 @@ import {
   afterFind,
   afterFetch,
   belongsTo,
+  computed,
 } from '@adonisjs/lucid/orm'
 import crypto from 'node:crypto'
 import encryption from '@adonisjs/core/services/encryption'
 import Credential from '#models/credential'
+import dot from 'dot-object'
 
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 
@@ -85,4 +87,37 @@ export default class Camera extends BaseModel {
 
   @belongsTo(() => Credential)
   declare credential: BelongsTo<typeof Credential>
+
+  get #dottedTraits() {
+    return 'object' === typeof this.info &&
+      null !== this.info &&
+      'object' === typeof this.info.traits &&
+      null !== this.info.traits
+      ? dot.dot(this.info.traits)
+      : {}
+  }
+
+  @computed({ serializeAs: 'resolution' })
+  get resolution() {
+    const maxVideoResolution =
+      this.#dottedTraits['sdm.devices.traits.CameraLiveStream.maxVideoResolution.width'] &&
+      this.#dottedTraits['sdm.devices.traits.CameraLiveStream.maxVideoResolution.height']
+        ? {
+            width:
+              this.#dottedTraits['sdm.devices.traits.CameraLiveStream.maxVideoResolution.width'],
+            height:
+              this.#dottedTraits['sdm.devices.traits.CameraLiveStream.maxVideoResolution.height'],
+          }
+        : undefined
+    let width: undefined | number
+    let height: undefined | number
+    if (maxVideoResolution) {
+      width = maxVideoResolution.width
+      height = maxVideoResolution.height
+    }
+    if (!width || !height) {
+      return null
+    }
+    return `${width}x${height}`
+  }
 }
