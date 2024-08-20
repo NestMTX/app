@@ -20,6 +20,7 @@ import { ICEService } from '#services/ice'
 import { IPCService } from '#services/ipc'
 import { MiliCron } from '@jakguru/milicron'
 import { init } from '#services/cron'
+import pm2 from 'pm2'
 
 const base = new URL('../', import.meta.url).pathname
 
@@ -31,6 +32,7 @@ declare module '@adonisjs/core/types' {
     'mqtt/client'?: MqttClient
     'mediamtx': MediaMTXService
     'gstreamer': GStreamerService
+    'pm2': typeof pm2
     'nat/service': NATService
     'ice/service': ICEService
     'ipc/service': IPCService
@@ -70,6 +72,7 @@ export default class AppProvider {
     this.app.container.singleton('mqtt/client', () => this.#mqtt)
     this.app.container.singleton('mediamtx', () => this.#mediamtx)
     this.app.container.singleton('gstreamer', () => this.#gstreamer)
+    this.app.container.singleton('pm2', () => pm2)
     this.app.container.singleton('nat/service', () => this.#nat)
     this.app.container.singleton('ice/service', () => this.#ice)
     this.app.container.singleton('ipc/service', () => this.#ipc)
@@ -159,8 +162,19 @@ export default class AppProvider {
       } else {
         logger.error('Invalid MQTT Configuration. Not connecting to MQTT Server.')
       }
-      await this.#mediamtx.boot(logger, this.#nat, this.#ice)
-      await this.#gstreamer.boot(logger, this.#nat, this.#ice)
+      logger.info('Connecting to PM2 Daemon...')
+      await new Promise<void>((resolve, reject) => {
+        pm2.connect(true, (err: Error) => {
+          if (err) {
+            logger.error('Failed to connect to PM2 Daemon')
+            logger.error(err)
+            return reject(err)
+          } else {
+            logger.info('Connected to PM2 Daemon')
+            return resolve()
+          }
+        })
+      })
     }
     await init(this.#cron, logger as LoggerServiceWithConfig)
   }
@@ -186,6 +200,12 @@ export default class AppProvider {
     if ('web' === env) {
       await this.#io.start(server)
       logger.info('Socket.IO Server Attached')
+      /**
+       * TODO: Create a way to start these services
+       * Need a dedicated process manager - let's call it PM3
+       */
+      // await this.#mediamtx.boot(logger, this.#nat, this.#ice, pm2)
+      // await this.#gstreamer.boot(logger, this.#nat, this.#ice, pm2)
     }
     if (this.#mqtt) {
       new MqttService(this.#api, this.#mqtt, logger)

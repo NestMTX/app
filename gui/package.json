@@ -15,6 +15,7 @@
     "@jakguru/vueprint": "^1.6.5",
     "@nuxt/eslint": "^0.3.12",
     "change-case": "^5.4.4",
+    "filesize": "^10.1.4",
     "nuxt": "^3.12.4",
     "qs": "^6.12.1",
     "socket.io-client": "^4.7.5",

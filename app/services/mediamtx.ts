@@ -3,7 +3,7 @@ import fs from 'node:fs/promises'
 import yaml from 'yaml'
 import { existsSync, createReadStream } from 'node:fs'
 import { execa } from 'execa'
-import pm2 from 'pm2'
+import type PM2 from 'pm2'
 import type { ApplicationService } from '@adonisjs/core/types'
 import type { LoggerService } from '@adonisjs/core/types'
 import type { Logger } from '@adonisjs/logger'
@@ -33,17 +33,8 @@ export class MediaMTXService {
     this.#stdErrLogPath = this.#app.tmpPath('mediamtx.stderr.log')
   }
 
-  async boot(logger: LoggerService, nat: NATService, ice: ICEService) {
+  async boot(logger: LoggerService, nat: NATService, ice: ICEService, pm2: typeof PM2) {
     this.#logger = logger.child({ service: 'mediamtx' })
-    await new Promise<void>((resolve, reject) => {
-      pm2.connect(false, (err: Error) => {
-        if (err) {
-          return reject(err)
-        } else {
-          return resolve()
-        }
-      })
-    })
     await Promise.all([this.#makeFifo(this.#stdOutLogPath), this.#makeFifo(this.#stdErrLogPath)])
     this.#stdOutStream = createReadStream(this.#stdOutLogPath)
     this.#stdErrStream = createReadStream(this.#stdErrLogPath)

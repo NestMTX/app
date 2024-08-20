@@ -611,4 +611,23 @@ export default {
       },
     },
   },
+  index: {
+    htop: {
+      cpu: 'CPU Usage',
+      memory: 'Memory Usage',
+      processes: {
+        title: 'NestMTX Processes',
+        pid: 'Process ID',
+        name: 'Process Name',
+        cpu: 'CPU Usage',
+        memory: 'Memory Usage',
+        actions: {
+          start: 'Start',
+          stop: 'Stop',
+          restart: 'Restart',
+          kill: 'Kill',
+        },
+      },
+    },
+  },
 }
