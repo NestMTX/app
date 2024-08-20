@@ -13,6 +13,7 @@ import crypto from 'node:crypto'
 import encryption from '@adonisjs/core/services/encryption'
 import Credential from '#models/credential'
 import dot from 'dot-object'
+dot.keepArray = true
 
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 
@@ -95,6 +96,15 @@ export default class Camera extends BaseModel {
       null !== this.info.traits
       ? dot.dot(this.info.traits)
       : {}
+  }
+
+  @computed({ serializeAs: 'protocols' })
+  get protocols() {
+    return Array.isArray(
+      this.#dottedTraits['sdm.devices.traits.CameraLiveStream.supportedProtocols']
+    )
+      ? this.#dottedTraits['sdm.devices.traits.CameraLiveStream.supportedProtocols'].join(', ')
+      : null
   }
 
   @computed({ serializeAs: 'resolution' })

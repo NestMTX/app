@@ -28,6 +28,7 @@
 import { defineComponent, ref, computed, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ModelIndex from '../../components/forms/modelIndex.vue'
+import { renderAsCode } from '../../utilities/renderers'
 import type { ToastService, ApiService } from '@jakguru/vueprint'
 export default defineComponent({
   name: 'CamerasIndex',
@@ -51,6 +52,13 @@ export default defineComponent({
         label: t('fields.room'),
         formatter: (value: unknown) => value as string,
         sortable: true,
+      },
+      {
+        key: 'protocols',
+        label: t('fields.protocols'),
+        formatter: (value: unknown) => value as string,
+        sortable: false,
+        renderer: renderAsCode,
       },
       {
         key: 'resolution',

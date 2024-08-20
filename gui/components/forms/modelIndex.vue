@@ -73,6 +73,9 @@
           <v-btn v-for="(a, i) in value" :key="`item-${value.id}-action-${i}`" v-bind="a" />
         </v-toolbar-items>
       </template>
+      <template v-for="r in renderers" :key="`renderer-for-${r.key}`" #[r.key]="{ value }">
+        <component :is="r.renderer" :value="value"></component>
+      </template>
     </v-data-table-server>
   </div>
 </template>
@@ -81,10 +84,13 @@
 import { defineComponent, computed, ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { capitalCase } from 'change-case'
+import { renderAsDefault } from '../../utilities/renderers'
 import qs from 'qs'
 import type { PropType } from 'vue'
 import type { ApiService, SwalService } from '@jakguru/vueprint'
 import type { VDataTableServer } from 'vuetify/components/VDataTable/'
+
+type ModelIndexFieldRenderer = typeof renderAsDefault
 
 interface ModelIndexFieldTextFormatter {
   // eslint-disable-next-line no-unused-vars
@@ -119,6 +125,7 @@ interface ModelIndexField {
   maxWidth?: string | undefined
   sortable?: boolean | undefined
   cellProps?: Record<string, any> | undefined
+  renderer?: ModelIndexFieldRenderer
 }
 
 export default defineComponent({
@@ -180,6 +187,12 @@ export default defineComponent({
           sortable: c.sortable,
           cellProps: c.cellProps,
         }))
+    )
+    const renderers = computed(() =>
+      [...columns.value].map((c) => ({
+        key: `item.${c.key}`,
+        renderer: c.renderer || renderAsDefault,
+      }))
     )
     const totalItems = ref(0)
     const loading = ref(false)
@@ -306,6 +319,7 @@ export default defineComponent({
       modelI18nPluralCapitalized,
       table,
       hasActions,
+      renderers,
     }
   },
 })
