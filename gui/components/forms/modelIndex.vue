@@ -286,6 +286,7 @@ export default defineComponent({
       table,
       hasActions,
       renderers,
+      manualLoadItems,
     }
   },
 })

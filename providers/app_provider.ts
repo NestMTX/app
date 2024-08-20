@@ -14,6 +14,7 @@ import { connect as MqttConnect } from 'mqtt'
 import Joi from 'joi'
 import { MqttService } from '#services/mqtt'
 import { MediaMTXService } from '#services/mediamtx'
+import { GStreamerService } from '#services/gstreamer'
 import { NATService } from '#services/nat'
 import { ICEService } from '#services/ice'
 import { IPCService } from '#services/ipc'
@@ -29,6 +30,7 @@ declare module '@adonisjs/core/types' {
     'mqtt/broker'?: Server
     'mqtt/client'?: MqttClient
     'mediamtx': MediaMTXService
+    'gstreamer': GStreamerService
     'nat/service': NATService
     'ice/service': ICEService
     'ipc/service': IPCService
@@ -40,6 +42,7 @@ export default class AppProvider {
   #api: ApiService
   #io: SocketIoService
   #mediamtx: MediaMTXService
+  #gstreamer: GStreamerService
   #mqttBroker?: Server
   #mqtt?: MqttClient
   #nat: NATService
@@ -50,6 +53,7 @@ export default class AppProvider {
     this.#api = new ApiService()
     this.#io = new SocketIoService(this.app, this.#api)
     this.#mediamtx = new MediaMTXService(this.app)
+    this.#gstreamer = new GStreamerService(this.app)
     this.#nat = new NATService()
     this.#ice = new ICEService()
     this.#ipc = new IPCService(this.app)
@@ -65,6 +69,7 @@ export default class AppProvider {
     this.app.container.singleton('mqtt/broker', () => this.#mqttBroker)
     this.app.container.singleton('mqtt/client', () => this.#mqtt)
     this.app.container.singleton('mediamtx', () => this.#mediamtx)
+    this.app.container.singleton('gstreamer', () => this.#gstreamer)
     this.app.container.singleton('nat/service', () => this.#nat)
     this.app.container.singleton('ice/service', () => this.#ice)
     this.app.container.singleton('ipc/service', () => this.#ipc)
@@ -155,6 +160,7 @@ export default class AppProvider {
         logger.error('Invalid MQTT Configuration. Not connecting to MQTT Server.')
       }
       await this.#mediamtx.boot(logger, this.#nat, this.#ice)
+      await this.#gstreamer.boot(logger, this.#nat, this.#ice)
     }
     await init(this.#cron, logger as LoggerServiceWithConfig)
   }

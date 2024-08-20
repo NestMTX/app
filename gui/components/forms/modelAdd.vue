@@ -33,17 +33,8 @@ import { useForm } from 'vee-validate'
 import { useI18n } from 'vue-i18n'
 
 import type { PropType } from 'vue'
-import type { ValidationRule } from '@/utilities/validations'
 import type { ApiService, SwalService } from '@jakguru/vueprint'
-
-interface ModelAddField {
-  key: string
-  label: string
-  validator: ValidationRule
-  default: any
-  component: 'VTextField' | 'VPasswordField' | 'VAutocomplete' | 'VSwitch'
-  bindings: Record<string, any>
-}
+import type { ModelAddField } from '../../types/forms.js'
 
 export default defineComponent({
   name: 'ModelAdd',

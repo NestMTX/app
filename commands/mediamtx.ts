@@ -43,6 +43,8 @@ export default class Mediamtx extends BaseCommand {
       responseType: 'arraybuffer',
     })
     const dest = join(BASE_DIR, 'tmp', asset.name)
+    const binary = join(BASE_DIR, 'tmp', 'mediamtx')
+    const manifest = join(BASE_DIR, 'tmp', 'mediamtx.yml')
     await fs.promises.writeFile(dest, data)
     this.logger.success(`Downloaded MediaMTX Binary for ${platform} ${arch} to ${dest}`)
     const unzippedDest = join(BASE_DIR, 'tmp', nameMatch)
@@ -50,6 +52,8 @@ export default class Mediamtx extends BaseCommand {
       await fs.promises.mkdir(unzippedDest)
     } catch {}
     const extension = asset.name.replace(nameMatch, '')
+    this.logger.info(`Cleaning up existing assets`)
+    await Promise.all([fs.promises.unlink(binary), fs.promises.unlink(manifest)])
     this.logger.info(`Uncompressing ${asset.name}`)
     switch (extension) {
       case '.zip':

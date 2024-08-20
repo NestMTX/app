@@ -120,7 +120,7 @@ export class MediaMTXService {
        * Update the API configuration
        */
       api: true,
-      apiAddress: `${env.get('HOST')}:${env.get('MEDIA_MTX_RTSP_API_PORT', 9997)}`,
+      apiAddress: `${env.get('HOST')}:${env.get('MEDIA_MTX_API_PORT', 9997)}`,
       apiTrustedProxies: ['127.0.0.1', '::1', ...nat.lanIps],
       apiEncryption: false,
       /**

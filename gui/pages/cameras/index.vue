@@ -13,7 +13,27 @@
                     search-end-point="/api/cameras/"
                     :columns="modelIndexColumns"
                     :actions="modelIndexActions"
-                  />
+                  >
+                    <template #action-buttons>
+                      <v-badge icon="mdi-sync" color="primary" :model-value="!cloudSyncRunning">
+                        <v-btn
+                          :icon="true"
+                          variant="elevated"
+                          size="38"
+                          title="Syncronize from the Cloud"
+                          :loading="cloudSyncRunning"
+                          @click="doCloudSync"
+                        >
+                          <img
+                            :src="gcpcSvg"
+                            alt="Syncronize from the Cloud"
+                            width="16px"
+                            height="16px"
+                          />
+                        </v-btn>
+                      </v-badge>
+                    </template>
+                  </ModelIndex>
                 </v-col>
               </v-row>
             </v-container>
@@ -25,16 +45,12 @@
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  computed,
-  // inject
-} from 'vue'
+import { defineComponent, ref, computed, inject, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ModelIndex from '../../components/forms/modelIndex.vue'
 import { renderAsCode, renderAsDeviceChip } from '../../utilities/renderers'
-// import type { ToastService, ApiService } from '@jakguru/vueprint'
+import gcpcSvg from '../../assets/brand-icons/cloud-platform-console.google.svg'
+import type { ToastService, ApiService, CronService } from '@jakguru/vueprint'
 export default defineComponent({
   name: 'CamerasIndex',
   components: {
@@ -43,8 +59,9 @@ export default defineComponent({
   setup() {
     const modelIndex = ref<typeof ModelIndex | undefined>(undefined)
     const { t } = useI18n({ useScope: 'global' })
-    // const toast = inject<ToastService>('toast')!
-    // const api = inject<ApiService>('api')!
+    const toast = inject<ToastService>('toast')!
+    const api = inject<ApiService>('api')!
+    const cron = inject<CronService>('cron')!
     const modelIndexColumns = computed(() => [
       {
         key: 'name',
@@ -113,10 +130,41 @@ export default defineComponent({
       //   },
       // },
     ])
+    const cloudSyncRunning = ref(false)
+    const doCloudSync = async () => {
+      cloudSyncRunning.value = true
+      const { status } = await api.put(`/api/cronjobs/SyncCloudCamerasJob/`)
+      if (status === 201) {
+        toast.fire({
+          title: t('dialogs.cronjobs.run.success.title'),
+          icon: 'success',
+        })
+      } else {
+        toast.fire({
+          title: t('dialogs.cronjobs.run.failure.title'),
+          icon: 'error',
+        })
+      }
+      cloudSyncRunning.value = false
+    }
+    const refreshEveryMinute = () => {
+      if (modelIndex.value) {
+        modelIndex.value.manualLoadItems()
+      }
+    }
+    onMounted(() => {
+      cron.$on('* * * * *', refreshEveryMinute)
+    })
+    onBeforeUnmount(() => {
+      cron.$off('* * * * *', refreshEveryMinute)
+    })
     return {
       modelIndex,
       modelIndexColumns,
       modelIndexActions,
+      cloudSyncRunning,
+      doCloudSync,
+      gcpcSvg,
     }
   },
 })

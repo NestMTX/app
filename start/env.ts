@@ -68,7 +68,7 @@ export default await Env.create(new URL('../', import.meta.url), {
    */
   MEDIA_MTX_PATH: Env.schema.string(),
   MEDIA_MTX_CONFIG_PATH: Env.schema.string(),
-  MEDIA_MTX_RTSP_API_PORT: Env.schema.number.optional(),
+  MEDIA_MTX_API_PORT: Env.schema.number.optional(),
   MEDIA_MTX_PLAYBACK_ENABLED: Env.schema.boolean.optional(),
   MEDIA_MTX_RTSP_PLAYBACK_PORT: Env.schema.number.optional(),
   MEDIA_MTX_RTSP_ENABLED: Env.schema.boolean.optional(),

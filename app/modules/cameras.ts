@@ -24,9 +24,8 @@ export default class CamerasModule implements ApiServiceModule {
     const query = db.from(Camera.table)
     if (search) {
       query.where((builder) => {
-        builder.where('description', 'like', `%${search}%`)
-        builder.orWhere('oauth_client_id', 'like', `%${search}%`)
-        builder.orWhere('dac_project_id', 'like', `%${search}%`)
+        builder.where('room', 'like', `%${search}%`)
+        builder.orWhere('name', 'like', `%${search}%`)
       })
     }
     if (sortBy) {
@@ -47,7 +46,6 @@ export default class CamerasModule implements ApiServiceModule {
         return camera
       })
     )
-    console.log(items)
     const ret = {
       ...context.payload,
       page: pageAsInt,

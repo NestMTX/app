@@ -1,4 +1,5 @@
 import type { renderAsDefault } from '../../utilities/renderers'
+import type { ValidationRule } from '../../utilities/validations'
 
 export type ModelIndexFieldRenderer = typeof renderAsDefault
 
@@ -33,4 +34,13 @@ export interface ModelIndexField {
   sortable?: boolean | undefined
   cellProps?: Record<string, any> | undefined
   renderer?: ModelIndexFieldRenderer
+}
+
+export interface ModelAddField {
+  key: string
+  label: string
+  validator: ValidationRule
+  default: any
+  component: 'VTextField' | 'VPasswordField' | 'VAutocomplete' | 'VSwitch'
+  bindings: Record<string, any>
 }

@@ -58,7 +58,7 @@ export default defineComponent({
         const { status, data } = await api.get(uri)
         if (status === 200) {
           toast.fire({
-            title: t('dialog.credentials.authorize.success'),
+            title: t('dialogs.credentials.authorize.success'),
             icon: 'success',
           })
         } else {
@@ -91,7 +91,7 @@ export default defineComponent({
           icon: 'error',
         })
       }
-      router.push(localeRoute({ name: 'credentials' }))
+      router.push(localeRoute({ name: 'credentials' })!)
     }
 
     onMounted(() => {

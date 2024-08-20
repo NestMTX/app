@@ -145,6 +145,7 @@ import ModelIndex from '../../components/forms/modelIndex.vue'
 import ModelAdd from '../../components/forms/modelAdd.vue'
 import gcpcSvg from '../../assets/brand-icons/cloud-platform-console.google.svg'
 import type { ToastService, ApiService } from '@jakguru/vueprint'
+import type { ModelAddField } from '../../types/forms.js'
 export default defineComponent({
   name: 'Credentials',
   components: {
@@ -153,7 +154,7 @@ export default defineComponent({
     ModelAdd,
   },
   setup() {
-    const modelIndex = ref<ModelIndex | undefined>(undefined)
+    const modelIndex = ref<typeof ModelIndex | undefined>(undefined)
     const { t } = useI18n({ useScope: 'global' })
     const toast = inject<ToastService>('toast')!
     const api = inject<ApiService>('api')!
@@ -271,7 +272,7 @@ export default defineComponent({
           validator: validatorFactory(Joi.string().required()),
           default: '',
           component: 'VTextField',
-          bindings: {},
+          bindings: {} as any,
         },
         {
           key: 'oauth_client_id',
@@ -279,7 +280,7 @@ export default defineComponent({
           validator: validatorFactory(Joi.string().required()),
           default: '',
           component: 'VTextField',
-          bindings: {},
+          bindings: {} as any,
         },
         {
           key: 'oauth_client_secret',
@@ -287,7 +288,7 @@ export default defineComponent({
           validator: validatorFactory(Joi.string().required()),
           default: '',
           component: 'VPasswordField',
-          bindings: {},
+          bindings: {} as any,
         },
         {
           key: 'dac_project_id',
@@ -295,9 +296,9 @@ export default defineComponent({
           validator: validatorFactory(Joi.string().allow(null)),
           default: null,
           component: 'VTextField',
-          bindings: {},
+          bindings: {} as any,
         },
-      ],
+      ] as ModelAddField[],
       addEndPoint: '/api/credentials/',
     }))
     const onModelAddSubmitted = () => {

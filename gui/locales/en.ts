@@ -17,6 +17,7 @@ export default {
     resolution: 'Resolution',
     codecs_video: 'Video Codecs',
     codecs_audio: 'Audio Codecs',
+    room: 'Room',
   },
   actions: {
     login: 'Log In',
@@ -425,6 +426,13 @@ export default {
     add: {
       success: {
         title: 'Created Successfully',
+      },
+    },
+    cronjobs: {
+      run: {
+        success: {
+          title: 'Job Ran Successfully',
+        },
       },
     },
   },
