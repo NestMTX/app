@@ -10,12 +10,12 @@ import cameraBatteryPosterizedPng from '../../assets/device-icons/camera.battery
 import cameraFloodlightFullPng from '../../assets/device-icons/camera.floodlight.full.png'
 import cameraFloodlightIconPng from '../../assets/device-icons/camera.floodlight.icon.png'
 import cameraFloodlightPosterizedPng from '../../assets/device-icons/camera.floodlight.posterized.png'
-import cameraLegacyFullPng from '../../assets/device-icons/camera.legacy.full.png'
-import cameraLegacyIconPng from '../../assets/device-icons/camera.legacy.icon.png'
-import cameraLegacyPosterizedPng from '../../assets/device-icons/camera.legacy.posterized.png'
-// import cameraWiredFullPng from '../../assets/device-icons/camera.wired.full.png'
-// import cameraWiredIconPng from '../../assets/device-icons/camera.wired.icon.png'
-// import cameraWiredPosterizedPng from '../../assets/device-icons/camera.wired.posterized.png'
+// import cameraLegacyFullPng from '../../assets/device-icons/camera.legacy.full.png'
+// import cameraLegacyIconPng from '../../assets/device-icons/camera.legacy.icon.png'
+// import cameraLegacyPosterizedPng from '../../assets/device-icons/camera.legacy.posterized.png'
+import cameraWiredFullPng from '../../assets/device-icons/camera.wired.full.png'
+import cameraWiredIconPng from '../../assets/device-icons/camera.wired.icon.png'
+import cameraWiredPosterizedPng from '../../assets/device-icons/camera.wired.posterized.png'
 import cameraWiredIndoorFullPng from '../../assets/device-icons/camera.wired.indoor.full.png'
 import cameraWiredIndoorIconPng from '../../assets/device-icons/camera.wired.indoor.icon.png'
 import cameraWiredIndoorPosterizedPng from '../../assets/device-icons/camera.wired.indoor.posterized.png'
@@ -57,7 +57,7 @@ export default defineComponent({
             case 'Nest Cam with floodlight':
               return cameraFloodlightFullPng
             case 'Nest Cam (indoor, wired)':
-              return cameraWiredIndoorFullPng
+              return cameraWiredFullPng
             case 'Nest Hub Max':
               return displayFullPng
             case 'Nest Doorbell (legacy)':
@@ -68,7 +68,7 @@ export default defineComponent({
               return doorbellWiredFullPng
             case 'Nest Cam (legacy)':
             default:
-              return cameraLegacyFullPng
+              return cameraWiredIndoorFullPng
           }
 
         case 'posterized':
@@ -78,7 +78,7 @@ export default defineComponent({
             case 'Nest Cam with floodlight':
               return cameraFloodlightPosterizedPng
             case 'Nest Cam (indoor, wired)':
-              return cameraWiredIndoorPosterizedPng
+              return cameraWiredPosterizedPng
             case 'Nest Hub Max':
               return displayPosterizedPng
             case 'Nest Doorbell (legacy)':
@@ -89,7 +89,7 @@ export default defineComponent({
               return doorbellWiredPosterizedPng
             case 'Nest Cam (legacy)':
             default:
-              return cameraLegacyPosterizedPng
+              return cameraWiredIndoorPosterizedPng
           }
 
         default:
@@ -99,7 +99,7 @@ export default defineComponent({
             case 'Nest Cam with floodlight':
               return cameraFloodlightIconPng
             case 'Nest Cam (indoor, wired)':
-              return cameraWiredIndoorIconPng
+              return cameraWiredIconPng
             case 'Nest Hub Max':
               return displayIconPng
             case 'Nest Doorbell (legacy)':
@@ -110,7 +110,7 @@ export default defineComponent({
               return doorbellWiredIconPng
             case 'Nest Cam (legacy)':
             default:
-              return cameraLegacyIconPng
+              return cameraWiredIndoorIconPng
           }
       }
     })

@@ -25,21 +25,26 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, inject } from 'vue'
+import {
+  defineComponent,
+  ref,
+  computed,
+  // inject
+} from 'vue'
 import { useI18n } from 'vue-i18n'
 import ModelIndex from '../../components/forms/modelIndex.vue'
-import { renderAsCode } from '../../utilities/renderers'
-import type { ToastService, ApiService } from '@jakguru/vueprint'
+import { renderAsCode, renderAsDeviceChip } from '../../utilities/renderers'
+// import type { ToastService, ApiService } from '@jakguru/vueprint'
 export default defineComponent({
   name: 'CamerasIndex',
   components: {
     ModelIndex,
   },
   setup() {
-    const modelIndex = ref<ModelIndex | undefined>(undefined)
+    const modelIndex = ref<typeof ModelIndex | undefined>(undefined)
     const { t } = useI18n({ useScope: 'global' })
-    const toast = inject<ToastService>('toast')!
-    const api = inject<ApiService>('api')!
+    // const toast = inject<ToastService>('toast')!
+    // const api = inject<ApiService>('api')!
     const modelIndexColumns = computed(() => [
       {
         key: 'name',
@@ -65,6 +70,7 @@ export default defineComponent({
         label: t('fields.identified_as'),
         formatter: (value: unknown) => value as string,
         sortable: false,
+        renderer: renderAsDeviceChip,
       },
       {
         key: 'resolution',

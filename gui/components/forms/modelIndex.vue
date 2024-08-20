@@ -89,44 +89,7 @@ import qs from 'qs'
 import type { PropType } from 'vue'
 import type { ApiService, SwalService } from '@jakguru/vueprint'
 import type { VDataTableServer } from 'vuetify/components/VDataTable/'
-
-type ModelIndexFieldRenderer = typeof renderAsDefault
-
-interface ModelIndexFieldTextFormatter {
-  // eslint-disable-next-line no-unused-vars
-  (value: unknown, row: Record<string, unknown>): string
-}
-
-interface ModelIndexActionCallback {
-  // eslint-disable-next-line no-unused-vars
-  (row: Record<string, unknown>): void | Promise<void>
-}
-
-interface ModelIndexActionCondition {
-  // eslint-disable-next-line no-unused-vars
-  (row: Record<string, unknown>): boolean
-}
-
-interface ModelIndexAction {
-  icon: string
-  color?: undefined | string
-  label: string
-  callback: ModelIndexActionCallback
-  condition?: ModelIndexActionCondition
-}
-
-interface ModelIndexField {
-  key: string
-  label: string
-  formatter: ModelIndexFieldTextFormatter
-  align?: 'start' | 'end' | 'center' | undefined
-  width?: string | number | undefined
-  minWidth?: string | undefined
-  maxWidth?: string | undefined
-  sortable?: boolean | undefined
-  cellProps?: Record<string, any> | undefined
-  renderer?: ModelIndexFieldRenderer
-}
+import type { ModelIndexField, ModelIndexAction } from '../../types/forms.js'
 
 export default defineComponent({
   name: 'ModelIndex',
@@ -171,6 +134,9 @@ export default defineComponent({
               sortable: false,
               width: '100px',
               cellProps: { class: 'px-0' },
+              align: undefined,
+              maxWidth: undefined,
+              minWidth: undefined,
             }
           : undefined,
         ...columns.value,
@@ -190,7 +156,7 @@ export default defineComponent({
     )
     const renderers = computed(() =>
       [...columns.value].map((c) => ({
-        key: `item.${c.key}`,
+        key: `item.${c.key}` as `item.${string}`,
         renderer: c.renderer || renderAsDefault,
       }))
     )
