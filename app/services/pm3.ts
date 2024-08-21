@@ -24,6 +24,8 @@ export interface PM3ProcessOptions {
   gid?: number
   signal?: AbortSignal
   verbose?: boolean
+  restart?: boolean
+  maxRestarts?: number
 }
 
 export interface PM3ProcessEventMap {
@@ -67,12 +69,14 @@ export class PM3NoSuchProcess extends Error {
 }
 
 export class PM3 extends EventEmitter<PM3ProcessEventMap> {
+  readonly #options: Map<string, PM3ProcessOptions>
   readonly #desired: Map<string, DesiredProcess>
   readonly #processes: Map<string, ExecaChildProcess>
   readonly #abortControllers: Map<string, AbortController>
 
   constructor() {
     super({ captureRejections: true })
+    this.#options = new Map()
     this.#desired = new Map()
     this.#processes = new Map()
     this.#abortControllers = new Map()
@@ -145,6 +149,7 @@ export class PM3 extends EventEmitter<PM3ProcessEventMap> {
       options: opts,
     }
     await this.#cleanup(name)
+    this.#options.set(name, { name, ...options })
     this.#desired.set(name, desired)
     this.#abortControllers.set(name, abortController)
     if (start) {
@@ -153,13 +158,28 @@ export class PM3 extends EventEmitter<PM3ProcessEventMap> {
   }
 
   start(name: string) {
+    this.#start(name)
+  }
+
+  #start(name: string, attempt: number = 0) {
     const desired = this.#desired.get(name)
-    if (!desired) {
+    const options = this.#options.get(name)
+    if (!desired || !options) {
       throw new PM3NoSuchProcess(name)
     }
     let process = this.#processes.get(name)
     if (!process || process.exitCode !== null) {
       process = execa(desired.file, desired.arguments, desired.options)
+      process.on('exit', () => {
+        const restartable = 'undefined' === typeof options.restart || true === options.restart
+        const maxRestarts =
+          'number' === typeof options.maxRestarts && options.maxRestarts > 0
+            ? options.maxRestarts
+            : Number.POSITIVE_INFINITY
+        if (restartable && attempt < maxRestarts) {
+          this.#start(name, attempt + 1)
+        }
+      })
       if (process.stdout) {
         process.stdout.on('data', (chunk) => this.#onStdOut(name, chunk))
       }
