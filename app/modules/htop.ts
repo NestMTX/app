@@ -1,10 +1,10 @@
 import { ApiServiceModule } from '#services/api'
 import os from 'node:os'
+import pidusage from 'pidusage'
 
 import type { ApplicationService } from '@adonisjs/core/types'
-import type PM2 from 'pm2'
-
-import type { ProcessDescription } from 'pm2'
+import type { PM3 } from '#services/pm3'
+import type { UpdateCommandContext } from '#services/api'
 
 export default class HtopModule implements ApiServiceModule {
   #app: ApplicationService
@@ -45,6 +45,28 @@ export default class HtopModule implements ApiServiceModule {
     }
   }
 
+  async update(ctx: UpdateCommandContext) {
+    const pm3: PM3 = await this.#app.container.make('pm3')
+    const { action } = ctx.payload
+    switch (action) {
+      case 'start':
+        await pm3.start(ctx.entity)
+        break
+
+      case 'stop':
+        await pm3.stop(ctx.entity)
+        break
+
+      case 'restart':
+        await pm3.restart(ctx.entity)
+        break
+
+      default:
+        throw new Error(`Unknown action: ${action}`)
+    }
+    return {}
+  }
+
   async #getCpuUsage() {
     const cpus = os.cpus()
     return cpus.map((cpu, index) => {
@@ -71,24 +93,17 @@ export default class HtopModule implements ApiServiceModule {
   }
 
   async #getProcessList() {
-    const pm2: typeof PM2 = await this.#app.container.make('pm2')
-    const list: ProcessDescription[] = await new Promise<ProcessDescription[]>(
-      (resolve, reject) => {
-        pm2.list((err, processDescriptionList) => {
-          if (err) {
-            return reject(err)
-          } else {
-            return resolve(processDescriptionList)
-          }
-        })
-      }
-    )
-    return list.map((p) => ({
-      pid: p.pid,
-      name: p.name,
-      cpu: p.monit?.cpu || 0,
-      memory: p.monit?.memory || 0,
-    }))
+    const pm3: PM3 = await this.#app.container.make('pm3')
+    const usage = await pidusage(process.pid)
+    const nestMtxProcess = {
+      name: 'nestmtx',
+      pid: process.pid,
+      cpu: usage.cpu,
+      memory: usage.memory,
+      uptime: usage.elapsed,
+    }
+    const children = await pm3.stats()
+    return [nestMtxProcess, ...children]
   }
 
   get $descriptionOfList() {

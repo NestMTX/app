@@ -20,7 +20,7 @@ import { ICEService } from '#services/ice'
 import { IPCService } from '#services/ipc'
 import { MiliCron } from '@jakguru/milicron'
 import { init } from '#services/cron'
-import pm2 from 'pm2'
+import { PM3 } from '#services/pm3'
 
 const base = new URL('../', import.meta.url).pathname
 
@@ -32,7 +32,7 @@ declare module '@adonisjs/core/types' {
     'mqtt/client'?: MqttClient
     'mediamtx': MediaMTXService
     'gstreamer': GStreamerService
-    'pm2': typeof pm2
+    'pm3': PM3
     'nat/service': NATService
     'ice/service': ICEService
     'ipc/service': IPCService
@@ -51,6 +51,7 @@ export default class AppProvider {
   #ice: ICEService
   #ipc: IPCService
   #cron: MiliCron
+  #pm3: PM3
   constructor(protected app: ApplicationService) {
     this.#api = new ApiService()
     this.#io = new SocketIoService(this.app, this.#api)
@@ -60,6 +61,7 @@ export default class AppProvider {
     this.#ice = new ICEService()
     this.#ipc = new IPCService(this.app)
     this.#cron = new MiliCron()
+    this.#pm3 = new PM3()
   }
 
   /**
@@ -72,7 +74,7 @@ export default class AppProvider {
     this.app.container.singleton('mqtt/client', () => this.#mqtt)
     this.app.container.singleton('mediamtx', () => this.#mediamtx)
     this.app.container.singleton('gstreamer', () => this.#gstreamer)
-    this.app.container.singleton('pm2', () => pm2)
+    this.app.container.singleton('pm3', () => this.#pm3)
     this.app.container.singleton('nat/service', () => this.#nat)
     this.app.container.singleton('ice/service', () => this.#ice)
     this.app.container.singleton('ipc/service', () => this.#ipc)
@@ -84,6 +86,10 @@ export default class AppProvider {
    */
   async boot() {
     const logger = await this.app.container.make('logger')
+    const pm3Logger = logger.child({ service: 'pm3' })
+    this.#pm3.on('debug', (message) => {
+      pm3Logger.info(message)
+    })
     const env = this.app.getEnvironment()
     if ('web' === env) {
       await this.#nat.boot(logger as LoggerServiceWithConfig)
@@ -162,19 +168,8 @@ export default class AppProvider {
       } else {
         logger.error('Invalid MQTT Configuration. Not connecting to MQTT Server.')
       }
-      logger.info('Connecting to PM2 Daemon...')
-      await new Promise<void>((resolve, reject) => {
-        pm2.connect(true, (err: Error) => {
-          if (err) {
-            logger.error('Failed to connect to PM2 Daemon')
-            logger.error(err)
-            return reject(err)
-          } else {
-            logger.info('Connected to PM2 Daemon')
-            return resolve()
-          }
-        })
-      })
+      await this.#mediamtx.boot(logger, this.#nat, this.#ice, this.#pm3)
+      await this.#gstreamer.boot(logger, this.#nat, this.#ice, this.#pm3)
     }
     await init(this.#cron, logger as LoggerServiceWithConfig)
   }
@@ -200,12 +195,6 @@ export default class AppProvider {
     if ('web' === env) {
       await this.#io.start(server)
       logger.info('Socket.IO Server Attached')
-      /**
-       * TODO: Create a way to start these services
-       * Need a dedicated process manager - let's call it PM3
-       */
-      // await this.#mediamtx.boot(logger, this.#nat, this.#ice, pm2)
-      // await this.#gstreamer.boot(logger, this.#nat, this.#ice, pm2)
     }
     if (this.#mqtt) {
       new MqttService(this.#api, this.#mqtt, logger)
@@ -219,6 +208,8 @@ export default class AppProvider {
     const logger = await this.app.container.make('logger')
     const env = this.app.getEnvironment()
     if ('web' === env) {
+      logger.info('Shutting down child processes')
+      await this.#pm3.kill()
       logger.info('Shutting down Cron Service...')
       this.#cron.stop()
       await this.#ipc.shutdown()

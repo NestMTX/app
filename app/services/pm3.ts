@@ -37,8 +37,14 @@ export interface PM3ProcessEventMap {
    * `stderr:<name>` - Emitted when a process writes to stderr
    */
   [event: `stderr:${string}`]: [string]
+  /**
+   * `error:<name>` - Emitted when a process writes to stderr
+   */
+  [event: `error:${string}`]: [string]
   'log:out': [string, string]
   'log:err': [string, string]
+  'caught:error': [string, string]
+  'debug': [string]
 }
 
 export interface PM3SyncProcessInformation {
@@ -83,10 +89,10 @@ export class PM3 extends EventEmitter<PM3ProcessEventMap> {
   }
 
   get processes(): PM3SyncProcessInformation[] {
-    return [...this.#processes].map(([name, process]) => ({
-      name,
-      pid: process.pid || null,
-    }))
+    return [...this.#desired].map(([name]) => {
+      const process = this.#processes.get(name)
+      return { name, pid: process && process.pid ? process.pid : null }
+    })
   }
 
   async stats(): Promise<PM3ProcessInformation[]> {
@@ -101,10 +107,14 @@ export class PM3 extends EventEmitter<PM3ProcessEventMap> {
         if (!op.pid) {
           return ret
         }
-        const usage = await pidusage(op.pid)
-        ret.cpu = usage.cpu
-        ret.memory = usage.memory
-        ret.uptime = usage.elapsed
+        try {
+          const usage = await pidusage(op.pid)
+          ret.cpu = usage.cpu
+          ret.memory = usage.memory
+          ret.uptime = usage.elapsed
+        } catch {
+          // noop
+        }
         return ret
       })
     )
@@ -117,10 +127,12 @@ export class PM3 extends EventEmitter<PM3ProcessEventMap> {
       }
       return await this.start(name)
     }
-    const abortController = new AbortController()
     if (options.signal) {
       options.signal.addEventListener('abort', () => {
-        abortController.abort()
+        const abortController = this.#abortControllers.get(name)
+        if (abortController) {
+          abortController.abort()
+        }
       })
     }
     const opts: ProcessOptions = {
@@ -140,7 +152,6 @@ export class PM3 extends EventEmitter<PM3ProcessEventMap> {
       gid: options.gid,
       shell: false,
       timeout: 0,
-      signal: abortController.signal,
       verbose: options.verbose,
     }
     const desired: DesiredProcess = {
@@ -151,7 +162,6 @@ export class PM3 extends EventEmitter<PM3ProcessEventMap> {
     await this.#cleanup(name)
     this.#options.set(name, { name, ...options })
     this.#desired.set(name, desired)
-    this.#abortControllers.set(name, abortController)
     if (start) {
       return this.start(name)
     }
@@ -162,13 +172,22 @@ export class PM3 extends EventEmitter<PM3ProcessEventMap> {
   }
 
   #start(name: string, attempt: number = 0) {
+    this.#debug(`Starting process: ${name}`)
     const desired = this.#desired.get(name)
     const options = this.#options.get(name)
     if (!desired || !options) {
+      this.#debug(`Missing process information for: ${name}`)
       throw new PM3NoSuchProcess(name)
     }
     let process = this.#processes.get(name)
     if (!process || process.exitCode !== null) {
+      this.#debug(`Starting new process: ${name}`)
+      const abortController = new AbortController()
+      this.#abortControllers.set(name, abortController)
+      desired.options = {
+        ...desired.options,
+        signal: abortController.signal,
+      }
       process = execa(desired.file, desired.arguments, desired.options)
       process.on('exit', () => {
         const restartable = 'undefined' === typeof options.restart || true === options.restart
@@ -180,33 +199,52 @@ export class PM3 extends EventEmitter<PM3ProcessEventMap> {
           this.#start(name, attempt + 1)
         }
       })
+      process.catch((e) => {
+        this.#onError(name, e)
+      })
       if (process.stdout) {
         process.stdout.on('data', (chunk) => this.#onStdOut(name, chunk))
+        process.stdout.on('error', (error) => this.#onError(name, error))
       }
       if (process.stderr) {
         process.stderr.on('data', (chunk) => this.#onStdErr(name, chunk))
+        process.stderr.on('error', (error) => this.#onError(name, error))
       }
+      process.on('error', (error) => this.#onError(name, error))
       this.#processes.set(name, process)
+    } else {
+      this.#debug(`Process for ${name} is already running`)
     }
   }
 
   async stop(name: string, signal: NodeJS.Signals | number = 'SIGTERM') {
+    this.#debug(`Stopping process: ${name}`)
     if (!this.#desired.has(name)) {
+      this.#debug(`No process with name ${name} exists`)
       throw new PM3NoSuchProcess(name)
     }
     const process = this.#processes.get(name)
     const abortController = this.#abortControllers.get(name)
     if (!process || !abortController) {
-      throw new PM3NoSuchProcess(name)
+      this.#debug(`Process for ${name} is not running`)
+      return
     }
+    this.#debug(`Killing process: ${name}`)
     process.kill(signal)
+    await process
+    this.#debug(`Aborting controller for process: ${name}`)
     abortController.abort()
+    this.#debug(`Cleaning up process: ${name}`)
+    this.#processes.delete(name)
+    this.#abortControllers.delete(name)
     await process
   }
 
   async restart(name: string) {
+    this.#debug(`Restarting process: ${name}`)
     await this.stop(name)
     await this.start(name)
+    this.#debug(`Restarted process: ${name}`)
   }
 
   async remove(name: string) {
@@ -216,6 +254,14 @@ export class PM3 extends EventEmitter<PM3ProcessEventMap> {
       // noop
     }
     await this.#cleanup(name)
+  }
+
+  async kill(signal: NodeJS.Signals | number = 'SIGTERM') {
+    await Promise.all(
+      [...this.#processes].map(async ([name]) => {
+        await this.stop(name, signal)
+      })
+    )
   }
 
   emit(): never {
@@ -249,12 +295,24 @@ export class PM3 extends EventEmitter<PM3ProcessEventMap> {
     this.#onOutput(name, chunk, 'stderr')
   }
 
-  #onOutput(name: string, chunk: Buffer, type: 'stdout' | 'stderr') {
-    let logtype: 'log:out' | 'log:err'
+  #onError(name: string, error: Error) {
+    if (error.message.includes('The operation was aborted')) {
+      return
+    }
+    this.#onOutput(name, Buffer.from(error.stack!), 'error')
+  }
+
+  #onOutput(name: string, chunk: Buffer, type: 'stdout' | 'stderr' | 'error') {
+    let logtype: 'log:out' | 'log:err' | 'caught:error'
     switch (type) {
       case 'stderr':
         logtype = 'log:err'
         break
+
+      case 'error':
+        logtype = 'caught:error'
+        break
+
       default:
         logtype = 'log:out'
         break
@@ -267,5 +325,9 @@ export class PM3 extends EventEmitter<PM3ProcessEventMap> {
         super.emit(`${type}:${name}`, l)
         super.emit(logtype, name, l)
       })
+  }
+
+  #debug(message: string) {
+    super.emit('debug', message)
   }
 }

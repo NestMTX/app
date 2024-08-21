@@ -2,16 +2,12 @@
 import fs from 'node:fs/promises'
 import { existsSync, createReadStream } from 'node:fs'
 import { execa } from 'execa'
-import type PM2 from 'pm2'
+import type { PM3 } from '#services/pm3'
 import type { ApplicationService } from '@adonisjs/core/types'
 import type { LoggerService } from '@adonisjs/core/types'
 import type { Logger } from '@adonisjs/logger'
 import type { NATService } from '#services/nat'
 import type { ICEService } from '#services/ice'
-import type {
-  ProcessDescription,
-  // Proc
-} from 'pm2'
 import type { Readable } from 'node:stream'
 
 /**
@@ -31,72 +27,72 @@ export class GStreamerService {
     this.#stdErrLogPath = this.#app.tmpPath('gstreamer.stderr.log')
   }
 
-  async boot(logger: LoggerService, nat: NATService, ice: ICEService, pm2: typeof PM2) {
+  async boot(logger: LoggerService, nat: NATService, ice: ICEService, pm3: PM3) {
     this.#logger = logger.child({ service: 'gstreamer' })
-    await Promise.all([this.#makeFifo(this.#stdOutLogPath), this.#makeFifo(this.#stdErrLogPath)])
-    this.#stdOutStream = createReadStream(this.#stdOutLogPath)
-    this.#stdErrStream = createReadStream(this.#stdErrLogPath)
-    this.#stdOutStream.on('data', (chunk) => {
-      if (this.#logger) {
-        chunk
-          .toString()
-          .split('\n')
-          .filter((l: string) => l.trim().length > 0)
-          .forEach((l: string) => this.#logger!.info(l))
-      }
-    })
-    this.#stdErrStream.on('data', (chunk) => {
-      if (this.#logger) {
-        chunk
-          .toString()
-          .split('\n')
-          .filter((l: string) => l.trim().length > 0)
-          .forEach((l: string) => this.#logger!.error(l))
-      }
-    })
-    this.#stdOutStream.on('error', (err) => {
-      if (this.#logger) {
-        this.#logger.error(err)
-      }
-    })
-    this.#stdErrStream.on('error', (err) => {
-      if (this.#logger) {
-        this.#logger.error(err)
-      }
-    })
-    const list: ProcessDescription[] = await new Promise<ProcessDescription[]>(
-      (resolve, reject) => {
-        pm2.list((err, processDescriptionList) => {
-          if (err) {
-            return reject(err)
-          } else {
-            return resolve(processDescriptionList)
-          }
-        })
-      }
-    )
-    if (list.length > 0) {
-      const existing = list.filter(
-        (process) => 'string' === typeof process.name && process.name.startsWith('gstreamer')
-      )
-      if (existing.length > 0) {
-        logger.info('Stopping existing GStreamer Processes')
-        await Promise.all(
-          existing.map(async (process) => {
-            return new Promise<void>((resolve, reject) => {
-              pm2.delete(process.name!, (err) => {
-                if (err) {
-                  return reject(err)
-                } else {
-                  return resolve()
-                }
-              })
-            })
-          })
-        )
-        logger.info('Stopped existing GStreamer Processes')
-      }
-    }
+    // await Promise.all([this.#makeFifo(this.#stdOutLogPath), this.#makeFifo(this.#stdErrLogPath)])
+    // this.#stdOutStream = createReadStream(this.#stdOutLogPath)
+    // this.#stdErrStream = createReadStream(this.#stdErrLogPath)
+    // this.#stdOutStream.on('data', (chunk) => {
+    //   if (this.#logger) {
+    //     chunk
+    //       .toString()
+    //       .split('\n')
+    //       .filter((l: string) => l.trim().length > 0)
+    //       .forEach((l: string) => this.#logger!.info(l))
+    //   }
+    // })
+    // this.#stdErrStream.on('data', (chunk) => {
+    //   if (this.#logger) {
+    //     chunk
+    //       .toString()
+    //       .split('\n')
+    //       .filter((l: string) => l.trim().length > 0)
+    //       .forEach((l: string) => this.#logger!.error(l))
+    //   }
+    // })
+    // this.#stdOutStream.on('error', (err) => {
+    //   if (this.#logger) {
+    //     this.#logger.error(err)
+    //   }
+    // })
+    // this.#stdErrStream.on('error', (err) => {
+    //   if (this.#logger) {
+    //     this.#logger.error(err)
+    //   }
+    // })
+    // const list: ProcessDescription[] = await new Promise<ProcessDescription[]>(
+    //   (resolve, reject) => {
+    //     pm2.list((err, processDescriptionList) => {
+    //       if (err) {
+    //         return reject(err)
+    //       } else {
+    //         return resolve(processDescriptionList)
+    //       }
+    //     })
+    //   }
+    // )
+    // if (list.length > 0) {
+    //   const existing = list.filter(
+    //     (process) => 'string' === typeof process.name && process.name.startsWith('gstreamer')
+    //   )
+    //   if (existing.length > 0) {
+    //     logger.info('Stopping existing GStreamer Processes')
+    //     await Promise.all(
+    //       existing.map(async (process) => {
+    //         return new Promise<void>((resolve, reject) => {
+    //           pm2.delete(process.name!, (err) => {
+    //             if (err) {
+    //               return reject(err)
+    //             } else {
+    //               return resolve()
+    //             }
+    //           })
+    //         })
+    //       })
+    //     )
+    //     logger.info('Stopped existing GStreamer Processes')
+    //   }
+    // }
     this.#logger!.info('Starting GStreamer Processes')
     // await new Promise<Proc>((resolve, reject) => {
     //   pm2.start(

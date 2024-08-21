@@ -57,23 +57,42 @@
                   <th>{{ $t('index.htop.processes.name') }}</th>
                   <th>{{ $t('index.htop.processes.cpu') }}</th>
                   <th>{{ $t('index.htop.processes.memory') }}</th>
+                  <th>{{ $t('index.htop.processes.uptime') }}</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="(p, i) in processes" :key="`process-${i}`">
                   <td class="px-0">
-                    <v-toolbar-items class="h-100">
-                      <v-btn icon color="success-darken-2">
+                    <v-toolbar-items v-if="'nestmtx' !== p.name" class="h-100">
+                      <v-btn
+                        v-if="!p.pid"
+                        icon
+                        color="success-darken-2"
+                        :title="$t('action.start')"
+                        :loading="actionsInProgress[p.name] === 'start'"
+                        @click="doAction(p.name, 'start')"
+                      >
                         <v-icon>mdi-play</v-icon>
                       </v-btn>
-                      <v-btn icon color="warning">
-                        <v-icon>mdi-stop</v-icon>
-                      </v-btn>
-                      <v-btn icon color="warning">
+                      <v-btn
+                        v-if="!!p.pid"
+                        icon
+                        color="warning"
+                        :title="$t('action.restart')"
+                        :loading="actionsInProgress[p.name] === 'restart'"
+                        @click="doAction(p.name, 'restart')"
+                      >
                         <v-icon>mdi-restart</v-icon>
                       </v-btn>
-                      <v-btn icon color="error">
-                        <v-icon>mdi-cancel</v-icon>
+                      <v-btn
+                        v-if="!!p.pid"
+                        icon
+                        color="error"
+                        :title="$t('action.stop')"
+                        :loading="actionsInProgress[p.name] === 'stop'"
+                        @click="doAction(p.name, 'stop')"
+                      >
+                        <v-icon>mdi-stop</v-icon>
                       </v-btn>
                     </v-toolbar-items>
                   </td>
@@ -85,6 +104,18 @@
                   </td>
                   <td>{{ 'number' === typeof p.cpu ? `${Math.ceil(p.cpu)}%` : '' }}</td>
                   <td>{{ 'number' === typeof p.memory ? filesize(p.memory, { base: 2 }) : '' }}</td>
+                  <td>
+                    {{
+                      'number' === typeof p.uptime ? Duration.fromMillis(p.uptime).toHuman() : ''
+                    }}
+                  </td>
+                </tr>
+                <tr v-if="processes.length === 0">
+                  <td colspan="6" class="pa-0">
+                    <v-alert color="info" type="info" dense rounded="0">{{
+                      $t('index.htop.processes.empty')
+                    }}</v-alert>
+                  </td>
                 </tr>
               </tbody>
             </v-table>
@@ -107,6 +138,7 @@ import {
   triggerRef,
 } from 'vue'
 import { filesize } from 'filesize'
+import { Duration } from 'luxon'
 import type { CronService, ApiService } from '@jakguru/vueprint'
 
 interface CpuUsage {
@@ -125,10 +157,10 @@ interface MemoryUsage {
 
 interface ProcessDescription {
   name: string
-  pid: number
-  pm_id: number
-  memory: number
-  cpu: number
+  pid: number | null
+  memory: number | null
+  cpu: number | null
+  uptime: number | null
 }
 
 interface HtopResponse {
@@ -209,6 +241,25 @@ export default defineComponent({
       bgColor: 'transparent',
       height: 16,
     }))
+    const actionsInProgress = shallowRef<Record<string, 'start' | 'stop' | 'restart' | undefined>>(
+      {}
+    )
+    const doAction = async (name: string, action: 'start' | 'stop' | 'restart') => {
+      actionsInProgress.value[name] = action
+      triggerRef(actionsInProgress)
+      const { status } = await api.put(
+        `/api/htop/${name}`,
+        { action },
+        {
+          validateStatus: () => true,
+        }
+      )
+      if (201 === status) {
+        update()
+      }
+      actionsInProgress.value[name] = undefined
+      triggerRef(actionsInProgress)
+    }
     return {
       cpu: cpuProgressLinearBindings,
       memory,
@@ -217,6 +268,9 @@ export default defineComponent({
       updating,
       cpuCols,
       filesize,
+      Duration,
+      actionsInProgress,
+      doAction,
     }
   },
 })

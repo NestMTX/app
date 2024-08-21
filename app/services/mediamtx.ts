@@ -3,13 +3,12 @@ import fs from 'node:fs/promises'
 import yaml from 'yaml'
 import { existsSync, createReadStream } from 'node:fs'
 import { execa } from 'execa'
-import type PM2 from 'pm2'
+import type { PM3 } from '#services/pm3'
 import type { ApplicationService } from '@adonisjs/core/types'
 import type { LoggerService } from '@adonisjs/core/types'
 import type { Logger } from '@adonisjs/logger'
 import type { NATService } from '#services/nat'
 import type { ICEService } from '#services/ice'
-import type { ProcessDescription, Proc } from 'pm2'
 import type { Readable } from 'node:stream'
 
 /**
@@ -33,38 +32,16 @@ export class MediaMTXService {
     this.#stdErrLogPath = this.#app.tmpPath('mediamtx.stderr.log')
   }
 
-  async boot(logger: LoggerService, nat: NATService, ice: ICEService, pm2: typeof PM2) {
+  async boot(logger: LoggerService, nat: NATService, ice: ICEService, pm3: PM3) {
     this.#logger = logger.child({ service: 'mediamtx' })
-    await Promise.all([this.#makeFifo(this.#stdOutLogPath), this.#makeFifo(this.#stdErrLogPath)])
-    this.#stdOutStream = createReadStream(this.#stdOutLogPath)
-    this.#stdErrStream = createReadStream(this.#stdErrLogPath)
-    this.#stdOutStream.on('data', (chunk) => {
-      if (this.#logger) {
-        chunk
-          .toString()
-          .split('\n')
-          .filter((l: string) => l.trim().length > 0)
-          .forEach((l: string) => this.#logger!.info(l))
-      }
+    pm3.on('stdout:mediamtx', (data) => {
+      this.#logger!.info(data)
     })
-    this.#stdErrStream.on('data', (chunk) => {
-      if (this.#logger) {
-        chunk
-          .toString()
-          .split('\n')
-          .filter((l: string) => l.trim().length > 0)
-          .forEach((l: string) => this.#logger!.error(l))
-      }
+    pm3.on('stderr:mediamtx', (data) => {
+      this.#logger!.error(data)
     })
-    this.#stdOutStream.on('error', (err) => {
-      if (this.#logger) {
-        this.#logger.error(err)
-      }
-    })
-    this.#stdErrStream.on('error', (err) => {
-      if (this.#logger) {
-        this.#logger.error(err)
-      }
+    pm3.on('error:mediamtx', (data) => {
+      this.#logger!.error(data)
     })
     const mediaMtxConfigRaw = await fs.readFile(this.#configPath, 'utf-8')
     const mediaMtxConfig = yaml.parse(mediaMtxConfigRaw)
@@ -204,58 +181,47 @@ export class MediaMTXService {
         },
       })
     )
-    const list: ProcessDescription[] = await new Promise<ProcessDescription[]>(
-      (resolve, reject) => {
-        pm2.list((err, processDescriptionList) => {
-          if (err) {
-            return reject(err)
-          } else {
-            return resolve(processDescriptionList)
-          }
-        })
-      }
-    )
-    if (list.length > 0) {
-      const hasExisting = list.some((process) => process.name === 'mediamtx')
-      if (hasExisting) {
-        logger.info('Stopping existing MediaMTX service')
-        await new Promise<void>((resolve, reject) => {
-          pm2.delete('mediamtx', (err) => {
-            if (err) {
-              return reject(err)
-            } else {
-              return resolve()
-            }
-          })
-        })
-        logger.info('Stopped existing MediaMTX service')
-      }
+    const hasExisting = pm3.processes.some((process) => process.name === 'mediamtx')
+    if (hasExisting) {
+      this.#logger.info('Stopping & Removing existing MediaMTX service')
+      await pm3.remove('mediamtx')
+      this.#logger.info('Stopped & Removed existing MediaMTX service')
     }
     this.#logger!.info('Starting MediaMTX service')
-    await new Promise<Proc>((resolve, reject) => {
-      pm2.start(
-        {
-          name: 'mediamtx',
-          script: this.#binaryPath,
-          args: [updatedConfigPath],
-          autorestart: true,
-          max_restarts: 5,
-          cwd: this.#app.tmpPath(),
-          output: this.#stdOutLogPath,
-          error: this.#stdErrLogPath,
-          pid: this.#app.tmpPath('mediamtx.pid'),
-          time: false,
-          interpreter: 'none',
-        },
-        (err, proc: Proc) => {
-          if (err) {
-            return reject(err)
-          } else {
-            return resolve(proc)
-          }
-        }
-      )
-    })
+    pm3.add(
+      'mediamtx',
+      {
+        file: this.#binaryPath,
+        arguments: [updatedConfigPath],
+        restart: true,
+        maxRestarts: 5,
+      },
+      true
+    )
+    // await new Promise<Proc>((resolve, reject) => {
+    //   pm2.start(
+    //     {
+    //       name: 'mediamtx',
+    //       script: this.#binaryPath,
+    //       args: [updatedConfigPath],
+    //       autorestart: true,
+    //       max_restarts: 5,
+    //       cwd: this.#app.tmpPath(),
+    //       output: this.#stdOutLogPath,
+    //       error: this.#stdErrLogPath,
+    //       pid: this.#app.tmpPath('mediamtx.pid'),
+    //       time: false,
+    //       interpreter: 'none',
+    //     },
+    //     (err, proc: Proc) => {
+    //       if (err) {
+    //         return reject(err)
+    //       } else {
+    //         return resolve(proc)
+    //       }
+    //     }
+    //   )
+    // })
     this.#logger!.info('Started MediaMTX service')
   }
 

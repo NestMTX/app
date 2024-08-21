@@ -621,6 +621,8 @@ export default {
         name: 'Process Name',
         cpu: 'CPU Usage',
         memory: 'Memory Usage',
+        uptime: 'Uptime',
+        empty: 'NestMTX has no running processes',
         actions: {
           start: 'Start',
           stop: 'Stop',
