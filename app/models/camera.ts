@@ -1,3 +1,4 @@
+import env from '#start/env'
 import { DateTime } from 'luxon'
 import {
   BaseModel,
@@ -36,6 +37,12 @@ type CameraModel =
   | 'Nest Doorbell (battery)'
   | 'Nest Doorbell (wired)'
 
+interface GetBasePublicUrlOptions {
+  protocol?: string
+  pathname?: string
+  searchParams?: Record<string, string>
+}
+
 export default class Camera extends BaseModel {
   @column({ isPrimary: true })
   declare id: number
@@ -72,6 +79,9 @@ export default class Camera extends BaseModel {
 
   @beforeSave()
   static async encrypt(item: Camera) {
+    if (!encryption) {
+      return
+    }
     item.checksum = makeChecksum(item.uid)
     item.uid = encryption.encrypt(item.uid)
     item.info = item.info ? encryption.encrypt(JSON.stringify(item.info)) : null
@@ -85,6 +95,12 @@ export default class Camera extends BaseModel {
 
   @afterFind()
   static async decrypt(item: Camera) {
+    if (!item) {
+      return
+    }
+    if (!encryption) {
+      return
+    }
     item.uid = encryption.decrypt(item.uid)!
     item.info = item.info ? JSON.parse(encryption.decrypt(item.info)!) : null
     item.isEnabled = Boolean(item.isEnabled)
@@ -471,6 +487,172 @@ export default class Camera extends BaseModel {
   @computed({ serializeAs: 'stream_data_tx' })
   get stream_data_tx() {
     return this.#mediamtx_path && this.#mediamtx_path.ready ? this.#mediamtx_path.dataTx : 0
+  }
+
+  #getBasePublicUrl(port: number, options?: GetBasePublicUrlOptions) {
+    const defaultOptions = {
+      protocol: 'http',
+      pathname: '',
+      searchParams: {},
+    }
+    const defined = Object.assign({}, defaultOptions, options)
+    const base = `http://localhost:${port.toString()}`
+    const url = new URL(defined.pathname, base)
+    url.protocol = `${defined.protocol}:`
+    for (const key in defined.searchParams!) {
+      url.searchParams.set(key, defined.searchParams![key])
+    }
+    return url
+      .toString()
+      .replace('http:', `${defined.protocol}:`)
+      .replace(/\/\/(localhost|127\.0\.0\.1):/gm, '//<window.location.origin>:')
+  }
+
+  @computed({ serializeAs: 'url_rtsp_tcp' })
+  get url_rtsp_tcp() {
+    if (!this.mtxPath) {
+      return null
+    }
+    const enabled = env.get('MEDIA_MTX_RTSP_ENABLED', false)
+    if (!enabled) {
+      return null
+    }
+    const port = env.get('MEDIA_MTX_RTSP_TCP_PORT', 8554)
+    if (port <= 0) {
+      return null
+    }
+    return this.#getBasePublicUrl(port, {
+      protocol: 'rtsp',
+      pathname: `/${this.mtxPath}`,
+    })
+  }
+  @computed({ serializeAs: 'url_rtsp_udp_rtp' })
+  get url_rtsp_udp_rtp() {
+    if (!this.mtxPath) {
+      return null
+    }
+    const enabled = env.get('MEDIA_MTX_RTSP_ENABLED', false)
+    if (!enabled) {
+      return null
+    }
+    const port = env.get('MEDIA_MTX_RTSP_UDP_RTP_PORT', 8000)
+    if (port <= 0) {
+      return null
+    }
+    return this.#getBasePublicUrl(port, {
+      protocol: 'rtsp',
+      pathname: `/${this.mtxPath}`,
+    })
+  }
+  @computed({ serializeAs: 'url_rtsp_udp_rtcp' })
+  get url_rtsp_udp_rtcp() {
+    if (!this.mtxPath) {
+      return null
+    }
+    const enabled = env.get('MEDIA_MTX_RTSP_ENABLED', false)
+    if (!enabled) {
+      return null
+    }
+    const port = env.get('MEDIA_MTX_RTSP_UDP_RTCP_PORT', 8001)
+    if (port <= 0) {
+      return null
+    }
+    return this.#getBasePublicUrl(port, {
+      protocol: 'rtsp',
+      pathname: `/${this.mtxPath}`,
+    })
+  }
+  @computed({ serializeAs: 'url_rtmp' })
+  get url_rtmp() {
+    if (!this.mtxPath) {
+      return null
+    }
+    const enabled = env.get('MEDIA_MTX_RTMP_ENABLED', false)
+    if (!enabled) {
+      return null
+    }
+    const port = env.get('MEDIA_MTX_RTMP_PORT', 1935)
+    if (port <= 0) {
+      return null
+    }
+    return this.#getBasePublicUrl(port, {
+      protocol: 'rtmp',
+      pathname: `/${this.mtxPath}`,
+    })
+  }
+  @computed({ serializeAs: 'url_hls' })
+  get url_hls() {
+    if (!this.mtxPath) {
+      return null
+    }
+    const enabled = env.get('MEDIA_MTX_HLS_ENABLED', false)
+    if (!enabled) {
+      return null
+    }
+    const port = env.get('MEDIA_MTX_HLS_PORT', 8888)
+    if (port <= 0) {
+      return null
+    }
+    return this.#getBasePublicUrl(port, {
+      protocol: 'http',
+      pathname: `/${this.mtxPath}`,
+    })
+  }
+  @computed({ serializeAs: 'url_hls_m3u8' })
+  get url_hls_m3u8() {
+    if (!this.mtxPath) {
+      return null
+    }
+    const enabled = env.get('MEDIA_MTX_HLS_ENABLED', false)
+    if (!enabled) {
+      return null
+    }
+    const port = env.get('MEDIA_MTX_HLS_PORT', 8888)
+    if (port <= 0) {
+      return null
+    }
+    return this.#getBasePublicUrl(port, {
+      protocol: 'http',
+      pathname: `/${this.mtxPath}/index.m3u8`,
+    })
+  }
+  @computed({ serializeAs: 'url_web_rtc' })
+  get url_web_rtc() {
+    if (!this.mtxPath) {
+      return null
+    }
+    const enabled = env.get('MEDIA_MTX_WEB_RTC_ENABLED', false)
+    if (!enabled) {
+      return null
+    }
+    const port = env.get('MEDIA_MTX_WEB_RTC_PORT', 8889)
+    if (port <= 0) {
+      return null
+    }
+    return this.#getBasePublicUrl(port, {
+      protocol: 'http',
+      pathname: `/${this.mtxPath}`,
+    })
+  }
+  @computed({ serializeAs: 'url_srt' })
+  get url_srt() {
+    if (!this.mtxPath) {
+      return null
+    }
+    const enabled = env.get('MEDIA_MTX_SRT_ENABLED', false)
+    if (!enabled) {
+      return null
+    }
+    const port = env.get('MEDIA_MTX_SRT_PORT', 8890)
+    if (port <= 0) {
+      return null
+    }
+    return this.#getBasePublicUrl(port, {
+      protocol: 'srt',
+      searchParams: {
+        streamid: `read:${this.mtxPath}`,
+      },
+    })
   }
 
   async start() {

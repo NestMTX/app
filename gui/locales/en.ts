@@ -27,6 +27,7 @@ export default {
     stream_data_rx: 'Data Received',
     stream_data_tx: 'Data Sent',
     mtx_path: 'Path',
+    is_enabled: 'Enabled',
   },
   actions: {
     login: 'Log In',
@@ -35,6 +36,7 @@ export default {
     authorize: 'Authorize',
     manage: 'Manage',
     run: 'Run',
+    listUrls: 'List URLs',
   },
   validation: {
     bad: 'The value is not a valid {label}',
@@ -665,6 +667,16 @@ export default {
       unavailable: 'Unavailable',
       starting: 'Staring',
       running: 'Running',
+    },
+    url: {
+      hls: 'HLS',
+      hls_m3u8: 'HLS M3U8',
+      rtmp: 'RTMP',
+      rtsp_tcp: 'RTSP (TCP)',
+      rtsp_udp_rtcp: 'RTSP (UDP/RTCP)',
+      rtsp_udp_rtp: 'RTSP (UDP/RTP)',
+      srt: 'SRT',
+      web_rtc: 'WebRTC',
     },
   },
 }

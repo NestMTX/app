@@ -68,6 +68,10 @@ export default class CamerasModule implements ApiServiceModule {
     return 'Search for and list Cameras'
   }
 
+  async read(context: ReadCommandContext) {
+    return await Camera.findOrFail(Number.parseInt(context.entity))
+  }
+
   async update(context: UpdateCommandContext) {
     const { mtx_path: mtxPath, is_enabled: isEnabled } = context.payload
     if (isEnabled && !mtxPath) {

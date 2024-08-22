@@ -53,12 +53,25 @@ import {
   renderAsDeviceChip,
   renderAsCameraStatusChip,
   renderAsMtxPathForm,
+  renderAsCameraEnabledSwitch,
 } from '../../utilities/renderers'
 import { formatInteger, formatFileSize } from '../../utilities/formatters'
 import gcpcSvg from '../../assets/brand-icons/cloud-platform-console.google.svg'
 import type { ToastService, ApiService, CronService, BusService } from '@jakguru/vueprint'
 import type { ModelIndexField } from '../../types/forms.js'
 import '../../types/augmentations'
+
+interface CameraUrls {
+  hls?: string | null
+  hls_m3u8?: string | null
+  rtmp?: string | null
+  rtsp_tcp?: string | null
+  rtsp_udp_rtcp?: string | null
+  rtsp_udp_rtp?: string | null
+  srt?: string | null
+  web_rtc?: string | null
+}
+
 export default defineComponent({
   name: 'CamerasIndex',
   components: {
@@ -71,6 +84,7 @@ export default defineComponent({
     const api = inject<ApiService>('api')!
     const cron = inject<CronService>('cron')!
     const bus = inject<BusService>('bus')!
+    const cameraUrls = ref<CameraUrls | undefined>(undefined)
     const modelIndexColumns = computed<Array<ModelIndexField>>(() => [
       {
         key: 'status',
@@ -98,6 +112,13 @@ export default defineComponent({
         formatter: (value: unknown) => value as string,
         sortable: true,
         renderer: renderAsMtxPathForm,
+      },
+      {
+        key: 'is_enabled',
+        label: t('fields.is_enabled'),
+        formatter: (value: unknown) => value as string,
+        sortable: true,
+        renderer: renderAsCameraEnabledSwitch,
       },
       {
         key: 'identified_as',
@@ -192,6 +213,40 @@ export default defineComponent({
       },
     ])
     const modelIndexActions = computed(() => [
+      {
+        icon: 'mdi-view-list-outline',
+        label: t('actions.listUrls'),
+        callback: async (row: Record<string, unknown>) => {
+          const { status, data } = await api.get(`/api/cameras/${row.id}/`)
+          if (status === 200) {
+            const cameraUrlsObject = {
+              hls: data.url_hls,
+              hls_m3u8: data.url_hls_m3u8,
+              rtmp: data.url_rtmp,
+              rtsp_tcp: data.url_rtsp_tcp,
+              rtsp_udp_rtcp: data.url_rtsp_udp_rtcp,
+              rtsp_udp_rtp: data.url_rtsp_udp_rtp,
+              srt: data.url_srt,
+              web_rtc: data.url_web_rtc,
+            }
+            for (const key in cameraUrlsObject) {
+              if ('string' === typeof cameraUrlsObject[key as keyof CameraUrls]) {
+                cameraUrlsObject[key as keyof CameraUrls] = cameraUrlsObject[
+                  key as keyof CameraUrls
+                ].replace('<window.location.origin>', window.location.hostname)
+              }
+            }
+            cameraUrls.value = cameraUrlsObject
+          } else {
+            toast.fire({
+              title: t('errors.cameras.fetch.failure.title'),
+              icon: 'error',
+            })
+          }
+        },
+        condition: (row: Record<string, unknown>) =>
+          row.mtx_path !== null && row.is_enabled === true,
+      },
       // {
       //   icon: 'mdi-play-circle',
       //   label: t('actions.run'),
@@ -254,6 +309,7 @@ export default defineComponent({
       cloudSyncRunning,
       doCloudSync,
       gcpcSvg,
+      cameraUrls,
     }
   },
 })

@@ -80,7 +80,8 @@ export default defineComponent({
             .length === 0,
         'label': '',
         'readonly': formIsSubmitting.value || currentIsEnabled.value === true,
-        'clearable': !formIsSubmitting.value && !formIsValidating.value,
+        'clearable':
+          !formIsSubmitting.value && !formIsValidating.value && currentIsEnabled.value === false,
         'minWidth': 200,
       },
     })

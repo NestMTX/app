@@ -2,6 +2,7 @@ import { h, computed, defineComponent } from 'vue'
 import DeviceChip from '../components/renderers/deviceChip.vue'
 import CameraStatusChip from '../components/renderers/cameraStatusChip.vue'
 import MtxPathForm from '../components/renderers/mtxPathForm.vue'
+import CameraEnabledSwitch from '../components/renderers/cameraEnabledSwitch.vue'
 import type { PropType } from 'vue'
 
 export const renderAsDefault = defineComponent({
@@ -49,3 +50,4 @@ export const renderAsCode = defineComponent({
 export { DeviceChip as renderAsDeviceChip }
 export { CameraStatusChip as renderAsCameraStatusChip }
 export { MtxPathForm as renderAsMtxPathForm }
+export { CameraEnabledSwitch as renderAsCameraEnabledSwitch }
