@@ -253,25 +253,31 @@ export class MediaMTXService {
     if (!this.#apiClient) {
       return
     }
-    const all = await this.#getAllActiveMediaMtxPaths()
-    const names = all.map((p) => p.name)
-    const toRemove = Array.from(this.#paths.keys()).filter((name) => !names.includes(name))
-    toRemove.forEach((name) => {
-      this.#paths.delete(name)
-    })
-    all.forEach((path) => {
-      const p: MediaMtxPath = {
-        path: path.name || '',
-        src: path.source ? path.source.type || '' : '',
-        ready: path.ready || false,
-        uptime: path.readyTime || null,
-        tracks: path.tracks ? path.tracks.length : 0,
-        dataRx: path.bytesReceived || 0,
-        dataTx: path.bytesSent || 0,
-        consumers: path.readers ? path.readers.length : 0,
-      }
-      this.#paths.set(p.path, p)
-    })
+    try {
+      const all = await this.#getAllActiveMediaMtxPaths()
+      const names = all.map((p) => p.name)
+      const toRemove = Array.from(this.#paths.keys()).filter((name) => !names.includes(name))
+      toRemove.forEach((name) => {
+        this.#paths.delete(name)
+      })
+      all.forEach((path) => {
+        const p: MediaMtxPath = {
+          path: path.name || '',
+          src: path.source ? path.source.type || '' : '',
+          ready: path.ready || false,
+          uptime: path.readyTime || null,
+          tracks: path.tracks ? path.tracks.length : 0,
+          dataRx: path.bytesReceived || 0,
+          dataTx: path.bytesSent || 0,
+          consumers: path.readers ? path.readers.length : 0,
+        }
+        this.#paths.set(p.path, p)
+      })
+    } catch {
+      this.#paths.forEach((_, p) => {
+        this.#paths.delete(p)
+      })
+    }
   }
 
   async #getAllActiveMediaMtxPaths(signal?: AbortSignal) {

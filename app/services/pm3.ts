@@ -232,12 +232,9 @@ export class PM3 extends EventEmitter<PM3ProcessEventMap> {
     this.#debug(`Killing process: ${name}`)
     process.kill(signal)
     await process
-    this.#debug(`Aborting controller for process: ${name}`)
-    abortController.abort()
     this.#debug(`Cleaning up process: ${name}`)
     this.#processes.delete(name)
     this.#abortControllers.delete(name)
-    await process
   }
 
   async restart(name: string) {

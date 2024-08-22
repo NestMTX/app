@@ -186,7 +186,7 @@ export default class AppProvider {
         logger.error('Invalid MQTT Configuration. Not connecting to MQTT Server.')
       }
       await this.#mediamtx.boot(logger, this.#nat, this.#ice, this.#pm3)
-      await this.#gstreamer.boot(logger, this.#nat, this.#ice, this.#pm3)
+      await this.#gstreamer.boot(logger, this.#nat, this.#ice, this.#pm3, this.#ipc)
       this.#cron.$on('*/5 * * * * *', this.#mediamtx.cron.bind(this.#mediamtx))
     }
     await init(this.#cron, logger as LoggerServiceWithConfig)
