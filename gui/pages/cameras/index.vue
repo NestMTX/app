@@ -52,9 +52,12 @@ import {
   renderAsCode,
   renderAsDeviceChip,
   renderAsCameraStatusChip,
+  renderAsMtxPathForm,
 } from '../../utilities/renderers'
+import { formatInteger, formatFileSize } from '../../utilities/formatters'
 import gcpcSvg from '../../assets/brand-icons/cloud-platform-console.google.svg'
 import type { ToastService, ApiService, CronService } from '@jakguru/vueprint'
+import type { ModelIndexField } from '../../types/forms.js'
 export default defineComponent({
   name: 'CamerasIndex',
   components: {
@@ -66,20 +69,13 @@ export default defineComponent({
     const toast = inject<ToastService>('toast')!
     const api = inject<ApiService>('api')!
     const cron = inject<CronService>('cron')!
-    const modelIndexColumns = computed(() => [
+    const modelIndexColumns = computed<Array<ModelIndexField>>(() => [
       {
         key: 'status',
         label: t('fields.status'),
         formatter: (value: unknown) => value as string,
         sortable: false,
         renderer: renderAsCameraStatusChip,
-      },
-      {
-        key: 'process_id',
-        label: t('fields.process_id'),
-        formatter: (value: unknown) => value as string,
-        sortable: false,
-        renderer: renderAsCode,
       },
       {
         key: 'name',
@@ -94,11 +90,11 @@ export default defineComponent({
         sortable: true,
       },
       {
-        key: 'protocols',
-        label: t('fields.protocols'),
+        key: 'mtx_path',
+        label: t('fields.mtx_path'),
         formatter: (value: unknown) => value as string,
-        sortable: false,
-        renderer: renderAsCode,
+        sortable: true,
+        renderer: renderAsMtxPathForm,
       },
       {
         key: 'identified_as',
@@ -106,6 +102,13 @@ export default defineComponent({
         formatter: (value: unknown) => value as string,
         sortable: false,
         renderer: renderAsDeviceChip,
+      },
+      {
+        key: 'protocols',
+        label: t('fields.protocols'),
+        formatter: (value: unknown) => value as string,
+        sortable: false,
+        renderer: renderAsCode,
       },
       {
         key: 'resolution',
@@ -119,6 +122,7 @@ export default defineComponent({
         formatter: (value: unknown) => value as string,
         sortable: false,
         renderer: renderAsCode,
+        align: 'end',
       },
       {
         key: 'codecs_audio',
@@ -126,6 +130,62 @@ export default defineComponent({
         formatter: (value: unknown) => value as string,
         sortable: false,
         renderer: renderAsCode,
+        align: 'end',
+      },
+      {
+        key: 'process_id',
+        label: t('fields.process_id'),
+        formatter: (value: unknown) => (null === value ? '' : (value as string)),
+        sortable: false,
+        renderer: renderAsCode,
+        align: 'end',
+      },
+      {
+        key: 'stream_ready',
+        label: t('fields.stream_ready'),
+        formatter: (value: unknown) => (true === value ? 'Yes' : 'No'),
+        sortable: false,
+        align: 'end',
+      },
+      {
+        key: 'stream_uptime',
+        label: t('fields.stream_uptime'),
+        formatter: (value: unknown) => (null === value ? '' : (value as string)),
+        sortable: false,
+        renderer: renderAsCode,
+        align: 'end',
+      },
+      {
+        key: 'stream_track_count',
+        label: t('fields.stream_track_count'),
+        formatter: formatInteger,
+        sortable: false,
+        renderer: renderAsCode,
+        align: 'end',
+      },
+      {
+        key: 'stream_consumer_count',
+        label: t('fields.stream_consumer_count'),
+        formatter: formatInteger,
+        sortable: false,
+        renderer: renderAsCode,
+        align: 'end',
+      },
+      {
+        key: 'stream_data_rx',
+        label: t('fields.stream_data_rx'),
+        formatter: formatFileSize,
+        sortable: false,
+        renderer: renderAsCode,
+        align: 'end',
+      },
+      {
+        key: 'stream_data_tx',
+        label: t('fields.stream_data_tx'),
+        formatter: formatFileSize,
+        sortable: false,
+        renderer: renderAsCode,
+        align: 'end',
       },
     ])
     const modelIndexActions = computed(() => [

@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import env from '#start/env'
 import axios from 'axios'
 import { execa } from 'execa'
+import YAML from 'yaml'
 
 const BASE_DIR = new URL('../', import.meta.url).pathname
 
@@ -39,13 +40,23 @@ export default class Mediamtx extends BaseCommand {
     } else {
       this.logger.info(`Found Asset ${asset.name} for ${platform} ${arch}`)
     }
-    const { data } = await axios.get(asset.browser_download_url, {
-      responseType: 'arraybuffer',
-    })
+    const openApiManifestUrl = `https://raw.githubusercontent.com/bluenviron/mediamtx/${latest.name}/apidocs/openapi.yaml`
+    const [{ data: releaseFile }, { data: openApiManifestFile }] = await Promise.all([
+      axios.get(asset.browser_download_url, {
+        responseType: 'arraybuffer',
+      }),
+      axios.get(openApiManifestUrl, {
+        responseType: 'arraybuffer',
+      }),
+    ])
     const dest = join(BASE_DIR, 'tmp', asset.name)
     const binary = join(BASE_DIR, 'tmp', 'mediamtx')
     const manifest = join(BASE_DIR, 'tmp', 'mediamtx.yaml')
-    await fs.promises.writeFile(dest, data)
+    const openapiManifest = join(BASE_DIR, 'tmp', 'mediamtx.openapi.yaml')
+    await Promise.all([
+      fs.promises.writeFile(dest, releaseFile),
+      fs.promises.writeFile(openapiManifest, openApiManifestFile),
+    ])
     this.logger.success(`Downloaded MediaMTX Binary for ${platform} ${arch} to ${dest}`)
     const unzippedDest = join(BASE_DIR, 'tmp', nameMatch)
     try {
@@ -54,13 +65,13 @@ export default class Mediamtx extends BaseCommand {
     const extension = asset.name.replace(nameMatch, '')
     this.logger.info(`Cleaning up existing assets`)
     await Promise.all([
-      fs.promises.unlink(binary).catch(() => {}),
-      fs.promises.unlink(manifest).catch(() => {}),
+      fs.promises.rm(binary).catch(() => {}),
+      fs.promises.rm(manifest).catch(() => {}),
     ])
     this.logger.info(`Uncompressing ${asset.name}`)
     switch (extension) {
       case '.zip':
-        await execa('unzip', [asset.name, '-d', unzippedDest], {
+        await execa('unzip', [asset.name, '-f', '-d', unzippedDest], {
           cwd: join(BASE_DIR, 'tmp'),
         })
         break
@@ -86,10 +97,38 @@ export default class Mediamtx extends BaseCommand {
         binarySrcPath += '.exe'
         break
     }
+    await Promise.all([
+      fs.promises.rm(dstPath).catch(() => {}),
+      fs.promises.rm(dstConfigPath).catch(() => {}),
+    ])
     await fs.promises.copyFile(binarySrcPath, dstPath, fs.constants.COPYFILE_EXCL)
     await fs.promises.copyFile(configSrcPath, dstConfigPath, fs.constants.COPYFILE_EXCL)
     await fs.promises.rm(unzippedDest, { recursive: true })
     await fs.promises.chmod(dstPath, 0o755)
     this.logger.success(`Installed MediaMTX ${name} to ${dstPath}`)
+    this.logger.info(`Generating type definitions for the MediaMTX API Client`)
+    const { stdout } = await execa('npx', ['openapi-client-axios-typegen', openapiManifest])
+    const typesDestination = join(BASE_DIR, 'lib', 'mediamtx', 'types.ts')
+    await fs.promises.writeFile(typesDestination, stdout)
+    await execa('npx', ['eslint', '--fix', typesDestination])
+    this.logger.success(`Generated MediaMTX API Client Type Definitions`)
+    this.logger.info(`Generating api specification definitions for the MediaMTX API Client`)
+    const openApiDefinitionsObject = YAML.parse(openApiManifestFile.toString())
+    if (
+      'object' !== typeof openApiDefinitionsObject.info ||
+      null === openApiDefinitionsObject.info
+    ) {
+      openApiDefinitionsObject.info = {}
+    }
+    openApiDefinitionsObject.info.version = latest.name!.replace(/^v/, '')
+    const openApiDefinitionsDestination = join(BASE_DIR, 'lib', 'mediamtx', 'definition.ts')
+    await fs.promises.writeFile(
+      openApiDefinitionsDestination,
+      `import type { OpenAPIV3 } from 'openapi-types'
+const definition: OpenAPIV3.Document = ${JSON.stringify(openApiDefinitionsObject)}
+export default definition`
+    )
+    await execa('npx', ['eslint', '--fix', openApiDefinitionsDestination])
+    this.logger.success(`Generated api specification definitions for the MediaMTX API Client`)
   }
 }

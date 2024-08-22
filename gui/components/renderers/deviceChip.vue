@@ -22,6 +22,10 @@ export default defineComponent({
       type: Array as PropType<string[]>,
       required: true,
     },
+    item: {
+      type: Object as PropType<Record<string, unknown>>,
+      required: true,
+    },
   },
 })
 </script>

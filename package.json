@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit"
   },
   "imports": {
+    "#clients/*": "./app/clients/*.js",
     "#controllers/*": "./app/controllers/*.js",
     "#exceptions/*": "./app/exceptions/*.js",
     "#models/*": "./app/models/*.js",
@@ -73,6 +74,8 @@
     "mqtt": "^5.5.2",
     "mssql": "^10.0.2",
     "mysql2": "^3.9.4",
+    "openapi-client-axios": "^7.5.5",
+    "openapi-client-axios-typegen": "^7.6.2",
     "pg": "^8.11.5",
     "pick-port": "^2.0.1",
     "pidusage": "^3.0.2",

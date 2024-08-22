@@ -187,6 +187,7 @@ export default class AppProvider {
       }
       await this.#mediamtx.boot(logger, this.#nat, this.#ice, this.#pm3)
       await this.#gstreamer.boot(logger, this.#nat, this.#ice, this.#pm3)
+      this.#cron.$on('*/5 * * * * *', this.#mediamtx.cron.bind(this.#mediamtx))
     }
     await init(this.#cron, logger as LoggerServiceWithConfig)
     Application.getter('apiService', () => this.#api)
@@ -236,6 +237,7 @@ export default class AppProvider {
     const logger = await this.app.container.make('logger')
     const env = this.app.getEnvironment()
     if ('web' === env) {
+      this.#cron.$off('*/5 * * * * *', this.#mediamtx.cron.bind(this.#mediamtx))
       logger.info('Shutting down child processes')
       await this.#pm3.kill()
       logger.info('Shutting down Cron Service...')

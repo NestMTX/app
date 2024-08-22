@@ -1,12 +1,60 @@
 import env from '#start/env'
 import fs from 'node:fs/promises'
 import yaml from 'yaml'
+import { mediamtxClientFactory } from '#clients/mediamtx'
 import type { PM3 } from '#services/pm3'
 import type { ApplicationService } from '@adonisjs/core/types'
 import type { LoggerService } from '@adonisjs/core/types'
 import type { Logger } from '@adonisjs/logger'
 import type { NATService } from '#services/nat'
 import type { ICEService } from '#services/ice'
+import type { MediaMTXClient } from '#clients/mediamtx'
+
+interface MediaMTXApiPathSource {
+  type?:
+    | 'hlsSource'
+    | 'redirect'
+    | 'rpiCameraSource'
+    | 'rtmpConn'
+    | 'rtmpSource'
+    | 'rtspSession'
+    | 'rtspSource'
+    | 'rtspsSession'
+    | 'srtConn'
+    | 'srtSource'
+    | 'udpSource'
+    | 'webRTCSession'
+    | 'webRTCSource'
+  id?: string
+}
+
+interface MediaMTXApiPathReader {
+  type?: 'hlsMuxer' | 'rtmpConn' | 'rtspSession' | 'rtspsSession' | 'srtConn' | 'webRTCSession'
+  id?: string
+}
+
+interface MediaMTXApiPath {
+  name?: string
+  confName?: string
+  source?: MediaMTXApiPathSource
+  ready?: boolean
+  readyTime?: string | null
+  tracks?: string[]
+  bytesReceived?: number // int64
+  bytesSent?: number // int64
+  readers?: MediaMTXApiPathReader[]
+}
+
+export interface MediaMtxPath {
+  path: string
+  src: string
+  ready: boolean
+  uptime: string | null
+  tracks: number
+  dataRx: number
+  dataTx: number
+  consumers: number
+}
 
 /**
  * A class for managing the MediaMTX service process
@@ -15,12 +63,18 @@ export class MediaMTXService {
   readonly #binaryPath: string
   readonly #configPath: string
   readonly #app: ApplicationService
+  readonly #paths: Map<string, MediaMtxPath> = new Map()
   #logger?: Logger
+  #apiClient?: MediaMTXClient
 
   constructor(app: ApplicationService) {
     this.#app = app
     this.#binaryPath = env.get('MEDIA_MTX_PATH')!
     this.#configPath = env.get('MEDIA_MTX_CONFIG_PATH')!
+  }
+
+  get paths() {
+    return [...this.#paths].map(([, path]) => path)
   }
 
   async boot(logger: LoggerService, nat: NATService, ice: ICEService, pm3: PM3) {
@@ -190,5 +244,56 @@ export class MediaMTXService {
       true
     )
     this.#logger!.info('Started MediaMTX service')
+    const apiHostName = env.get('HOST') === '0.0.0.0' ? '127.0.0.1' : env.get('HOST')
+    const apiServerUrl = `http://${apiHostName}:${env.get('MEDIA_MTX_API_PORT', 9997)}`
+    this.#apiClient = await mediamtxClientFactory(apiServerUrl)
+  }
+
+  async cron() {
+    if (!this.#apiClient) {
+      return
+    }
+    const all = await this.#getAllActiveMediaMtxPaths()
+    const names = all.map((p) => p.name)
+    const toRemove = Array.from(this.#paths.keys()).filter((name) => !names.includes(name))
+    toRemove.forEach((name) => {
+      this.#paths.delete(name)
+    })
+    all.forEach((path) => {
+      const p: MediaMtxPath = {
+        path: path.name || '',
+        src: path.source ? path.source.type || '' : '',
+        ready: path.ready || false,
+        uptime: path.readyTime || null,
+        tracks: path.tracks ? path.tracks.length : 0,
+        dataRx: path.bytesReceived || 0,
+        dataTx: path.bytesSent || 0,
+        consumers: path.readers ? path.readers.length : 0,
+      }
+      this.#paths.set(p.path, p)
+    })
+  }
+
+  async #getAllActiveMediaMtxPaths(signal?: AbortSignal) {
+    let page = 0
+    let itemsPerPage = 100
+    let pageCount = 1
+    let ret: Array<MediaMTXApiPath> = []
+    if (!this.#apiClient) {
+      return ret
+    }
+    while (page < pageCount && (!signal || !signal.aborted)) {
+      const { data } = await this.#apiClient.pathsList({
+        page,
+        itemsPerPage,
+      })
+      pageCount = data.pageCount || 0
+      if (Array.isArray(data.items)) {
+        data.items.forEach((item) => {
+          ret.push(item)
+        })
+      }
+    }
+    return ret
   }
 }

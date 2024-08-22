@@ -411,40 +411,66 @@ export default class Camera extends BaseModel {
     return `gstreamer-camera-${this.id}`
   }
 
+  get #gstreamerProcess() {
+    return app.pm3.processes.find((p) => p.name === this.#gstreamerProcessName)
+  }
+
   @computed({ serializeAs: 'status' })
   get status() {
-    const process = app.pm3.processes.find((p) => p.name === this.#gstreamerProcessName)
-    if (!process) {
-      if (!this.mtxPath) {
-        return 'unconfigured'
-      } else if (!this.isEnabled) {
-        return 'stopped'
-      } else {
-        return 'unstopped'
-      }
-    } else if (!process.pid) {
-      if (!this.mtxPath) {
-        return 'unconfigured'
-      } else if (!this.isEnabled) {
-        return 'stopped'
-      } else {
-        return 'dead'
-      }
+    if (!this.mtxPath) {
+      return 'unconfigured'
+    } else if (!this.isEnabled) {
+      return 'disabled'
+    } else if (!this.#gstreamerProcess) {
+      return 'dead'
+    } else if (!this.#gstreamerProcess.pid) {
+      return 'stopped'
+    } else if (!this.#mediamtx_path) {
+      return 'unavailable'
+    } else if (!this.#mediamtx_path.ready) {
+      return 'starting'
     } else {
-      if (!this.mtxPath) {
-        return 'unconfigured'
-      } else if (!this.isEnabled) {
-        return 'unstopped'
-      } else {
-        return 'running'
-      }
+      return 'running'
     }
   }
 
   @computed({ serializeAs: 'process_id' })
   get process_id() {
-    const process = app.pm3.processes.find((p) => p.name === this.#gstreamerProcessName)
-    return process ? process.pid : null
+    return this.#gstreamerProcess ? this.#gstreamerProcess.pid : null
+  }
+
+  get #mediamtx_path() {
+    return app.mediamtx.paths.find((p) => p.path === this.mtxPath)
+  }
+
+  @computed({ serializeAs: 'stream_ready' })
+  get stream_ready() {
+    return this.#mediamtx_path ? this.#mediamtx_path.ready : false
+  }
+
+  @computed({ serializeAs: 'stream_uptime' })
+  get stream_uptime() {
+    return this.#mediamtx_path && this.#mediamtx_path.ready ? this.#mediamtx_path.uptime : null
+  }
+
+  @computed({ serializeAs: 'stream_track_count' })
+  get stream_track_count() {
+    return this.#mediamtx_path && this.#mediamtx_path.ready ? this.#mediamtx_path.tracks : 0
+  }
+
+  @computed({ serializeAs: 'stream_consumer_count' })
+  get stream_consumer_count() {
+    return this.#mediamtx_path && this.#mediamtx_path.ready ? this.#mediamtx_path.consumers : 0
+  }
+
+  @computed({ serializeAs: 'stream_data_rx' })
+  get stream_data_rx() {
+    return this.#mediamtx_path && this.#mediamtx_path.ready ? this.#mediamtx_path.dataRx : 0
+  }
+
+  @computed({ serializeAs: 'stream_data_tx' })
+  get stream_data_tx() {
+    return this.#mediamtx_path && this.#mediamtx_path.ready ? this.#mediamtx_path.dataTx : 0
   }
 
   async start() {

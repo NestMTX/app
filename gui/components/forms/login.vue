@@ -24,7 +24,7 @@
             scroll-into-view
             :label="$t('fields.username')"
             autocomplete="username"
-            :disabled="formIsSubmitting"
+            :readonly="formIsSubmitting"
             density="comfortable"
             :clearable="!formIsSubmitting && !formIsValidating"
             prepend-inner-icon="mdi-account-outline"
@@ -43,7 +43,7 @@
             :label="$t('fields.password')"
             autocomplete="current-password"
             prepend-inner-icon="mdi-lock-outline"
-            :disabled="formIsSubmitting"
+            :readonly="formIsSubmitting"
             density="comfortable"
             :clearable="!formIsSubmitting && !formIsValidating"
           />

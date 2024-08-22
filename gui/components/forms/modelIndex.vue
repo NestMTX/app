@@ -73,8 +73,8 @@
           <v-btn v-for="(a, i) in value" :key="`item-${value.id}-action-${i}`" v-bind="a" />
         </v-toolbar-items>
       </template>
-      <template v-for="r in renderers" :key="`renderer-for-${r.key}`" #[r.key]="{ value }">
-        <component :is="r.renderer" :value="value"></component>
+      <template v-for="r in renderers" :key="`renderer-for-${r.key}`" #[r.key]="{ value, item }">
+        <component :is="r.renderer" :value="value" :item="item"></component>
       </template>
     </v-data-table-server>
   </div>

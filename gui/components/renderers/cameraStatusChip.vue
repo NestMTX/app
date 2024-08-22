@@ -12,7 +12,13 @@ export default defineComponent({
   name: 'CameraStatusChip',
   props: {
     value: {
-      type: String as PropType<'unconfigured' | 'stopped' | 'unstopped' | 'dead' | 'running'>,
+      type: String as PropType<
+        'unconfigured' | 'disabled' | 'dead' | 'stopped' | 'unavailable' | 'starting' | 'running'
+      >,
+      required: true,
+    },
+    item: {
+      type: Object as PropType<Record<string, unknown>>,
       required: true,
     },
   },
@@ -21,17 +27,21 @@ export default defineComponent({
     const value = computed(() => props.value)
     const color = computed(() => {
       switch (value.value) {
-        case 'unconfigured':
-          return 'grey'
-        case 'unstopped':
-        case 'stopped':
-          return 'red'
+        case 'disabled':
+          return 'grey-darken-2'
         case 'dead':
-          return 'black'
+          return 'red-darken-4'
+        case 'stopped':
+          return 'red-lighten-1'
+        case 'unavailable':
+          return 'orange-darken-3'
+        case 'starting':
+          return 'yellow-accent-3'
         case 'running':
-          return 'green'
+          return 'green-accent-3'
+        case 'unconfigured':
         default:
-          return 'grey'
+          return 'grey-lighten-2'
       }
     })
     const title = computed(() => t(`camera.status.${value.value}`))
