@@ -460,6 +460,14 @@ export default {
       update: {
         title: 'Updated Camera Successfully',
       },
+      urls: {
+        title: 'Camera URLs',
+        none: 'There are no streaming protocols enabled. Please check your configuration.',
+        copy: {
+          success: 'URL copied to clipboard',
+          failure: 'Failed to copy URL to clipboard',
+        },
+      },
     },
   },
   $vuetify: {

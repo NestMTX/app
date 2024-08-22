@@ -49,7 +49,9 @@ export default class MediaMtxOnEvent extends BaseCommand {
       .object(
         Object.assign(
           {},
-          ...MediaMTXEvents[event].map((key) => ({ [key]: joi.string().required() }))
+          ...MediaMTXEvents[event].map((key) => ({
+            [key]: joi.string().required().allow('', null),
+          }))
         )
       )
       .required()

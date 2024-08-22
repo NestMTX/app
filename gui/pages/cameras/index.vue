@@ -41,6 +41,44 @@
         </v-col>
       </v-row>
     </v-col>
+    <v-dialog v-model="showCameraUrls" max-width="500" scrim="surface" opacity="0.38">
+      <v-card color="transparent" class="glass-surface">
+        <v-toolbar color="transparent" density="compact">
+          <v-toolbar-title class="font-raleway font-weight-bold">{{
+            $t('dialogs.cameras.urls.title')
+          }}</v-toolbar-title>
+          <v-toolbar-items>
+            <v-btn icon @click="showCameraUrls = false">
+              <v-icon>mdi-close</v-icon>
+            </v-btn>
+          </v-toolbar-items>
+        </v-toolbar>
+        <v-divider />
+        <v-container>
+          <v-row v-if="cameraUrls">
+            <template v-for="(v, k) of cameraUrls" :key="k">
+              <v-col v-if="v" cols="12">
+                <VTextFieldWithCopy
+                  :value="v"
+                  :label="$t(`camera.url.${k}`)"
+                  readonly
+                  density="compact"
+                  @copied="onCopySuccess"
+                  @copy-failed="onCopyFail"
+                />
+              </v-col>
+            </template>
+          </v-row>
+          <v-row v-else-if="!cameraUrls || !hasCameraUrls">
+            <v-col cols="12">
+              <v-alert type="info">
+                {{ $t('dialogs.cameras.urls.none') }}
+              </v-alert>
+            </v-col>
+          </v-row>
+        </v-container>
+      </v-card>
+    </v-dialog>
   </v-row>
 </template>
 
@@ -60,6 +98,7 @@ import gcpcSvg from '../../assets/brand-icons/cloud-platform-console.google.svg'
 import type { ToastService, ApiService, CronService, BusService } from '@jakguru/vueprint'
 import type { ModelIndexField } from '../../types/forms.js'
 import '../../types/augmentations'
+import VTextFieldWithCopy from '../../components/fields/VTextFieldWithCopy.vue'
 
 interface CameraUrls {
   hls?: string | null
@@ -76,6 +115,7 @@ export default defineComponent({
   name: 'CamerasIndex',
   components: {
     ModelIndex,
+    VTextFieldWithCopy,
   },
   setup() {
     const modelIndex = ref<typeof ModelIndex | undefined>(undefined)
@@ -85,6 +125,20 @@ export default defineComponent({
     const cron = inject<CronService>('cron')!
     const bus = inject<BusService>('bus')!
     const cameraUrls = ref<CameraUrls | undefined>(undefined)
+    const showCameraUrls = computed({
+      get: () => cameraUrls.value !== undefined,
+      set: (value: boolean) => {
+        if (false === value) {
+          cameraUrls.value = undefined
+        }
+      },
+    })
+    const hasCameraUrls = computed(
+      () =>
+        'object' === typeof cameraUrls.value &&
+        null !== cameraUrls.value &&
+        Object.values(cameraUrls.value).some((u) => 'string' === typeof u && u.trim().length > 0)
+    )
     const modelIndexColumns = computed<Array<ModelIndexField>>(() => [
       {
         key: 'status',
@@ -302,6 +356,18 @@ export default defineComponent({
       cron.$off('* * * * *', refreshEveryMinute)
       bus.off('cameras:updated', refreshEveryMinute, { crossTab: true, local: true })
     })
+    const onCopySuccess = () => {
+      toast.fire({
+        title: t('dialogs.cameras.urls.copy.success'),
+        icon: 'success',
+      })
+    }
+    const onCopyFail = () => {
+      toast.fire({
+        title: t('dialogs.cameras.urls.copy.failure'),
+        icon: 'error',
+      })
+    }
     return {
       modelIndex,
       modelIndexColumns,
@@ -310,6 +376,10 @@ export default defineComponent({
       doCloudSync,
       gcpcSvg,
       cameraUrls,
+      showCameraUrls,
+      hasCameraUrls,
+      onCopySuccess,
+      onCopyFail,
     }
   },
 })
