@@ -12,7 +12,15 @@ import db from '@adonisjs/lucid/services/db'
 
 export default class CamerasModule implements ApiServiceModule {
   get schemas() {
-    return {}
+    return {
+      update: Joi.object({
+        mtx_path: Joi.string()
+          .optional()
+          .allow(null)
+          .regex(/^[A-Za-z0-9\-._~]+$/),
+        is_enabled: Joi.boolean().required(),
+      }),
+    }
   }
 
   get description() {
@@ -58,5 +66,28 @@ export default class CamerasModule implements ApiServiceModule {
 
   get $descriptionOfList() {
     return 'Search for and list Cameras'
+  }
+
+  async update(context: UpdateCommandContext) {
+    const { mtx_path: mtxPath, is_enabled: isEnabled } = context.payload
+    if (isEnabled && !mtxPath) {
+      throw new I18NException('errors.cameras.update.mtxPathIsRequired')
+    }
+    const camera = await Camera.findOrFail(Number.parseInt(context.entity))
+    if (mtxPath !== null) {
+      const camerasWithPath = await Camera.query()
+        .where('mtx_path', mtxPath)
+        .whereNotIn('id', [camera.id])
+      if (camerasWithPath.length > 0) {
+        throw new I18NException('errors.cameras.update.mtxPathAlreadyInUse')
+      }
+    }
+    camera.mtxPath = mtxPath
+    await camera.save()
+    if (isEnabled) {
+      camera.start()
+    } else {
+      camera.stop()
+    }
   }
 }

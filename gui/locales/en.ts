@@ -20,7 +20,7 @@ export default {
     room: 'Room',
     status: 'Status',
     process_id: 'Process ID',
-    stream_ready: 'Streamable',
+    stream_ready: 'Streaming',
     stream_uptime: 'Up Time',
     stream_track_count: 'Track Count',
     stream_consumer_count: 'Consumer Count',
@@ -407,6 +407,13 @@ export default {
         invalidState: 'The authorization state is invalid',
       },
     },
+    cameras: {
+      update: {
+        title: 'Failed to Update Camera',
+        mtxPathIsRequired: 'The Camera Path must be set before the camera can be enabled',
+        mtxPathAlreadyInUse: 'The Camera Path is already in use by another camera',
+      },
+    },
   },
   dialogs: {
     systemInfo: {
@@ -442,6 +449,14 @@ export default {
         success: {
           title: 'Job Ran Successfully',
         },
+        failure: {
+          title: 'Job Failed to Run',
+        },
+      },
+    },
+    cameras: {
+      update: {
+        title: 'Updated Camera Successfully',
       },
     },
   },

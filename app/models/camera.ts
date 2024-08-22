@@ -58,10 +58,10 @@ export default class Camera extends BaseModel {
   @column()
   declare info: smartdevicemanagement_v1.Schema$GoogleHomeEnterpriseSdmV1Device | string | null
 
-  @column()
+  @column({ serializeAs: 'mtx_path' })
   declare mtxPath: string | null
 
-  @column()
+  @column({ serializeAs: 'is_enabled' })
   declare isEnabled: boolean
 
   @column.dateTime({ autoCreate: true })

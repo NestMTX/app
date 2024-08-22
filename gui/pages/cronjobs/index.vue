@@ -36,7 +36,7 @@ export default defineComponent({
     ModelIndex,
   },
   setup() {
-    const modelIndex = ref<ModelIndex | undefined>(undefined)
+    const modelIndex = ref<typeof ModelIndex | undefined>(undefined)
     const { t } = useI18n({ useScope: 'global' })
     const toast = inject<ToastService>('toast')!
     const api = inject<ApiService>('api')!

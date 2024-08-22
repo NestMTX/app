@@ -56,8 +56,9 @@ import {
 } from '../../utilities/renderers'
 import { formatInteger, formatFileSize } from '../../utilities/formatters'
 import gcpcSvg from '../../assets/brand-icons/cloud-platform-console.google.svg'
-import type { ToastService, ApiService, CronService } from '@jakguru/vueprint'
+import type { ToastService, ApiService, CronService, BusService } from '@jakguru/vueprint'
 import type { ModelIndexField } from '../../types/forms.js'
+import '../../types/augmentations'
 export default defineComponent({
   name: 'CamerasIndex',
   components: {
@@ -69,6 +70,7 @@ export default defineComponent({
     const toast = inject<ToastService>('toast')!
     const api = inject<ApiService>('api')!
     const cron = inject<CronService>('cron')!
+    const bus = inject<BusService>('bus')!
     const modelIndexColumns = computed<Array<ModelIndexField>>(() => [
       {
         key: 'status',
@@ -76,6 +78,7 @@ export default defineComponent({
         formatter: (value: unknown) => value as string,
         sortable: false,
         renderer: renderAsCameraStatusChip,
+        align: 'center',
       },
       {
         key: 'name',
@@ -238,9 +241,11 @@ export default defineComponent({
     }
     onMounted(() => {
       cron.$on('* * * * *', refreshEveryMinute)
+      bus.on('cameras:updated', refreshEveryMinute, { crossTab: true, local: true })
     })
     onBeforeUnmount(() => {
       cron.$off('* * * * *', refreshEveryMinute)
+      bus.off('cameras:updated', refreshEveryMinute, { crossTab: true, local: true })
     })
     return {
       modelIndex,

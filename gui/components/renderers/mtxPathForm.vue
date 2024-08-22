@@ -1,6 +1,6 @@
 <template>
   <form action="#" method="POST" @submit.stop="submit">
-    <v-text-field v-bind="form.mtx_path">
+    <v-text-field v-bind="form.mtx_path" density="compact">
       <template v-if="!currentIsEnabled" #append-inner>
         <v-btn
           icon="mdi-content-save"
@@ -17,12 +17,14 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, watch } from 'vue'
+import { defineComponent, computed, watch, inject } from 'vue'
 import type { PropType } from 'vue'
 import { useForm } from 'vee-validate'
 import { useI18n } from 'vue-i18n'
 import { validatorFactory } from '../../utilities/validations'
 import Joi from 'joi'
+import type { ApiService, SwalService, ToastService, BusService } from '@jakguru/vueprint'
+import '../../types/augmentations'
 export default defineComponent({
   name: 'MtxPathForm',
   components: {},
@@ -79,12 +81,41 @@ export default defineComponent({
         'label': '',
         'readonly': formIsSubmitting.value || currentIsEnabled.value === true,
         'clearable': !formIsSubmitting.value && !formIsValidating.value,
-        'density': 'compact',
         'minWidth': 200,
       },
     })
+    const api = inject<ApiService>('api')!
+    const swal = inject<SwalService>('swal')!
+    const toast = inject<ToastService>('toast')!
+    const bus = inject<BusService>('bus')!
     const submit = handleFormSubmit(async (values) => {
-      console.log(values)
+      const item = { ...props.item }
+      const { status, data } = await api.put(
+        `/api/cameras/${item.id}`,
+        {
+          mtx_path: values.mtx_path,
+          is_enabled: item.is_enabled,
+        },
+        {
+          validateStatus: () => true,
+        }
+      )
+      if (status === 201) {
+        toast.fire({
+          icon: 'success',
+          title: t('dialogs.cameras.update.title'),
+        })
+        bus.emit('cameras:updated', {
+          crossTab: true,
+          local: true,
+        })
+      } else {
+        swal.fire({
+          icon: 'error',
+          title: t('errors.cameras.update.title'),
+          text: t(data.error.message),
+        })
+      }
     })
     const form = computed(() => ({
       mtx_path: defineFormComponentBinds('mtx_path', vuetifyConfig).value,
