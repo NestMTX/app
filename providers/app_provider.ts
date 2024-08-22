@@ -2,6 +2,7 @@ import type { ApplicationService } from '@adonisjs/core/types'
 import type { LoggerServiceWithConfig } from '#services/socket.io'
 import type { IClientOptions, MqttClient } from 'mqtt'
 import type { Server } from 'node:net'
+import { Application } from '@adonisjs/core/app'
 import { MigrationRunner } from '@adonisjs/lucid/migration'
 import fs from 'node:fs/promises'
 import { join } from 'node:path'
@@ -37,6 +38,22 @@ declare module '@adonisjs/core/types' {
     'ice/service': ICEService
     'ipc/service': IPCService
     'cron/service': MiliCron
+  }
+}
+
+declare module '@adonisjs/core/app' {
+  interface Application<ContainerBindings extends Record<any, any>> {
+    apiService: ApiService
+    socketIoService: SocketIoService
+    mqttBroker?: Server
+    mqttClient?: MqttClient
+    mediamtx: MediaMTXService
+    gstreamer: GStreamerService
+    pm3: PM3
+    natService: NATService
+    iceService: ICEService
+    ipcService: IPCService
+    cronService: MiliCron
   }
 }
 
@@ -172,6 +189,17 @@ export default class AppProvider {
       await this.#gstreamer.boot(logger, this.#nat, this.#ice, this.#pm3)
     }
     await init(this.#cron, logger as LoggerServiceWithConfig)
+    Application.getter('apiService', () => this.#api)
+    Application.getter('socketIoService', () => this.#io)
+    Application.getter('mqttBroker', () => this.#mqttBroker)
+    Application.getter('mqttClient', () => this.#mqtt)
+    Application.getter('mediamtx', () => this.#mediamtx)
+    Application.getter('gstreamer', () => this.#gstreamer)
+    Application.getter('pm3', () => this.#pm3)
+    Application.getter('natService', () => this.#nat)
+    Application.getter('iceService', () => this.#ice)
+    Application.getter('ipcService', () => this.#ipc)
+    Application.getter('cronService', () => this.#cron)
   }
 
   /**

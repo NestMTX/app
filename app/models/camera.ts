@@ -13,6 +13,7 @@ import crypto from 'node:crypto'
 import encryption from '@adonisjs/core/services/encryption'
 import Credential from '#models/credential'
 import dot from 'dot-object'
+import app from '@adonisjs/core/services/app'
 dot.keepArray = true
 
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
@@ -404,5 +405,60 @@ export default class Camera extends BaseModel {
     return Array.isArray(this.#dottedTraits['sdm.devices.traits.CameraLiveStream.audioCodecs'])
       ? this.#dottedTraits['sdm.devices.traits.CameraLiveStream.audioCodecs'].join(', ')
       : null
+  }
+
+  get #gstreamerProcessName() {
+    return `gstreamer-camera-${this.id}`
+  }
+
+  @computed({ serializeAs: 'status' })
+  get status() {
+    const process = app.pm3.processes.find((p) => p.name === this.#gstreamerProcessName)
+    if (!process) {
+      if (!this.mtxPath) {
+        return 'unconfigured'
+      } else if (!this.isEnabled) {
+        return 'stopped'
+      } else {
+        return 'unstopped'
+      }
+    } else if (!process.pid) {
+      if (!this.mtxPath) {
+        return 'unconfigured'
+      } else if (!this.isEnabled) {
+        return 'stopped'
+      } else {
+        return 'dead'
+      }
+    } else {
+      if (!this.mtxPath) {
+        return 'unconfigured'
+      } else if (!this.isEnabled) {
+        return 'unstopped'
+      } else {
+        return 'running'
+      }
+    }
+  }
+
+  @computed({ serializeAs: 'process_id' })
+  get process_id() {
+    const process = app.pm3.processes.find((p) => p.name === this.#gstreamerProcessName)
+    return process ? process.pid : null
+  }
+
+  async start() {
+    if (!this.mtxPath) {
+      throw new Error(`Camera ${this.id} does not have a path`)
+    }
+    this.isEnabled = true
+    await this.save()
+    // @todo: implement this
+  }
+
+  async stop() {
+    this.isEnabled = false
+    await this.save()
+    // @todo: implement this
   }
 }

@@ -85,4 +85,8 @@ export default await Env.create(new URL('../', import.meta.url), {
   MEDIA_MTX_WEB_RTC_PORT: Env.schema.number.optional(),
   MEDIA_MTX_WEB_RTC_UDP_PORT: Env.schema.number.optional(),
   MEDIA_MTX_SRT_PORT: Env.schema.number.optional(),
+  /**
+   * GStreamer Configuration
+   */
+  GSTREAMER_BIN: Env.schema.string(),
 })

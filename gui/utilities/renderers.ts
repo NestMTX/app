@@ -1,5 +1,6 @@
 import { h, computed, defineComponent } from 'vue'
 import DeviceChip from '../components/renderers/deviceChip.vue'
+import CameraStatusChip from '../components/renderers/cameraStatusChip.vue'
 
 export const renderAsDefault = defineComponent({
   name: 'RenderAsDefault',
@@ -36,3 +37,4 @@ export const renderAsCode = defineComponent({
 })
 
 export { DeviceChip as renderAsDeviceChip }
+export { CameraStatusChip as renderAsCameraStatusChip }

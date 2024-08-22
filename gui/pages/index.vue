@@ -106,7 +106,12 @@
                   <td>{{ 'number' === typeof p.memory ? filesize(p.memory, { base: 2 }) : '' }}</td>
                   <td>
                     {{
-                      'number' === typeof p.uptime ? Duration.fromMillis(p.uptime).toHuman() : ''
+                      'number' === typeof p.uptime
+                        ? Duration.fromObject({ milliseconds: p.uptime }).rescale().toHuman({
+                            listStyle: 'long',
+                            unitDisplay: 'short',
+                          })
+                        : ''
                     }}
                   </td>
                 </tr>

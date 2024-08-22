@@ -18,6 +18,8 @@ export default {
     codecs_video: 'Video Codecs',
     codecs_audio: 'Audio Codecs',
     room: 'Room',
+    status: 'Status',
+    process_id: 'Process ID',
   },
   actions: {
     login: 'Log In',
@@ -630,6 +632,15 @@ export default {
           kill: 'Kill',
         },
       },
+    },
+  },
+  camera: {
+    status: {
+      unconfigured: 'Unconfigured',
+      stopped: 'Stopped',
+      dead: 'Dead',
+      running: 'Running',
+      unstopped: 'Unstopped',
     },
   },
 }

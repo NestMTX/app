@@ -183,16 +183,25 @@ export default defineComponent({
       }
       const url = `${searchEndPoint.value}?${qs.stringify(payload)}`
       const { status, data } = await api.get(url.toString(), {
+        validateStatus: () => true,
         signal: loadItemsAbortController.signal,
       })
       if (status < 200 || status >= 300) {
         if (!loadItemsAbortController.signal.aborted) {
-          const { message } = data.error
-          swal.fire({
-            title: t('components.modelIndex.errors.loadItems', { model: modelI18nPlural.value }),
-            text: t(message),
-            icon: 'error',
-          })
+          if (data.error) {
+            const { message } = data.error
+            swal.fire({
+              title: t('components.modelIndex.errors.loadItems', { model: modelI18nPlural.value }),
+              text: t(message),
+              icon: 'error',
+            })
+          } else {
+            swal.fire({
+              title: t('components.modelIndex.errors.loadItems', { model: modelI18nPlural.value }),
+              text: t('errors.unknown'),
+              icon: 'error',
+            })
+          }
         }
       } else {
         const { total, items } = data

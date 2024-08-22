@@ -48,7 +48,11 @@
 import { defineComponent, ref, computed, inject, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ModelIndex from '../../components/forms/modelIndex.vue'
-import { renderAsCode, renderAsDeviceChip } from '../../utilities/renderers'
+import {
+  renderAsCode,
+  renderAsDeviceChip,
+  renderAsCameraStatusChip,
+} from '../../utilities/renderers'
 import gcpcSvg from '../../assets/brand-icons/cloud-platform-console.google.svg'
 import type { ToastService, ApiService, CronService } from '@jakguru/vueprint'
 export default defineComponent({
@@ -63,6 +67,20 @@ export default defineComponent({
     const api = inject<ApiService>('api')!
     const cron = inject<CronService>('cron')!
     const modelIndexColumns = computed(() => [
+      {
+        key: 'status',
+        label: t('fields.status'),
+        formatter: (value: unknown) => value as string,
+        sortable: false,
+        renderer: renderAsCameraStatusChip,
+      },
+      {
+        key: 'process_id',
+        label: t('fields.process_id'),
+        formatter: (value: unknown) => value as string,
+        sortable: false,
+        renderer: renderAsCode,
+      },
       {
         key: 'name',
         label: t('fields.name'),
@@ -133,7 +151,13 @@ export default defineComponent({
     const cloudSyncRunning = ref(false)
     const doCloudSync = async () => {
       cloudSyncRunning.value = true
-      const { status } = await api.put(`/api/cronjobs/SyncCloudCamerasJob/`)
+      const { status } = await api.put(
+        `/api/cronjobs/SyncCloudCamerasJob/`,
+        {},
+        {
+          validateStatus: () => true,
+        }
+      )
       if (status === 201) {
         toast.fire({
           title: t('dialogs.cronjobs.run.success.title'),

@@ -1,15 +1,12 @@
 import env from '#start/env'
 import fs from 'node:fs/promises'
 import yaml from 'yaml'
-import { existsSync, createReadStream } from 'node:fs'
-import { execa } from 'execa'
 import type { PM3 } from '#services/pm3'
 import type { ApplicationService } from '@adonisjs/core/types'
 import type { LoggerService } from '@adonisjs/core/types'
 import type { Logger } from '@adonisjs/logger'
 import type { NATService } from '#services/nat'
 import type { ICEService } from '#services/ice'
-import type { Readable } from 'node:stream'
 
 /**
  * A class for managing the MediaMTX service process
@@ -18,18 +15,12 @@ export class MediaMTXService {
   readonly #binaryPath: string
   readonly #configPath: string
   readonly #app: ApplicationService
-  readonly #stdOutLogPath: string
-  readonly #stdErrLogPath: string
-  #stdOutStream?: Readable
-  #stdErrStream?: Readable
   #logger?: Logger
 
   constructor(app: ApplicationService) {
     this.#app = app
     this.#binaryPath = env.get('MEDIA_MTX_PATH')!
     this.#configPath = env.get('MEDIA_MTX_CONFIG_PATH')!
-    this.#stdOutLogPath = this.#app.tmpPath('mediamtx.stdout.log')
-    this.#stdErrLogPath = this.#app.tmpPath('mediamtx.stderr.log')
   }
 
   async boot(logger: LoggerService, nat: NATService, ice: ICEService, pm3: PM3) {
@@ -198,37 +189,6 @@ export class MediaMTXService {
       },
       true
     )
-    // await new Promise<Proc>((resolve, reject) => {
-    //   pm2.start(
-    //     {
-    //       name: 'mediamtx',
-    //       script: this.#binaryPath,
-    //       args: [updatedConfigPath],
-    //       autorestart: true,
-    //       max_restarts: 5,
-    //       cwd: this.#app.tmpPath(),
-    //       output: this.#stdOutLogPath,
-    //       error: this.#stdErrLogPath,
-    //       pid: this.#app.tmpPath('mediamtx.pid'),
-    //       time: false,
-    //       interpreter: 'none',
-    //     },
-    //     (err, proc: Proc) => {
-    //       if (err) {
-    //         return reject(err)
-    //       } else {
-    //         return resolve(proc)
-    //       }
-    //     }
-    //   )
-    // })
     this.#logger!.info('Started MediaMTX service')
-  }
-
-  async #makeFifo(path: string) {
-    if (existsSync(path)) {
-      await fs.unlink(path)
-    }
-    await execa('mkfifo', [path])
   }
 }

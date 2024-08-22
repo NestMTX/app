@@ -94,7 +94,9 @@ export default defineComponent({
     const swal = inject<SwalService>('swal')!
     const toast = inject<SwalService>('toast')!
     const submit = handleFormSubmit(async (values) => {
-      const { status, data } = await api.post(addEndPoint.value, values)
+      const { status, data } = await api.post(addEndPoint.value, values, {
+        validateStatus: () => true,
+      })
       if (status === 201) {
         emit('submitted')
         toast.fire({
