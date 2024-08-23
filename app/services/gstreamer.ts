@@ -78,30 +78,20 @@ export class GStreamerService {
     //     )
     //   }
     // }
-    this.#logger.info(`Loading Cameras which should be enabled`)
-    const cameras = await Camera.query().whereNotNull('mtx_path').where('is_enabled', true)
-    if (cameras.length > 0) {
-      this.#logger.info(`Found ${cameras.length} cameras to start`)
-      for (const camera of cameras) {
-        await camera.start()
-      }
-    } else {
-      this.#logger.info(`No cameras found to start`)
-    }
     ipc.on('demand', this.#onDemand.bind(this))
     ipc.on('unDemand', this.#onUnDemand.bind(this))
     this.#logger.info(`GStreamer Service booted`)
   }
 
-  async #getAvailableHwAccelerators() {
-    const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
-    const { stdout } = await execa(ffmpegBinary, ['-hwaccels'])
-    return stdout
-      .split('\n')
-      .filter((line) => line.length > 0)
-      .map((line) => line.trim())
-      .filter((l) => l !== 'Hardware acceleration methods:')
-  }
+  // async #getAvailableHwAccelerators() {
+  //   const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
+  //   const { stdout } = await execa(ffmpegBinary, ['-hwaccels'])
+  //   return stdout
+  //     .split('\n')
+  //     .filter((line) => line.length > 0)
+  //     .map((line) => line.trim())
+  //     .filter((l) => l !== 'Hardware acceleration methods:')
+  // }
 
   #logToInfo = (data: string) => {
     if (this.#logger) {
@@ -127,7 +117,8 @@ export class GStreamerService {
         processName = `ffmpeg-camera-disabled-${payload.MTX_PATH}`
         await this.#addCameraDisabledCameraStreamProcess(processName, payload.MTX_PATH)
       } else {
-        processName = `gstreamer-camera-${camera.id}`
+        processName = `camera-${camera.id}`
+        await camera.start()
       }
       this.#app.pm3.on(`stdout:${processName}`, this.#logToInfo.bind(this))
       this.#app.pm3.on(`stderr:${processName}`, this.#logToError.bind(this))
@@ -151,7 +142,7 @@ export class GStreamerService {
       } else if (!camera.isEnabled) {
         processName = `ffmpeg-camera-disabled-${payload.MTX_PATH}`
       } else {
-        processName = `gstreamer-camera-${camera.id}`
+        processName = `camera-${camera.id}`
       }
       this.#shuttingDownProcesses.add(processName)
       await this.#app.pm3.remove(processName)

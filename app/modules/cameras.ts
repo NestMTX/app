@@ -89,9 +89,9 @@ export default class CamerasModule implements ApiServiceModule {
     camera.mtxPath = mtxPath
     await camera.save()
     if (isEnabled) {
-      camera.start()
+      await camera.enable()
     } else {
-      camera.stop()
+      await camera.disable()
     }
   }
 }

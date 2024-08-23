@@ -672,6 +672,7 @@ export default {
         tracks: 'Track Count',
         dataRx: 'Data Received',
         dataTx: 'Data Sent',
+        empty: 'NestMTX has no active paths',
       },
     },
   },

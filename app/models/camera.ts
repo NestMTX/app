@@ -68,6 +68,9 @@ export default class Camera extends BaseModel {
   @column({ serializeAs: 'mtx_path' })
   declare mtxPath: string | null
 
+  @column({ serializeAs: null })
+  declare streamExtensionToken: string | null
+
   @column({ serializeAs: 'is_enabled' })
   declare isEnabled: boolean
 
@@ -409,26 +412,42 @@ export default class Camera extends BaseModel {
     return `${width}x${height}`
   }
 
+  get #videoWidth() {
+    return this.resolution ? Number.parseInt(this.resolution.split('x')[0]) : null
+  }
+
+  get #videoHeight() {
+    return this.resolution ? Number.parseInt(this.resolution.split('x')[1]) : null
+  }
+
+  get #videoCodecs() {
+    return Array.isArray(this.#dottedTraits['sdm.devices.traits.CameraLiveStream.videoCodecs'])
+      ? this.#dottedTraits['sdm.devices.traits.CameraLiveStream.videoCodecs']
+      : []
+  }
+
   @computed({ serializeAs: 'codecs_video' })
   get codecs_video() {
-    return Array.isArray(this.#dottedTraits['sdm.devices.traits.CameraLiveStream.videoCodecs'])
-      ? this.#dottedTraits['sdm.devices.traits.CameraLiveStream.videoCodecs'].join(', ')
-      : null
+    return this.#videoCodecs.join(', ')
+  }
+
+  get #audioCodecs() {
+    return Array.isArray(this.#dottedTraits['sdm.devices.traits.CameraLiveStream.audioCodecs'])
+      ? this.#dottedTraits['sdm.devices.traits.CameraLiveStream.audioCodecs']
+      : []
   }
 
   @computed({ serializeAs: 'codecs_audio' })
   get codecs_audio() {
-    return Array.isArray(this.#dottedTraits['sdm.devices.traits.CameraLiveStream.audioCodecs'])
-      ? this.#dottedTraits['sdm.devices.traits.CameraLiveStream.audioCodecs'].join(', ')
-      : null
+    return this.#audioCodecs.join(', ')
   }
 
-  get #gstreamerProcessName() {
-    return `gstreamer-camera-${this.id}`
+  get #streamProcessName() {
+    return `camera-${this.id}`
   }
 
   get #gstreamerProcess() {
-    return app.pm3.processes.find((p) => p.name === this.#gstreamerProcessName)
+    return app.pm3.processes.find((p) => p.name === this.#streamProcessName)
   }
 
   @computed({ serializeAs: 'status' })
@@ -655,18 +674,177 @@ export default class Camera extends BaseModel {
     })
   }
 
-  async start() {
+  async enable() {
     if (!this.mtxPath) {
       throw new Error(`Camera ${this.id} does not have a path`)
     }
     this.isEnabled = true
     await this.save()
-    // @todo: implement this
+    await this.#killExistingProcesses()
+  }
+
+  async disable() {
+    this.isEnabled = false
+    await this.save()
+    await this.#killExistingProcesses()
+  }
+
+  async #killExistingProcesses() {
+    if (!app.pm3) {
+      return
+    }
+    const ffmpegNoSuchCameraFeedProcess = `ffmpeg-no-such-camera-${this.mtxPath}`
+    const ffmpegCameraDisabledFeedProcess = `ffmpeg-camera-disabled-${this.mtxPath}`
+    const gstreamerCameraFeedProcess = `camera-${this.id}`
+    await Promise.all([
+      app.pm3.stop(ffmpegNoSuchCameraFeedProcess).catch(() => {}),
+      app.pm3.stop(ffmpegCameraDisabledFeedProcess).catch(() => {}),
+      app.pm3.stop(gstreamerCameraFeedProcess).catch(() => {}),
+    ])
+  }
+
+  async start() {
+    try {
+      await (this as Camera).load('credential')
+    } catch {
+      throw new Error(`Failed to load Google SDM API Credentials for Camera ${this.id}`)
+    }
+    if (
+      !this.protocols ||
+      (!this.protocols.includes('WEB_RTC') && !this.protocols.includes('RTSP'))
+    ) {
+      throw new Error(`Camera ${this.id} does not support any recognized protocols`)
+    }
+    if (this.#audioCodecs.length === 0) {
+      throw new Error('This devices does not support any Audio codecs')
+    }
+    if (this.#videoCodecs.length === 0) {
+      throw new Error('This device does not support any Video codecs')
+    }
+    if (!this.#audioCodecs.includes('AAC') && !this.#audioCodecs.includes('OPUS')) {
+      throw new Error('Unsupported audio codec. Supported codecs are AAC and OPUS.')
+    }
+    if (!this.#videoCodecs.includes('H264')) {
+      throw new Error('Unsupported video codec. Supported codec is H264.')
+    }
+    const service = await this.credential.getSDMClient()
+    if (this.protocols.includes('WEB_RTC')) {
+      await this.#startWebRTC(service)
+    } else if (this.protocols.includes('RTSP')) {
+      await this.#startRTSP(service)
+    } else {
+      throw new Error('No supported protocols found')
+    }
+  }
+
+  async extend() {
+    try {
+      await (this as Camera).load('credential')
+    } catch {
+      throw new Error(`Failed to load Google SDM API Credentials for Camera ${this.id}`)
+    }
+    if (
+      !this.protocols ||
+      (!this.protocols.includes('WEB_RTC') && !this.protocols.includes('RTSP'))
+    ) {
+      throw new Error(`Camera ${this.id} does not support any recognized protocols`)
+    }
+    const service = await this.credential.getSDMClient()
+    throw new Error('Not implemented')
   }
 
   async stop() {
-    this.isEnabled = false
+    this.streamExtensionToken = null
     await this.save()
-    // @todo: implement this
+    return await this.#killExistingProcesses()
+  }
+
+  async #startWebRTC(service: smartdevicemanagement_v1.Smartdevicemanagement) {
+    throw new Error('Not implemented')
+  }
+
+  async #startRTSP(service: smartdevicemanagement_v1.Smartdevicemanagement) {
+    const {
+      data: { results },
+    } = await service.enterprises.devices.executeCommand({
+      name: this.uid,
+      requestBody: {
+        command: 'sdm.devices.commands.CameraLiveStream.GenerateRtspStream',
+      },
+    })
+
+    if (!results!.streamUrls || !results!.streamUrls.rtspUrl) {
+      throw new Error('RTSP Stream URL not found')
+    }
+    if (!results!.streamExtensionToken) {
+      throw new Error('No stream extension token found')
+    }
+
+    this.streamExtensionToken = results!.streamExtensionToken
+    await this.save()
+
+    const rtspUrl = results!.streamUrls.rtspUrl
+    const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
+    const outputRtspUrl = `rtsp://localhost:${env.get('MEDIA_MTX_RTSP_TCP_PORT', 8554)}/${this.mtxPath}`
+
+    const inputVideoCodec = 'h264' // Assuming H264 is always used for video
+    let inputAudioCodec
+    if (this.#audioCodecs.includes('AAC')) {
+      inputAudioCodec = 'aac'
+    } else if (this.#audioCodecs.includes('OPUS')) {
+      inputAudioCodec = 'opus'
+    } else {
+      throw new Error('Unsupported audio codec')
+    }
+
+    const resolutionArgs = []
+    if (this.#videoWidth && this.#videoHeight) {
+      resolutionArgs.push('-s', `${this.#videoWidth}x${this.#videoHeight}`)
+    }
+
+    const args = [
+      '-loglevel',
+      'warning',
+      '-c:v',
+      inputVideoCodec, // Specify known input video codec
+      '-c:a',
+      inputAudioCodec, // Specify known input audio codec
+      '-i',
+      rtspUrl, // Input RTSP stream
+      ...resolutionArgs, // Include resolution if known
+      '-r',
+      '10', // Set maximum frame rate to 10fps
+      '-c:v',
+      'copy', // Copy video codec as-is
+      '-c:a',
+      'aac', // Re-encode audio to AAC
+      '-b:a',
+      '64k', // Lower audio bitrate to reduce CPU usage
+      '-preset',
+      'ultrafast', // Prioritize encoding speed
+      '-tune',
+      'zerolatency', // Reduce latency
+      '-bufsize',
+      '1M', // Buffer size for reducing latency
+      '-threads',
+      '2', // Limit the number of threads to manage CPU load
+      '-fps_mode',
+      'vfr', // Replace vsync with fps_mode
+      '-f',
+      'rtsp', // Output format
+      '-rtsp_transport',
+      'tcp', // Use TCP for RTSP
+      outputRtspUrl, // Output RTSP stream
+    ]
+
+    try {
+      await app.pm3.add(this.#streamProcessName, {
+        file: ffmpegBinary,
+        arguments: args,
+        restart: false,
+      })
+    } catch (error) {
+      console.error('Error starting FFmpeg process:', error)
+    }
   }
 }
