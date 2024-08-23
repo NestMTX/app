@@ -21,6 +21,7 @@ interface DemandEventPayload {
 export class GStreamerService {
   readonly #app: ApplicationService
   #logger?: Logger
+  #ffmpegHwAccelerator?: string
 
   constructor(app: ApplicationService) {
     this.#app = app
@@ -28,14 +29,34 @@ export class GStreamerService {
 
   async boot(logger: LoggerService, _nat: NATService, _ice: ICEService, pm3: PM3, ipc: IPCService) {
     this.#logger = logger.child({ service: 'gstreamer' })
-    const bin = env.get('GSTREAMER_PATH', 'gst-launch-1.0')
+    const gstreamerBinary = env.get('GSTREAMER_BIN', 'gst-launch-1.0')
+    const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
     this.#logger.info(`Checking for GStreamer Binary`)
     try {
-      await execa(bin, ['--version'])
+      await execa(gstreamerBinary, ['--version'])
     } catch {
       throw new Error(`GStreamer binary not found`)
     }
     this.#logger.info(`GStreamer Binary Confirmed`)
+    this.#logger.info(`Checking for FFmpeg Binary`)
+    try {
+      await execa(ffmpegBinary, ['-version'])
+    } catch {
+      throw new Error(`FFmpeg binary not found`)
+    }
+    this.#logger.info(`FFmpeg Binary Confirmed`)
+    const ffmpegHwAccelerator = env.get('FFMPEG_HW_ACCELERATOR')
+    if (ffmpegHwAccelerator) {
+      const availableHwAccelerators = await this.#getAvailableHwAccelerators()
+      if (availableHwAccelerators.includes(ffmpegHwAccelerator)) {
+        this.#ffmpegHwAccelerator = ffmpegHwAccelerator
+        this.#logger.info(`FFmpeg HW Accelerator "${ffmpegHwAccelerator}" is available`)
+      } else {
+        this.#logger.error(
+          `FFmpeg HW Accelerator "${ffmpegHwAccelerator}" is not available and will not be used`
+        )
+      }
+    }
     this.#logger.info(`Loading Cameras which should be enabled`)
     const cameras = await Camera.query().whereNotNull('mtx_path').where('is_enabled', true)
     if (cameras.length === 0) {
@@ -86,7 +107,6 @@ export class GStreamerService {
       processName = `gstreamer-camera-${camera.id}`
     }
     try {
-      await this.#app.pm3.kill()
       await this.#app.pm3.remove(processName)
     } catch (error) {
       if (this.#logger) {
@@ -96,58 +116,56 @@ export class GStreamerService {
   }
 
   async #addNoSuchCameraStreamProcess(name: string, path: string) {
-    const noSuchCameraImageFilePath = this.#app.tmpPath('no-such-camera.jpg')
-    const cmd = env.get('GSTREAMER_BIN')
+    const noSuchCameraImageFilePath = this.#app.makePath('resources/mediamtx/no-such-camera.jpg')
+    const cmd = env.get('FFMPEG_BIN', 'ffmpeg')
     const args = [
-      '-v',
-      'multifilesrc',
-      `location=${noSuchCameraImageFilePath}`,
-      'loop=true',
-      '!',
-      'image/jpeg,framerate=1/1',
-      '!',
-      'jpegdec',
-      '!',
-      'videoconvert',
-      '!',
-      'videoscale',
-      '!',
-      'video/x-raw,width=640,height=480',
-      '!',
-      'x264enc',
-      'tune=zerolatency',
-      'bitrate=500',
-      '!',
-      'h264parse',
-      '!',
-      'queue',
-      '!',
-      'mpegtsmux',
-      'name=mux',
-      '!',
-      'rtspclientsink',
-      `location=rtsp://localhost:${env.get('MEDIA_MTX_RTSP_TCP_PORT', 8554)}/${path}`,
-      'audiotestsrc',
-      'wave=silence',
-      'is-live=true',
-      '!',
-      'audioconvert',
-      '!',
-      'audioresample',
-      '!',
-      'faac',
-      '!',
-      'aacparse',
-      '!',
-      'queue',
-      '!',
-      'mux.',
+      '-loglevel',
+      'error',
+      '-loop',
+      '1',
+      '-i',
+      `${noSuchCameraImageFilePath}`,
+      '-f',
+      'lavfi',
+      '-i',
+      'anullsrc=r=48000:cl=stereo',
+      '-c:v',
+      'libx264',
+      '-tune',
+      'zerolatency',
+      '-b:v',
+      '500k',
+      '-pix_fmt',
+      'yuv420p',
+      '-r',
+      '1',
+      '-c:a',
+      'aac',
+      '-b:a',
+      '32k',
+      '-f',
+      'rtsp',
+      '-rtsp_transport',
+      'tcp',
+      `rtsp://localhost:${env.get('MEDIA_MTX_RTSP_TCP_PORT', 8554)}/${path}`,
     ]
     try {
       await this.#app.pm3.add(name, {
         file: cmd,
         arguments: args,
       })
-    } catch {}
+    } catch (error) {
+      console.error('Error adding stream process:', error)
+    }
+  }
+
+  async #getAvailableHwAccelerators() {
+    const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
+    const { stdout } = await execa(ffmpegBinary, ['-hwaccels'])
+    return stdout
+      .split('\n')
+      .filter((line) => line.length > 0)
+      .map((line) => line.trim())
+      .filter((l) => l !== 'Hardware acceleration methods:')
   }
 }

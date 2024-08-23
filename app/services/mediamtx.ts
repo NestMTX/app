@@ -239,7 +239,7 @@ export class MediaMTXService {
         file: this.#binaryPath,
         arguments: [updatedConfigPath],
         restart: true,
-        maxRestarts: 5,
+        maxRestarts: Number.POSITIVE_INFINITY,
       },
       true
     )

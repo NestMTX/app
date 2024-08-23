@@ -88,5 +88,10 @@ export default await Env.create(new URL('../', import.meta.url), {
   /**
    * GStreamer Configuration
    */
-  GSTREAMER_BIN: Env.schema.string(),
+  GSTREAMER_BIN: Env.schema.string.optional(),
+  /**
+   * FFmpeg Configuration
+   */
+  FFMPEG_BIN: Env.schema.string.optional(),
+  FFMPEG_HW_ACCELERATOR: Env.schema.string.optional(),
 })

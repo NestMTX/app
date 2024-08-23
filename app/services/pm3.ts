@@ -177,7 +177,11 @@ export class PM3 extends EventEmitter<PM3ProcessEventMap> {
     const options = this.#options.get(name)
     if (!desired || !options) {
       this.#debug(`Missing process information for: ${name}`)
-      throw new PM3NoSuchProcess(name)
+      if (attempt === 0) {
+        throw new PM3NoSuchProcess(name)
+      } else {
+        return
+      }
     }
     let process = this.#processes.get(name)
     if (!process || process.exitCode !== null) {
@@ -190,12 +194,14 @@ export class PM3 extends EventEmitter<PM3ProcessEventMap> {
       }
       process = execa(desired.file, desired.arguments, desired.options)
       process.on('exit', () => {
+        this.#debug(`Process exited: ${name}`)
         const restartable = 'undefined' === typeof options.restart || true === options.restart
         const maxRestarts =
           'number' === typeof options.maxRestarts && options.maxRestarts > 0
             ? options.maxRestarts
             : Number.POSITIVE_INFINITY
         if (restartable && attempt < maxRestarts) {
+          this.#processes.delete(name)
           this.#start(name, attempt + 1)
         }
       })
