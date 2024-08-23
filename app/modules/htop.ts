@@ -31,7 +31,7 @@ export default class HtopModule implements ApiServiceModule {
         cpu,
         memory,
         processes,
-        paths: this.#app.mediamtx.paths,
+        paths: this.#app.mediamtx.getPaths(),
       }
     } catch (error) {
       console.log(error)
@@ -42,7 +42,7 @@ export default class HtopModule implements ApiServiceModule {
           used: 0,
         },
         processes: [],
-        paths: this.#app.mediamtx.paths,
+        paths: this.#app.mediamtx.getPaths(),
       }
     }
   }

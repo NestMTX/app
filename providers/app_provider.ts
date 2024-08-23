@@ -188,8 +188,8 @@ export default class AppProvider {
       await this.#mediamtx.boot(logger, this.#nat, this.#ice, this.#pm3)
       await this.#gstreamer.boot(logger, this.#nat, this.#ice, this.#pm3, this.#ipc)
       this.#cron.$on('*/5 * * * * *', this.#mediamtx.cron.bind(this.#mediamtx))
+      await init(this.#cron, logger as LoggerServiceWithConfig)
     }
-    await init(this.#cron, logger as LoggerServiceWithConfig)
     Application.getter('apiService', () => this.#api)
     Application.getter('socketIoService', () => this.#io)
     Application.getter('mqttBroker', () => this.#mqttBroker)

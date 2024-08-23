@@ -664,6 +664,15 @@ export default {
           kill: 'Kill',
         },
       },
+      paths: {
+        title: 'NextMTX Paths',
+        path: 'Path',
+        ready: 'Streaming',
+        uptime: 'Uptime',
+        tracks: 'Track Count',
+        dataRx: 'Data Received',
+        dataTx: 'Data Sent',
+      },
     },
   },
   camera: {
@@ -686,5 +695,9 @@ export default {
       srt: 'SRT',
       web_rtc: 'WebRTC',
     },
+  },
+  general: {
+    yes: 'Yes',
+    no: 'No',
   },
 }

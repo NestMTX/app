@@ -20,14 +20,33 @@ interface DemandEventPayload {
  */
 export class GStreamerService {
   readonly #app: ApplicationService
+  readonly #managedProcesses: Set<string>
+  readonly #shuttingDownProcesses: Set<string>
   #logger?: Logger
-  #ffmpegHwAccelerator?: string
+  // #ffmpegHwAccelerator?: string
+  // #ffmpegHwAcceleratorDevice?: string
 
   constructor(app: ApplicationService) {
     this.#app = app
+    this.#managedProcesses = new Set()
+    this.#shuttingDownProcesses = new Set()
   }
 
-  async boot(logger: LoggerService, _nat: NATService, _ice: ICEService, pm3: PM3, ipc: IPCService) {
+  get managedProcesses() {
+    return [...this.#managedProcesses]
+  }
+
+  get shuttingDownProcesses() {
+    return [...this.#shuttingDownProcesses]
+  }
+
+  async boot(
+    logger: LoggerService,
+    _nat: NATService,
+    _ice: ICEService,
+    _pm3: PM3,
+    ipc: IPCService
+  ) {
     this.#logger = logger.child({ service: 'gstreamer' })
     const gstreamerBinary = env.get('GSTREAMER_BIN', 'gst-launch-1.0')
     const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
@@ -45,52 +64,76 @@ export class GStreamerService {
       throw new Error(`FFmpeg binary not found`)
     }
     this.#logger.info(`FFmpeg Binary Confirmed`)
-    const ffmpegHwAccelerator = env.get('FFMPEG_HW_ACCELERATOR')
-    if (ffmpegHwAccelerator) {
-      const availableHwAccelerators = await this.#getAvailableHwAccelerators()
-      if (availableHwAccelerators.includes(ffmpegHwAccelerator)) {
-        this.#ffmpegHwAccelerator = ffmpegHwAccelerator
-        this.#logger.info(`FFmpeg HW Accelerator "${ffmpegHwAccelerator}" is available`)
-      } else {
-        this.#logger.error(
-          `FFmpeg HW Accelerator "${ffmpegHwAccelerator}" is not available and will not be used`
-        )
-      }
-    }
+    // const ffmpegHwAccelerator = env.get('FFMPEG_HW_ACCELERATOR')
+    // const ffmpegHwAcceleratorDevice = env.get('FFMPEG_HW_ACCELERATOR_DEVICE')
+    // if (ffmpegHwAccelerator) {
+    //   const availableHwAccelerators = await this.#getAvailableHwAccelerators()
+    //   if (availableHwAccelerators.includes(ffmpegHwAccelerator)) {
+    //     this.#ffmpegHwAccelerator = ffmpegHwAccelerator
+    //     this.#ffmpegHwAcceleratorDevice = ffmpegHwAcceleratorDevice
+    //     this.#logger.info(`FFmpeg HW Accelerator "${ffmpegHwAccelerator}" is available`)
+    //   } else {
+    //     this.#logger.error(
+    //       `FFmpeg HW Accelerator "${ffmpegHwAccelerator}" is not available and will not be used`
+    //     )
+    //   }
+    // }
     this.#logger.info(`Loading Cameras which should be enabled`)
     const cameras = await Camera.query().whereNotNull('mtx_path').where('is_enabled', true)
-    if (cameras.length === 0) {
+    if (cameras.length > 0) {
+      this.#logger.info(`Found ${cameras.length} cameras to start`)
+      for (const camera of cameras) {
+        await camera.start()
+      }
+    } else {
       this.#logger.info(`No cameras found to start`)
-      return
-    }
-    this.#logger.info(`Found ${cameras.length} cameras to start`)
-    for (const camera of cameras) {
-      await camera.start()
     }
     ipc.on('demand', this.#onDemand.bind(this))
     ipc.on('unDemand', this.#onUnDemand.bind(this))
+    this.#logger.info(`GStreamer Service booted`)
+  }
+
+  async #getAvailableHwAccelerators() {
+    const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
+    const { stdout } = await execa(ffmpegBinary, ['-hwaccels'])
+    return stdout
+      .split('\n')
+      .filter((line) => line.length > 0)
+      .map((line) => line.trim())
+      .filter((l) => l !== 'Hardware acceleration methods:')
+  }
+
+  #logToInfo = (data: string) => {
+    if (this.#logger) {
+      this.#logger.info(data)
+    }
+  }
+
+  #logToError = (data: string) => {
+    if (this.#logger) {
+      this.#logger.error(data)
+    }
   }
 
   async #onDemand(payload: DemandEventPayload) {
-    const camera = await Camera.findBy({ mtx_path: payload.MTX_PATH })
-    let processName: string
-    if (!camera) {
-      processName = `gstreamer-no-such-camera-${payload.MTX_PATH}`
-      await this.#addNoSuchCameraStreamProcess(processName, payload.MTX_PATH)
-    } else {
-      processName = `gstreamer-camera-${camera.id}`
-    }
-    this.#app.pm3.on(`stdout:${processName}`, (data) => {
-      this.#logger!.info(data)
-    })
-    this.#app.pm3.on(`stderr:${processName}`, (data) => {
-      this.#logger!.error(data)
-    })
-    this.#app.pm3.on(`error:${processName}`, (data) => {
-      this.#logger!.error(data)
-    })
+    this.#logger?.info(`Received demand for ${payload.MTX_PATH}`)
     try {
+      const camera = await Camera.findBy({ mtx_path: payload.MTX_PATH })
+      let processName: string
+      if (!camera) {
+        processName = `ffmpeg-no-such-camera-${payload.MTX_PATH}`
+        await this.#addNoSuchCameraStreamProcess(processName, payload.MTX_PATH)
+      } else if (!camera.isEnabled) {
+        processName = `ffmpeg-camera-disabled-${payload.MTX_PATH}`
+        await this.#addCameraDisabledCameraStreamProcess(processName, payload.MTX_PATH)
+      } else {
+        processName = `gstreamer-camera-${camera.id}`
+      }
+      this.#app.pm3.on(`stdout:${processName}`, this.#logToInfo.bind(this))
+      this.#app.pm3.on(`stderr:${processName}`, this.#logToError.bind(this))
+      this.#app.pm3.on(`error:${processName}`, this.#logToError.bind(this))
       this.#app.pm3.start(processName)
+      this.#managedProcesses.add(processName)
     } catch (error) {
       if (this.#logger) {
         this.#logger.error(error)
@@ -99,15 +142,24 @@ export class GStreamerService {
   }
 
   async #onUnDemand(payload: DemandEventPayload) {
-    const camera = await Camera.findBy({ mtx_path: payload.MTX_PATH })
-    let processName: string
-    if (!camera) {
-      processName = `gstreamer-no-such-camera-${payload.MTX_PATH}`
-    } else {
-      processName = `gstreamer-camera-${camera.id}`
-    }
+    this.#logger?.info(`Received unDemand for ${payload.MTX_PATH}`)
     try {
+      const camera = await Camera.findBy({ mtx_path: payload.MTX_PATH })
+      let processName: string
+      if (!camera) {
+        processName = `ffmpeg-no-such-camera-${payload.MTX_PATH}`
+      } else if (!camera.isEnabled) {
+        processName = `ffmpeg-camera-disabled-${payload.MTX_PATH}`
+      } else {
+        processName = `gstreamer-camera-${camera.id}`
+      }
+      this.#shuttingDownProcesses.add(processName)
       await this.#app.pm3.remove(processName)
+      this.#app.pm3.off(`stdout:${processName}`, this.#logToInfo.bind(this))
+      this.#app.pm3.off(`stderr:${processName}`, this.#logToError.bind(this))
+      this.#app.pm3.off(`error:${processName}`, this.#logToError.bind(this))
+      this.#managedProcesses.delete(processName)
+      this.#shuttingDownProcesses.delete(processName)
     } catch (error) {
       if (this.#logger) {
         this.#logger.error(error)
@@ -116,15 +168,24 @@ export class GStreamerService {
   }
 
   async #addNoSuchCameraStreamProcess(name: string, path: string) {
-    const noSuchCameraImageFilePath = this.#app.makePath('resources/mediamtx/no-such-camera.jpg')
+    const filepath = this.#app.makePath('resources/mediamtx/no-such-camera.jpg')
+    return await this.#addFFmpegStreamFromJpegProcess(name, path, filepath)
+  }
+
+  async #addCameraDisabledCameraStreamProcess(name: string, path: string) {
+    const filepath = this.#app.makePath('resources/mediamtx/camera-disabled.jpg')
+    return await this.#addFFmpegStreamFromJpegProcess(name, path, filepath)
+  }
+
+  async #addFFmpegStreamFromJpegProcess(name: string, path: string, filepath: string) {
     const cmd = env.get('FFMPEG_BIN', 'ffmpeg')
     const args = [
       '-loglevel',
-      'error',
+      'warning',
       '-loop',
       '1',
       '-i',
-      `${noSuchCameraImageFilePath}`,
+      `${filepath}`,
       '-f',
       'lavfi',
       '-i',
@@ -157,15 +218,5 @@ export class GStreamerService {
     } catch (error) {
       console.error('Error adding stream process:', error)
     }
-  }
-
-  async #getAvailableHwAccelerators() {
-    const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
-    const { stdout } = await execa(ffmpegBinary, ['-hwaccels'])
-    return stdout
-      .split('\n')
-      .filter((line) => line.length > 0)
-      .map((line) => line.trim())
-      .filter((l) => l !== 'Hardware acceleration methods:')
   }
 }

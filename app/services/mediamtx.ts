@@ -66,6 +66,7 @@ export class MediaMTXService {
   readonly #paths: Map<string, MediaMtxPath> = new Map()
   #logger?: Logger
   #apiClient?: MediaMTXClient
+  #cronAbortController?: AbortController
 
   constructor(app: ApplicationService) {
     this.#app = app
@@ -74,6 +75,10 @@ export class MediaMTXService {
   }
 
   get paths() {
+    return [...this.#paths].map(([, path]) => path)
+  }
+
+  getPaths() {
     return [...this.#paths].map(([, path]) => path)
   }
 
@@ -253,8 +258,12 @@ export class MediaMTXService {
     if (!this.#apiClient) {
       return
     }
+    if (this.#cronAbortController) {
+      this.#cronAbortController.abort()
+    }
+    this.#cronAbortController = new AbortController()
     try {
-      const all = await this.#getAllActiveMediaMtxPaths()
+      const all = await this.#getAllActiveMediaMtxPaths(this.#cronAbortController.signal)
       const names = all.map((p) => p.name)
       const toRemove = Array.from(this.#paths.keys()).filter((name) => !names.includes(name))
       toRemove.forEach((name) => {
@@ -273,7 +282,10 @@ export class MediaMTXService {
         }
         this.#paths.set(p.path, p)
       })
-    } catch {
+    } catch (error) {
+      if (this.#logger) {
+        this.#logger.error(error)
+      }
       this.#paths.forEach((_, p) => {
         this.#paths.delete(p)
       })
@@ -288,16 +300,28 @@ export class MediaMTXService {
     if (!this.#apiClient) {
       return ret
     }
-    while (page < pageCount && (!signal || !signal.aborted)) {
-      const { data } = await this.#apiClient.pathsList({
-        page,
-        itemsPerPage,
-      })
-      pageCount = data.pageCount || 0
-      if (Array.isArray(data.items)) {
-        data.items.forEach((item) => {
-          ret.push(item)
-        })
+    while (page < pageCount) {
+      if (signal && signal.aborted) {
+        break
+      }
+      try {
+        const { data } = await this.#apiClient.pathsList(
+          {
+            page,
+            itemsPerPage,
+          },
+          {
+            signal,
+          }
+        )
+        pageCount = data.pageCount || 0
+        if (Array.isArray(data.items)) {
+          data.items.forEach((item) => {
+            ret.push(item)
+          })
+        }
+      } catch {
+        break
       }
     }
     return ret

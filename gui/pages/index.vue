@@ -126,6 +126,62 @@
             </v-table>
           </v-card>
         </v-col>
+        <v-col cols="12">
+          <v-card color="transparent" class="glass-surface mt-3" min-height="100">
+            <v-toolbar color="transparent" density="compact">
+              <v-toolbar-title class="font-raleway font-weight-bold">{{
+                $t('index.htop.paths.title')
+              }}</v-toolbar-title>
+            </v-toolbar>
+            <v-divider />
+            <v-table class="bg-transparent">
+              <thead>
+                <tr>
+                  <th>{{ $t('index.htop.paths.path') }}</th>
+                  <th style="width: 50px" class="text-center">
+                    {{ $t('index.htop.paths.ready') }}
+                  </th>
+                  <th>{{ $t('index.htop.paths.uptime') }}</th>
+                  <th>{{ $t('index.htop.paths.tracks') }}</th>
+                  <th>{{ $t('index.htop.paths.dataRx') }}</th>
+                  <th>{{ $t('index.htop.paths.dataTx') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(p, i) in paths" :key="`path-${i}`">
+                  <td>
+                    <code>{{ p.path }}</code>
+                  </td>
+                  <td class="text-center">
+                    <v-chip v-if="p.ready" variant="elevated" color="success">{{
+                      $t('general.yes')
+                    }}</v-chip>
+                    <v-chip v-else variant="elevated" color="error">{{ $t('general.no') }}</v-chip>
+                  </td>
+                  <td>
+                    {{ timestampToTimeSinceDuration(p.uptime) }}
+                  </td>
+                  <td>
+                    {{ numberAsFormattedInteger(p.tracks) }}
+                  </td>
+                  <td>
+                    {{ filesize(p.dataRx) }}
+                  </td>
+                  <td>
+                    {{ filesize(p.dataTx) }}
+                  </td>
+                </tr>
+                <tr v-if="paths.length === 0">
+                  <td colspan="7" class="pa-0">
+                    <v-alert color="info" type="info" dense rounded="0">{{
+                      $t('index.htop.paths.empty')
+                    }}</v-alert>
+                  </td>
+                </tr>
+              </tbody>
+            </v-table>
+          </v-card>
+        </v-col>
       </v-row>
     </v-col>
   </v-row>
@@ -143,7 +199,8 @@ import {
   triggerRef,
 } from 'vue'
 import { filesize } from 'filesize'
-import { Duration } from 'luxon'
+import { DateTime, Duration } from 'luxon'
+import numeral from 'numeral'
 import type { CronService, ApiService } from '@jakguru/vueprint'
 
 interface CpuUsage {
@@ -168,10 +225,40 @@ interface ProcessDescription {
   uptime: number | null
 }
 
+interface MtxPath {
+  path: string
+  src: string
+  ready: boolean
+  uptime: string | null
+  tracks: number
+  dataRx: number
+  dataTx: number
+  consumers: number
+}
+
 interface HtopResponse {
   cpu: CpuUsage[]
   memory: MemoryUsage
   processes: ProcessDescription[]
+  paths: MtxPath[]
+}
+
+const timestampToTimeSinceDuration = (timestamp: string | null) => {
+  if (!timestamp) {
+    return ''
+  }
+  const datetime = DateTime.fromISO(timestamp)
+  return datetime.diffNow().negate().rescale().toHuman({
+    listStyle: 'long',
+    unitDisplay: 'short',
+  })
+}
+
+const numberAsFormattedInteger = (value: number | null) => {
+  if ('number' !== typeof value) {
+    return ''
+  }
+  return numeral(value).format('0,0')
 }
 
 export default defineComponent({
@@ -179,8 +266,9 @@ export default defineComponent({
     const api = inject<ApiService>('api')!
     const cron = inject<CronService>('cron')!
     const cpu = shallowRef<CpuUsage[]>([])
-    const memory = ref<MemoryUsage>({ total: 0, used: 0 })
-    const processes = ref<ProcessDescription[]>([])
+    const memory = shallowRef<MemoryUsage>({ total: 0, used: 0 })
+    const processes = shallowRef<ProcessDescription[]>([])
+    const paths = shallowRef<MtxPath[]>([])
     const updating = ref(false)
     let abortController: AbortController | undefined = undefined
     const update = async () => {
@@ -197,7 +285,11 @@ export default defineComponent({
         cpu.value = data.cpu
         memory.value = data.memory
         processes.value = data.processes
+        paths.value = data.paths
         triggerRef(cpu)
+        triggerRef(memory)
+        triggerRef(processes)
+        triggerRef(paths)
       }
       updating.value = false
     }
@@ -270,12 +362,15 @@ export default defineComponent({
       memory,
       memoryProgressBindings,
       processes,
+      paths,
       updating,
       cpuCols,
       filesize,
       Duration,
       actionsInProgress,
       doAction,
+      timestampToTimeSinceDuration,
+      numberAsFormattedInteger,
     }
   },
 })
