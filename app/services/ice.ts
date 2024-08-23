@@ -4,6 +4,7 @@ import joi from 'joi'
 import Twilio from 'twilio'
 import type { LoggerService } from '@adonisjs/core/types'
 import type { Logger } from '@adonisjs/logger'
+import type { RTCIceServer } from 'werift'
 
 interface IceServer {
   url?: string
@@ -74,5 +75,11 @@ export class ICEService {
     return [...this.#known]
       .map((s) => ({ ...s, urls: undefined }))
       .filter((s) => s.url) as IceServer[]
+  }
+
+  get asRTCIceServers() {
+    return [...this.#known]
+      .map((s) => ({ ...s, url: undefined }))
+      .filter((s) => s.urls) as RTCIceServer[]
   }
 }

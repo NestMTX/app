@@ -78,13 +78,14 @@
     "openapi-client-axios": "^7.5.5",
     "openapi-client-axios-typegen": "^7.6.2",
     "pg": "^8.11.5",
-    "pick-port": "^2.0.1",
+    "pick-port": "^2.1.0",
     "pidusage": "^3.0.2",
     "pino-abstract-transport": "^1.2.0",
     "pm2": "^5.3.1",
     "reflect-metadata": "^0.2.1",
     "socket.io": "^4.7.5",
     "twilio": "^5.0.4",
+    "werift": "^0.19.8",
     "yaml": "^2.4.1"
   },
   "eslintConfig": {

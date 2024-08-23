@@ -41,6 +41,10 @@ export interface PM3ProcessEventMap {
    * `error:<name>` - Emitted when a process writes to stderr
    */
   [event: `error:${string}`]: [string]
+  /**
+   * `removed:<name>` - Emitted when a process writes to stderr
+   */
+  [event: `removed:${string}`]: []
   'log:out': [string, string]
   'log:err': [string, string]
   'caught:error': [string, string]
@@ -257,6 +261,7 @@ export class PM3 extends EventEmitter<PM3ProcessEventMap> {
       // noop
     }
     await this.#cleanup(name)
+    super.emit(`removed:${name}`)
   }
 
   async kill(signal: NodeJS.Signals | number = 'SIGTERM') {

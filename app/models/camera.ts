@@ -15,14 +15,47 @@ import encryption from '@adonisjs/core/services/encryption'
 import Credential from '#models/credential'
 import dot from 'dot-object'
 import app from '@adonisjs/core/services/app'
+import { RTCPeerConnection, RTCRtpCodecParameters } from 'werift'
+import { pickPort } from 'pick-port'
+import { createSocket } from 'node:dgram'
+
 dot.keepArray = true
 
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
+import type { RTCTrackEvent, RTCIceServer } from 'werift'
+import type { Socket as DGramSocket } from 'node:dgram'
+
+interface PickPortOptions {
+  type: 'tcp' | 'udp'
+  ip?: string
+  minPort?: number
+  maxPort?: number
+  reserveTimeout?: number
+}
 
 const makeChecksum = (data: string) => {
   const hash = crypto.createHash('sha256')
   hash.update(data)
   return hash.digest('hex')
+}
+
+export class IceCandidateError extends Error {
+  readonly address: string
+  readonly errorCode: number
+  readonly errorText: string
+  readonly port: number
+  readonly url: string
+
+  constructor(address: string, errorCode: number, errorText: string, port: number, url: string) {
+    super(errorText)
+    this.name = this.constructor.name
+    Error.captureStackTrace(this, this.constructor)
+    this.address = address
+    this.errorCode = errorCode
+    this.errorText = errorText
+    this.port = port
+    this.url = url
+  }
 }
 
 import type { smartdevicemanagement_v1 } from 'googleapis'
@@ -759,8 +792,213 @@ export default class Camera extends BaseModel {
     return await this.#killExistingProcesses()
   }
 
+  async #getWebRTCUdpPorts() {
+    const getPortOptions: PickPortOptions = {
+      type: 'udp',
+      ip: '0.0.0.0',
+      reserveTimeout: 15,
+      minPort: env.get('WEBRTC_RTP_MIN_PORT', 10000),
+      maxPort: env.get('WEBRTC_RTP_MAX_PORT', 20000),
+    }
+    const audioPort = await pickPort(getPortOptions)
+    const videoPort = await pickPort(getPortOptions)
+    return { audioPort, videoPort }
+  }
+
   async #startWebRTC(service: smartdevicemanagement_v1.Smartdevicemanagement) {
-    throw new Error('Not implemented')
+    const udp: DGramSocket = createSocket('udp4')
+    app.pm3.once(`removed:${this.#streamProcessName}`, () => {
+      udp.close()
+    })
+
+    const iceServers = app.iceService.asRTCIceServers
+    const additionalHostAddresses = [
+      '127.0.0.1',
+      '::1',
+      ...app.natService.lanIps,
+      app.natService.publicIp,
+    ]
+    if (!Array.isArray(iceServers)) {
+      throw new Error('Failed to get ICE servers')
+    }
+
+    const { audioPort, videoPort } = await this.#getWebRTCUdpPorts()
+
+    const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
+    const outputRtspUrl = `rtsp://localhost:${env.get('MEDIA_MTX_RTSP_TCP_PORT', 8554)}/${this.mtxPath}`
+
+    const resolutionArgs = []
+    if (this.#videoWidth && this.#videoHeight) {
+      resolutionArgs.push('-s', `${this.#videoWidth}x${this.#videoHeight}`)
+    }
+
+    const args = [
+      '-loglevel',
+      'debug', // Set to debug for more detailed output
+      '-protocol_whitelist',
+      'file,udp,rtp,rtsp,tcp',
+      '-use_wallclock_as_timestamps',
+      '1',
+      '-fflags',
+      '+genpts',
+      '-i',
+      `udp://localhost:${videoPort}?listen=1&fifo_size=50000000`, // Video stream input
+      '-i',
+      `udp://localhost:${audioPort}?listen=1&fifo_size=50000000`, // Audio stream input
+      '-c:v',
+      'libx264',
+      '-preset',
+      'ultrafast',
+      '-tune',
+      'zerolatency',
+      '-b:v',
+      '500k',
+      '-r',
+      '10',
+      '-c:a',
+      'aac',
+      '-b:a',
+      '64k',
+      '-f',
+      'rtsp',
+      '-rtsp_transport',
+      'tcp',
+      ...resolutionArgs,
+      outputRtspUrl,
+    ]
+
+    try {
+      await app.pm3.add(this.#streamProcessName, {
+        file: ffmpegBinary,
+        arguments: args,
+        restart: false,
+      })
+    } catch (error) {
+      console.error('Error starting FFmpeg process:', error)
+    }
+
+    const pc = new RTCPeerConnection({
+      bundlePolicy: 'max-bundle',
+      codecs: {
+        audio: [
+          new RTCRtpCodecParameters({
+            mimeType: 'audio/opus',
+            clockRate: 48000,
+            channels: 2,
+          }),
+        ],
+        video: [
+          new RTCRtpCodecParameters({
+            mimeType: 'video/H264',
+            clockRate: 90000,
+            rtcpFeedback: [
+              { type: 'transport-cc' },
+              { type: 'ccm', parameter: 'fir' },
+              { type: 'nack' },
+              { type: 'nack', parameter: 'pli' },
+              { type: 'goog-remb' },
+            ],
+            parameters: 'level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f',
+          }),
+        ],
+      },
+      iceServers,
+      iceAdditionalHostAddresses: additionalHostAddresses,
+      iceTransportPolicy: 'all',
+    })
+
+    pc.addEventListener('connectionstatechange', () => {
+      switch (pc.connectionState) {
+        case 'new':
+        case 'connecting':
+          break
+        case 'connected':
+          break
+        case 'disconnected':
+        case 'closed':
+        case 'failed':
+          break
+        default:
+          break
+      }
+    })
+
+    pc.addEventListener('icecandidateerror', (_event) => {
+      // Handle ICE candidate error
+    })
+
+    pc.addEventListener('track', (event: RTCTrackEvent) => {
+      event.track.onReceiveRtp.subscribe((rtp) => {
+        switch (event.track.kind) {
+          case 'video':
+            udp.send(rtp.serialize(), videoPort, '0.0.0.0', (error, _bytes) => {
+              if (error) {
+                return
+              }
+            })
+            break
+
+          case 'audio':
+            udp.send(rtp.serialize(), audioPort, '0.0.0.0', (error, _bytes) => {
+              if (error) {
+                return
+              }
+            })
+            break
+
+          default:
+            break
+        }
+      })
+    })
+
+    try {
+      pc.addTransceiver('audio', { direction: 'recvonly' })
+    } catch (error) {
+      throw new Error(`Failed to add audio transceiver: ${error.message}`)
+    }
+
+    try {
+      pc.addTransceiver('video', { direction: 'recvonly' })
+    } catch (error) {
+      throw new Error(`Failed to add video transceiver: ${error.message}`)
+    }
+
+    // Add a data channel to include the application m line in SDP
+    pc.createDataChannel('dataSendChannel', { id: 1 })
+
+    const offer = await pc.createOffer()
+    await pc.setLocalDescription(offer)
+
+    let results: smartdevicemanagement_v1.Schema$GoogleHomeEnterpriseSdmV1ExecuteDeviceCommandResponse['results']
+    try {
+      const {
+        data: { results: commandResults },
+      } = await service.enterprises.devices.executeCommand({
+        name: this.uid,
+        requestBody: {
+          command: 'sdm.devices.commands.CameraLiveStream.GenerateWebRtcStream',
+          params: {
+            offerSdp: offer.sdp,
+          },
+        },
+      })
+      results = commandResults!
+    } catch (error) {
+      throw new Error(`Google API returned error: ${error.message} for Offer SDP: \n\n${offer.sdp}`)
+    }
+
+    if (!results!.answerSdp) {
+      throw new Error('WebRTC Answer SDP not found')
+    }
+
+    await pc.setRemoteDescription({
+      type: 'answer',
+      sdp: results!.answerSdp,
+    })
+
+    // Adding a small delay before starting the FFmpeg process
+    await new Promise((resolve) => setTimeout(resolve, 500))
   }
 
   async #startRTSP(service: smartdevicemanagement_v1.Smartdevicemanagement) {
@@ -841,7 +1079,6 @@ export default class Camera extends BaseModel {
       await app.pm3.add(this.#streamProcessName, {
         file: ffmpegBinary,
         arguments: args,
-        restart: false,
       })
     } catch (error) {
       console.error('Error starting FFmpeg process:', error)

@@ -1,10 +1,5 @@
 import { ApiServiceModule } from '#services/api'
-import type {
-  CreateCommandContext,
-  ReadCommandContext,
-  UpdateCommandContext,
-  DeleteCommandContext,
-} from '#services/api'
+import type { CreateCommandContext, ReadCommandContext, UpdateCommandContext } from '#services/api'
 import Camera from '#models/camera'
 import Joi from 'joi'
 import I18NException from '#exceptions/i18n'

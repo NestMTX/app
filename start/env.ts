@@ -95,4 +95,9 @@ export default await Env.create(new URL('../', import.meta.url), {
   FFMPEG_BIN: Env.schema.string.optional(),
   FFMPEG_HW_ACCELERATOR: Env.schema.string.optional(),
   FFMPEG_HW_ACCELERATOR_DEVICE: Env.schema.string.optional(),
+  /**
+   * WebRTC Configuration
+   */
+  WEBRTC_RTP_MIN_PORT: Env.schema.number.optional(),
+  WEBRTC_RTP_MAX_PORT: Env.schema.number.optional(),
 })
