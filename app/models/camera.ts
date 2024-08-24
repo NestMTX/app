@@ -939,8 +939,13 @@ export default class Camera extends BaseModel {
       }
       pc.addEventListener('connectionstatechange', onConnectionStateChange)
       peerConnectedAbortController.signal.addEventListener('abort', () =>
-        reject(new Error('Aborted'))
+        // reject(new Error('Aborted'))
+        resolve(void 0)
       )
+    })
+
+    peerConnected.then(() => {
+      logger.info('WebRTC Peer connection established')
     })
 
     pc.addEventListener('icecandidateerror', (event) => {
@@ -967,6 +972,7 @@ export default class Camera extends BaseModel {
     app.pm3.once(`removed:${this.#streamProcessName}`, () => {
       rtpPromiseAbortController.abort()
       peerConnectedAbortController.abort()
+      // process.exit(1) // for debugging
     })
 
     const videoRtpSending = new Promise<void>((resolve, reject) => {
@@ -1065,8 +1071,10 @@ export default class Camera extends BaseModel {
       sdp: results!.answerSdp,
     })
 
-    await Promise.all([peerConnected, videoRtpSending, audioRtpSending])
-    logger.info('WebRTC Peer connection established. Starting GStreamer process for WebRTC stream')
+    // await Promise.all([peerConnected, videoRtpSending, audioRtpSending])
+    // logger.info('WebRTC Peer connection established. Starting GStreamer process for WebRTC stream')
+    await Promise.all([videoRtpSending, audioRtpSending])
+    logger.info('Starting GStreamer process for WebRTC stream')
   }
 
   async #startRTSP(service: smartdevicemanagement_v1.Smartdevicemanagement) {

@@ -22,6 +22,7 @@ export class GStreamerService {
   readonly #app: ApplicationService
   readonly #managedProcesses: Set<string>
   readonly #shuttingDownProcesses: Set<string>
+  readonly #undemandTimeouts: Map<string, NodeJS.Timeout>
   #logger?: Logger
   // #ffmpegHwAccelerator?: string
   // #ffmpegHwAcceleratorDevice?: string
@@ -30,6 +31,7 @@ export class GStreamerService {
     this.#app = app
     this.#managedProcesses = new Set()
     this.#shuttingDownProcesses = new Set()
+    this.#undemandTimeouts = new Map()
   }
 
   get managedProcesses() {
@@ -107,6 +109,11 @@ export class GStreamerService {
 
   async #onDemand(payload: DemandEventPayload) {
     this.#logger?.info(`Received demand for ${payload.MTX_PATH}`)
+    const undemandTimeout = this.#undemandTimeouts.get(payload.MTX_PATH)
+    if (undemandTimeout) {
+      clearTimeout(undemandTimeout)
+      this.#undemandTimeouts.delete(payload.MTX_PATH)
+    }
     try {
       const camera = await Camera.findBy({ mtx_path: payload.MTX_PATH })
       let processName: string
@@ -118,17 +125,17 @@ export class GStreamerService {
         await this.#addCameraDisabledCameraStreamProcess(processName, payload.MTX_PATH)
       } else {
         processName = `camera-${camera.id}`
-        const connectingProcessName = `camera-connecting-${camera.id}`
-        await this.#addCameraConnectingCameraStreamProcess(connectingProcessName, payload.MTX_PATH)
-        this.#app.pm3.on(`stdout:${connectingProcessName}`, this.#logToInfo.bind(this))
-        this.#app.pm3.on(`stderr:${connectingProcessName}`, this.#logToError.bind(this))
-        this.#app.pm3.on(`error:${connectingProcessName}`, this.#logToError.bind(this))
-        this.#app.pm3.start(connectingProcessName)
+        // const connectingProcessName = `camera-connecting-${camera.id}`
+        // await this.#addCameraConnectingCameraStreamProcess(connectingProcessName, payload.MTX_PATH)
+        // this.#app.pm3.on(`stdout:${connectingProcessName}`, this.#logToInfo.bind(this))
+        // this.#app.pm3.on(`stderr:${connectingProcessName}`, this.#logToError.bind(this))
+        // this.#app.pm3.on(`error:${connectingProcessName}`, this.#logToError.bind(this))
+        // this.#app.pm3.start(connectingProcessName)
         await camera.start()
-        await this.#app.pm3.remove(connectingProcessName)
-        this.#app.pm3.off(`stdout:${connectingProcessName}`, this.#logToInfo.bind(this))
-        this.#app.pm3.off(`stderr:${connectingProcessName}`, this.#logToError.bind(this))
-        this.#app.pm3.off(`error:${connectingProcessName}`, this.#logToError.bind(this))
+        // await this.#app.pm3.remove(connectingProcessName)
+        // this.#app.pm3.off(`stdout:${connectingProcessName}`, this.#logToInfo.bind(this))
+        // this.#app.pm3.off(`stderr:${connectingProcessName}`, this.#logToError.bind(this))
+        // this.#app.pm3.off(`error:${connectingProcessName}`, this.#logToError.bind(this))
       }
       this.#app.pm3.on(`stdout:${processName}`, this.#logToInfo.bind(this))
       this.#app.pm3.on(`stderr:${processName}`, this.#logToError.bind(this))
@@ -142,8 +149,8 @@ export class GStreamerService {
     }
   }
 
-  async #onUnDemand(payload: DemandEventPayload) {
-    this.#logger?.info(`Received unDemand for ${payload.MTX_PATH}`)
+  async #onUnDemandTimeout(payload: DemandEventPayload) {
+    this.#logger?.info(`Undemand Delay for ${payload.MTX_PATH} has been reached`)
     try {
       const camera = await Camera.findBy({ mtx_path: payload.MTX_PATH })
       let processName: string
@@ -168,6 +175,20 @@ export class GStreamerService {
     }
   }
 
+  async #onUnDemand(payload: DemandEventPayload) {
+    this.#logger?.info(
+      `Received unDemand for ${payload.MTX_PATH}. Delaying for 60 second to see if there is a new demand.`
+    )
+    const undemandTimeout = this.#undemandTimeouts.get(payload.MTX_PATH)
+    if (undemandTimeout) {
+      return
+    }
+    this.#undemandTimeouts.set(
+      payload.MTX_PATH,
+      setTimeout(() => this.#onUnDemandTimeout(payload), 60000)
+    )
+  }
+
   async #addNoSuchCameraStreamProcess(name: string, path: string) {
     const filepath = this.#app.makePath('resources/mediamtx/no-such-camera.jpg')
     return await this.#addFFmpegStreamFromJpegProcess(name, path, filepath)
@@ -175,11 +196,6 @@ export class GStreamerService {
 
   async #addCameraDisabledCameraStreamProcess(name: string, path: string) {
     const filepath = this.#app.makePath('resources/mediamtx/camera-disabled.jpg')
-    return await this.#addFFmpegStreamFromJpegProcess(name, path, filepath)
-  }
-
-  async #addCameraConnectingCameraStreamProcess(name: string, path: string) {
-    const filepath = this.#app.makePath('resources/mediamtx/connecting.jpg')
     return await this.#addFFmpegStreamFromJpegProcess(name, path, filepath)
   }
 
