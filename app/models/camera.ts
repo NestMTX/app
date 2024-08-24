@@ -832,13 +832,21 @@ export default class Camera extends BaseModel {
     const location = `rtsp://127.0.0.1:${env.get('MEDIA_MTX_RTSP_TCP_PORT', 8554)}/${this.mtxPath}`
 
     const args = [
-      '-v',
+      '-q', // Quiet mode
+      // '--gst-debug-level=4', // Log level set to INFO
+      '--gst-debug-level=2', // Log level set to WARNING
       // Audio pipeline
       'udpsrc',
       `port=${audioPort}`,
       'caps=application/x-rtp,media=(string)audio,clock-rate=(int)48000,encoding-name=(string)OPUS,payload=(int)96',
       '!',
       'rtpopusdepay',
+      '!',
+      'opusdec', // Decode Opus to raw audio
+      '!',
+      'audioconvert', // Convert raw audio format if needed
+      '!',
+      'avenc_aac', // Encode to AAC (or 'faac' if available)
       '!',
       'queue',
       '!',
