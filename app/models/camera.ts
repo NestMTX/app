@@ -18,11 +18,12 @@ import app from '@adonisjs/core/services/app'
 import { RTCPeerConnection, RTCRtpCodecParameters } from 'werift'
 import { pickPort } from 'pick-port'
 import { createSocket } from 'node:dgram'
+import { EventEmitter } from 'node:events'
 
 dot.keepArray = true
 
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
-import type { RTCTrackEvent, RTCIceServer } from 'werift'
+import type { RTCTrackEvent } from 'werift'
 import type { Socket as DGramSocket } from 'node:dgram'
 
 interface PickPortOptions {
@@ -47,7 +48,7 @@ export class IceCandidateError extends Error {
   readonly url: string
 
   constructor(address: string, errorCode: number, errorText: string, port: number, url: string) {
-    super(errorText)
+    super(`ICE Candidate Error: ${errorText}`)
     this.name = this.constructor.name
     Error.captureStackTrace(this, this.constructor)
     this.address = address
@@ -806,8 +807,11 @@ export default class Camera extends BaseModel {
   }
 
   async #startWebRTC(service: smartdevicemanagement_v1.Smartdevicemanagement) {
+    const mainLogger = await app.container.make('logger')
+    const logger = mainLogger.child({ service: `camera-${this.id}` })
     const udp: DGramSocket = createSocket('udp4')
     app.pm3.once(`removed:${this.#streamProcessName}`, () => {
+      logger.info('GStreamer process removed. Closing UDP socket.')
       udp.close()
     })
 
@@ -824,57 +828,46 @@ export default class Camera extends BaseModel {
 
     const { audioPort, videoPort } = await this.#getWebRTCUdpPorts()
 
-    const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
-    const outputRtspUrl = `rtsp://localhost:${env.get('MEDIA_MTX_RTSP_TCP_PORT', 8554)}/${this.mtxPath}`
-
-    const resolutionArgs = []
-    if (this.#videoWidth && this.#videoHeight) {
-      resolutionArgs.push('-s', `${this.#videoWidth}x${this.#videoHeight}`)
-    }
+    const gstreamerBinary = env.get('GSTREAMER_BIN', 'gst-launch-1.0')
+    const location = `rtsp://127.0.0.1:${env.get('MEDIA_MTX_RTSP_TCP_PORT', 8554)}/${this.mtxPath}`
 
     const args = [
-      '-loglevel',
-      'debug', // Set to debug for more detailed output
-      '-protocol_whitelist',
-      'file,udp,rtp,rtsp,tcp',
-      '-use_wallclock_as_timestamps',
-      '1',
-      '-fflags',
-      '+genpts',
-      '-i',
-      `udp://localhost:${videoPort}?listen=1&fifo_size=50000000`, // Video stream input
-      '-i',
-      `udp://localhost:${audioPort}?listen=1&fifo_size=50000000`, // Audio stream input
-      '-c:v',
-      'libx264',
-      '-preset',
-      'ultrafast',
-      '-tune',
-      'zerolatency',
-      '-b:v',
-      '500k',
-      '-r',
-      '10',
-      '-c:a',
-      'aac',
-      '-b:a',
-      '64k',
-      '-f',
-      'rtsp',
-      '-rtsp_transport',
-      'tcp',
-      ...resolutionArgs,
-      outputRtspUrl,
+      '-v',
+      // Audio pipeline
+      'udpsrc',
+      `port=${audioPort}`,
+      'caps=application/x-rtp,media=(string)audio,clock-rate=(int)48000,encoding-name=(string)OPUS,payload=(int)96',
+      '!',
+      'rtpopusdepay',
+      '!',
+      'queue',
+      '!',
+      'rtspclientsink',
+      'name=s',
+      `location=${location}`,
+      'async-handling=true',
+      // Video pipeline
+      'udpsrc',
+      `port=${videoPort}`,
+      'caps=application/x-rtp,media=(string)video,clock-rate=(int)90000,encoding-name=(string)H264,payload=(int)97',
+      '!',
+      'rtph264depay',
+      '!',
+      'h264parse',
+      '!',
+      'queue',
+      '!',
+      's.sink_1',
     ]
 
     try {
       await app.pm3.add(this.#streamProcessName, {
-        file: ffmpegBinary,
+        file: gstreamerBinary,
         arguments: args,
         restart: false,
       })
     } catch (error) {
-      console.error('Error starting FFmpeg process:', error)
+      logger.error('Error starting GStreamer process:', error)
     }
 
     const pc = new RTCPeerConnection({
@@ -911,38 +904,111 @@ export default class Camera extends BaseModel {
       switch (pc.connectionState) {
         case 'new':
         case 'connecting':
+          logger.info('WebRTC Peer connection state: connecting')
           break
         case 'connected':
+          logger.info('WebRTC Peer connection state: connected')
           break
         case 'disconnected':
         case 'closed':
         case 'failed':
+          logger.warn('WebRTC Peer connection state: disconnected')
           break
         default:
+          logger.warn('WebRTC Peer connection state: unknown')
           break
       }
     })
 
-    pc.addEventListener('icecandidateerror', (_event) => {
-      // Handle ICE candidate error
+    const peerConnectedAbortController = new AbortController()
+
+    const peerConnected = new Promise<void>((resolve, reject) => {
+      const onConnectionStateChange = () => {
+        switch (pc.connectionState) {
+          case 'connected':
+            pc.removeEventListener('connectionstatechange', onConnectionStateChange)
+            return resolve(void 0)
+          case 'disconnected':
+          case 'closed':
+          case 'failed':
+            pc.removeEventListener('connectionstatechange', onConnectionStateChange)
+            return reject(new Error('WebRTC Peer connection failed'))
+          default:
+            break
+        }
+      }
+      pc.addEventListener('connectionstatechange', onConnectionStateChange)
+      peerConnectedAbortController.signal.addEventListener('abort', () =>
+        reject(new Error('Aborted'))
+      )
+    })
+
+    pc.addEventListener('icecandidateerror', (event) => {
+      const e = new IceCandidateError(
+        event.address,
+        event.errorCode,
+        event.errorText,
+        event.port,
+        event.url
+      )
+      logger.error(e)
+    })
+
+    const videoRtpBus = new EventEmitter({
+      captureRejections: true,
+    })
+
+    const audioRtpBus = new EventEmitter({
+      captureRejections: true,
+    })
+
+    const rtpPromiseAbortController = new AbortController()
+
+    app.pm3.once(`removed:${this.#streamProcessName}`, () => {
+      rtpPromiseAbortController.abort()
+      peerConnectedAbortController.abort()
+    })
+
+    const videoRtpSending = new Promise<void>((resolve, reject) => {
+      videoRtpBus.once('sent', () => {
+        logger.info('Video Stream Started')
+        return resolve(void 0)
+      })
+      videoRtpBus.once('error', (error) => reject(error))
+      rtpPromiseAbortController.signal.addEventListener('abort', () => resolve(void 0))
+    })
+
+    const audioRtpSending = new Promise<void>((resolve, reject) => {
+      audioRtpBus.once('sent', () => {
+        logger.info('Audio Stream Started')
+        resolve(void 0)
+      })
+      audioRtpBus.once('error', (error) => reject(error))
+      rtpPromiseAbortController.signal.addEventListener('abort', () => resolve(void 0))
     })
 
     pc.addEventListener('track', (event: RTCTrackEvent) => {
-      event.track.onReceiveRtp.subscribe((rtp) => {
+      const { unSubscribe } = event.track.onReceiveRtp.subscribe((rtp) => {
         switch (event.track.kind) {
           case 'video':
-            udp.send(rtp.serialize(), videoPort, '0.0.0.0', (error, _bytes) => {
+            udp.send(rtp.serialize(), videoPort, '0.0.0.0', (error, bytes) => {
               if (error) {
+                logger.error(error)
                 return
               }
+              logger.debug(`Sent ${bytes} bytes of video data to 0.0.0.0:${videoPort}`)
+              videoRtpBus.emit('sent')
             })
             break
 
           case 'audio':
-            udp.send(rtp.serialize(), audioPort, '0.0.0.0', (error, _bytes) => {
+            udp.send(rtp.serialize(), audioPort, '0.0.0.0', (error, bytes) => {
               if (error) {
+                logger.error(error)
                 return
               }
+              logger.debug(`Sent ${bytes} bytes of audio data to 0.0.0.0:${audioPort}`)
+              audioRtpBus.emit('sent')
             })
             break
 
@@ -950,6 +1016,7 @@ export default class Camera extends BaseModel {
             break
         }
       })
+      rtpPromiseAbortController.signal.addEventListener('abort', () => unSubscribe())
     })
 
     try {
@@ -985,6 +1052,7 @@ export default class Camera extends BaseModel {
       })
       results = commandResults!
     } catch (error) {
+      rtpPromiseAbortController.abort()
       throw new Error(`Google API returned error: ${error.message} for Offer SDP: \n\n${offer.sdp}`)
     }
 
@@ -997,11 +1065,13 @@ export default class Camera extends BaseModel {
       sdp: results!.answerSdp,
     })
 
-    // Adding a small delay before starting the FFmpeg process
-    await new Promise((resolve) => setTimeout(resolve, 500))
+    await Promise.all([peerConnected, videoRtpSending, audioRtpSending])
+    logger.info('WebRTC Peer connection established. Starting GStreamer process for WebRTC stream')
   }
 
   async #startRTSP(service: smartdevicemanagement_v1.Smartdevicemanagement) {
+    const mainLogger = await app.container.make('logger')
+    const logger = mainLogger.child({ service: `camera-${this.id}` })
     const {
       data: { results },
     } = await service.enterprises.devices.executeCommand({
@@ -1023,7 +1093,7 @@ export default class Camera extends BaseModel {
 
     const rtspUrl = results!.streamUrls.rtspUrl
     const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
-    const outputRtspUrl = `rtsp://localhost:${env.get('MEDIA_MTX_RTSP_TCP_PORT', 8554)}/${this.mtxPath}`
+    const outputRtspUrl = `rtsp://127.0.0.1:${env.get('MEDIA_MTX_RTSP_TCP_PORT', 8554)}/${this.mtxPath}`
 
     const inputVideoCodec = 'h264' // Assuming H264 is always used for video
     let inputAudioCodec
@@ -1081,7 +1151,8 @@ export default class Camera extends BaseModel {
         arguments: args,
       })
     } catch (error) {
-      console.error('Error starting FFmpeg process:', error)
+      logger.error('Error starting FFmpeg process:', error)
     }
+    logger.info('Starting FFmpeg process for RTSP stream')
   }
 }

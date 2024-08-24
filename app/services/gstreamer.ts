@@ -118,7 +118,17 @@ export class GStreamerService {
         await this.#addCameraDisabledCameraStreamProcess(processName, payload.MTX_PATH)
       } else {
         processName = `camera-${camera.id}`
+        const connectingProcessName = `camera-connecting-${camera.id}`
+        await this.#addCameraConnectingCameraStreamProcess(connectingProcessName, payload.MTX_PATH)
+        this.#app.pm3.on(`stdout:${connectingProcessName}`, this.#logToInfo.bind(this))
+        this.#app.pm3.on(`stderr:${connectingProcessName}`, this.#logToError.bind(this))
+        this.#app.pm3.on(`error:${connectingProcessName}`, this.#logToError.bind(this))
+        this.#app.pm3.start(connectingProcessName)
         await camera.start()
+        await this.#app.pm3.remove(connectingProcessName)
+        this.#app.pm3.off(`stdout:${connectingProcessName}`, this.#logToInfo.bind(this))
+        this.#app.pm3.off(`stderr:${connectingProcessName}`, this.#logToError.bind(this))
+        this.#app.pm3.off(`error:${connectingProcessName}`, this.#logToError.bind(this))
       }
       this.#app.pm3.on(`stdout:${processName}`, this.#logToInfo.bind(this))
       this.#app.pm3.on(`stderr:${processName}`, this.#logToError.bind(this))
@@ -168,6 +178,11 @@ export class GStreamerService {
     return await this.#addFFmpegStreamFromJpegProcess(name, path, filepath)
   }
 
+  async #addCameraConnectingCameraStreamProcess(name: string, path: string) {
+    const filepath = this.#app.makePath('resources/mediamtx/connecting.jpg')
+    return await this.#addFFmpegStreamFromJpegProcess(name, path, filepath)
+  }
+
   async #addFFmpegStreamFromJpegProcess(name: string, path: string, filepath: string) {
     const cmd = env.get('FFMPEG_BIN', 'ffmpeg')
     const args = [
@@ -199,7 +214,7 @@ export class GStreamerService {
       'rtsp',
       '-rtsp_transport',
       'tcp',
-      `rtsp://localhost:${env.get('MEDIA_MTX_RTSP_TCP_PORT', 8554)}/${path}`,
+      `rtsp://127.0.0.1:${env.get('MEDIA_MTX_RTSP_TCP_PORT', 8554)}/${path}`,
     ]
     try {
       await this.#app.pm3.add(name, {
