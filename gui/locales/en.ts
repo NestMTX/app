@@ -683,7 +683,7 @@ export default {
       dead: 'Dead',
       stopped: 'Stopped',
       unavailable: 'Unavailable',
-      starting: 'Staring',
+      starting: 'Starting',
       running: 'Running',
     },
     url: {

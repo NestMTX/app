@@ -833,12 +833,14 @@ export default class Camera extends BaseModel {
 
     const args = [
       '-q', // Quiet mode
-      // '--gst-debug-level=4', // Log level set to INFO
       '--gst-debug-level=2', // Log level set to WARNING
       // Audio pipeline
       'udpsrc',
       `port=${audioPort}`,
       'caps=application/x-rtp,media=(string)audio,clock-rate=(int)48000,encoding-name=(string)OPUS,payload=(int)96',
+      '!',
+      'rtpjitterbuffer',
+      'latency=200', // Increased jitter buffer latency
       '!',
       'rtpopusdepay',
       '!',
@@ -849,6 +851,10 @@ export default class Camera extends BaseModel {
       'avenc_aac', // Encode to AAC (or 'faac' if available)
       '!',
       'queue',
+      'max-size-buffers=0',
+      'max-size-time=0',
+      'max-size-bytes=0',
+      'leaky=downstream',
       '!',
       'rtspclientsink',
       'name=s',
@@ -859,11 +865,19 @@ export default class Camera extends BaseModel {
       `port=${videoPort}`,
       'caps=application/x-rtp,media=(string)video,clock-rate=(int)90000,encoding-name=(string)H264,payload=(int)97',
       '!',
+      'rtpjitterbuffer',
+      'latency=200', // Increased jitter buffer latency
+      '!',
       'rtph264depay',
       '!',
       'h264parse',
+      'config-interval=-1', // Preserve the SPS/PPS information
       '!',
       'queue',
+      'max-size-buffers=0',
+      'max-size-time=0',
+      'max-size-bytes=0',
+      'leaky=downstream',
       '!',
       's.sink_1',
     ]
@@ -1130,16 +1144,20 @@ export default class Camera extends BaseModel {
       '-loglevel',
       'warning',
       '-c:v',
-      inputVideoCodec, // Specify known input video codec
+      inputVideoCodec, // Specify known input video codec (if you want to decode the input stream)
       '-c:a',
-      inputAudioCodec, // Specify known input audio codec
+      inputAudioCodec, // Specify known input audio codec (if you want to decode the input stream)
       '-i',
       rtspUrl, // Input RTSP stream
       ...resolutionArgs, // Include resolution if known
       '-r',
       '10', // Set maximum frame rate to 10fps
       '-c:v',
-      'copy', // Copy video codec as-is
+      'libx264', // Re-encode video to H.264
+      '-g',
+      '10', // Set keyframe interval to 10
+      '-bf',
+      '0', // Disable B-frames
       '-c:a',
       'aac', // Re-encode audio to AAC
       '-b:a',
@@ -1152,8 +1170,8 @@ export default class Camera extends BaseModel {
       '1M', // Buffer size for reducing latency
       '-threads',
       '2', // Limit the number of threads to manage CPU load
-      '-fps_mode',
-      'vfr', // Replace vsync with fps_mode
+      '-vsync',
+      'cfr', // Ensure constant frame rate (CFR)
       '-f',
       'rtsp', // Output format
       '-rtsp_transport',
