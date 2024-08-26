@@ -42,13 +42,7 @@ export class GStreamerService {
     return [...this.#shuttingDownProcesses]
   }
 
-  async boot(
-    logger: LoggerService,
-    _nat: NATService,
-    _ice: ICEService,
-    _pm3: PM3,
-    ipc: IPCService
-  ) {
+  async boot(logger: LoggerService, _nat: NATService, _ice: ICEService, pm3: PM3, ipc: IPCService) {
     this.#logger = logger.child({ service: 'gstreamer' })
     const gstreamerBinary = env.get('GSTREAMER_BIN', 'gst-launch-1.0')
     const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
@@ -83,6 +77,8 @@ export class GStreamerService {
     ipc.on('demand', this.#onDemand.bind(this))
     ipc.on('unDemand', this.#onUnDemand.bind(this))
     this.#logger.info(`GStreamer Service booted`)
+    pm3.on('log:out', this.#logProcessToInfo)
+    pm3.on('log:err', this.#logProcessToError)
   }
 
   // async #getAvailableHwAccelerators() {
@@ -95,16 +91,36 @@ export class GStreamerService {
   //     .filter((l) => l !== 'Hardware acceleration methods:')
   // }
 
-  #logToInfo = (data: string) => {
-    if (this.#logger) {
-      this.#logger.info(data)
+  // #logToInfo = (data: string) => {
+  //   if (this.#logger) {
+  //     this.#logger.info(data)
+  //   }
+  // }
+
+  // #logToError = (data: string) => {
+  //   if (this.#logger) {
+  //     this.#logger.error(data)
+  //   }
+  // }
+
+  #logProcessToInfo = (name: string, data: string) => {
+    if (['camera-', 'ffmpeg-', 'gstreamer-'].some((prefix) => name.startsWith(prefix))) {
+      if (this.#logger) {
+        const logger = this.#logger.child({ camera: name })
+        logger.info(data)
+      }
     }
+    // this.#logToInfo(`[${name}] ${data}`)
   }
 
-  #logToError = (data: string) => {
-    if (this.#logger) {
-      this.#logger.error(data)
+  #logProcessToError = (name: string, data: string) => {
+    if (['camera-', 'ffmpeg-', 'gstreamer-'].some((prefix) => name.startsWith(prefix))) {
+      if (this.#logger) {
+        const logger = this.#logger.child({ camera: name })
+        logger.error(data)
+      }
     }
+    // this.#logToError(`[${name}] ${data}`)
   }
 
   async #onDemand(payload: DemandEventPayload) {
@@ -137,9 +153,9 @@ export class GStreamerService {
         // this.#app.pm3.off(`stderr:${connectingProcessName}`, this.#logToError.bind(this))
         // this.#app.pm3.off(`error:${connectingProcessName}`, this.#logToError.bind(this))
       }
-      this.#app.pm3.on(`stdout:${processName}`, this.#logToInfo.bind(this))
-      this.#app.pm3.on(`stderr:${processName}`, this.#logToError.bind(this))
-      this.#app.pm3.on(`error:${processName}`, this.#logToError.bind(this))
+      // this.#app.pm3.on(`stdout:${processName}`, this.#logToInfo.bind(this))
+      // this.#app.pm3.on(`stderr:${processName}`, this.#logToError.bind(this))
+      // this.#app.pm3.on(`error:${processName}`, this.#logToError.bind(this))
       this.#app.pm3.start(processName)
       this.#managedProcesses.add(processName)
     } catch (error) {
@@ -163,9 +179,9 @@ export class GStreamerService {
       }
       this.#shuttingDownProcesses.add(processName)
       await this.#app.pm3.remove(processName)
-      this.#app.pm3.off(`stdout:${processName}`, this.#logToInfo.bind(this))
-      this.#app.pm3.off(`stderr:${processName}`, this.#logToError.bind(this))
-      this.#app.pm3.off(`error:${processName}`, this.#logToError.bind(this))
+      // this.#app.pm3.off(`stdout:${processName}`, this.#logToInfo.bind(this))
+      // this.#app.pm3.off(`stderr:${processName}`, this.#logToError.bind(this))
+      // this.#app.pm3.off(`error:${processName}`, this.#logToError.bind(this))
       this.#managedProcesses.delete(processName)
       this.#shuttingDownProcesses.delete(processName)
     } catch (error) {

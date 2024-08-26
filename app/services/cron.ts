@@ -5,6 +5,7 @@ import { DateTime } from 'luxon'
 
 import type { MiliCron } from '@jakguru/milicron'
 import type { LoggerService } from '@adonisjs/core/types'
+import type { ApplicationService } from '@adonisjs/core/types'
 
 type LoggerServiceWithConfig = LoggerService & {
   config: any
@@ -13,11 +14,12 @@ type LoggerServiceWithConfig = LoggerService & {
 const base = new URL('../../', import.meta.url).pathname
 
 export abstract class CronJob {
+  constructor(protected app: ApplicationService) {}
   abstract get crontab(): string
   abstract run(): void | Promise<void>
 }
 
-export const loadJobs = async (): Promise<Array<CronJob>> => {
+export const loadJobs = async (app: ApplicationService): Promise<Array<CronJob>> => {
   const jobsPath = resolve(base, 'app', 'jobs')
   const files = await readdir(jobsPath)
   const ret = await Promise.all(
@@ -28,14 +30,18 @@ export const loadJobs = async (): Promise<Array<CronJob>> => {
         if (!(Job.prototype instanceof CronJob)) {
           return undefined
         }
-        return new Job()
+        return new Job(app)
       })
   )
   return ret.filter((job: Array<CronJob | undefined>) => job !== undefined) as Array<CronJob>
 }
 
-export const init = async (cron: MiliCron, logger: LoggerServiceWithConfig): Promise<void> => {
-  const jobs = await loadJobs()
+export const init = async (
+  app: ApplicationService,
+  cron: MiliCron,
+  logger: LoggerServiceWithConfig
+): Promise<void> => {
+  const jobs = await loadJobs(app)
   logger.info(`Loaded ${jobs.length} jobs`)
   const doJob = async (job: CronJob) => {
     const row = await Cronjob.firstOrCreate(

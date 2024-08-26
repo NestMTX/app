@@ -1,0 +1,15 @@
+:root {
+  body {
+    background-image: url("/backgrounds/light.svg");
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: center center;
+    background-attachment: local;
+  }
+
+  &.dark {
+    body {
+      background-image: url("/backgrounds/dark.svg");
+    }
+  }
+}

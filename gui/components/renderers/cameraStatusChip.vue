@@ -30,7 +30,7 @@ export default defineComponent({
         case 'disabled':
           return 'grey-darken-2'
         case 'dead':
-          return 'red-darken-4'
+          return 'blue-gray-lighten-3'
         case 'stopped':
           return 'red-lighten-1'
         case 'unavailable':

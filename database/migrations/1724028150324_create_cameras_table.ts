@@ -20,6 +20,7 @@ export default class extends BaseSchema {
       table.string('mtx_path').nullable().unique()
       table.boolean('is_enabled').defaultTo(false)
       table.string('stream_extension_token').nullable()
+      table.timestamp('expires_at').nullable()
       table.timestamp('created_at')
       table.timestamp('updated_at')
     })

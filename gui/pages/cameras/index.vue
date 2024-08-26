@@ -93,7 +93,11 @@ import {
   renderAsMtxPathForm,
   renderAsCameraEnabledSwitch,
 } from '../../utilities/renderers'
-import { formatInteger, formatFileSize } from '../../utilities/formatters'
+import {
+  formatInteger,
+  formatFileSize,
+  formatTimestampAsTimeSinceDuration,
+} from '../../utilities/formatters'
 import gcpcSvg from '../../assets/brand-icons/cloud-platform-console.google.svg'
 import type { ToastService, ApiService, CronService, BusService } from '@jakguru/vueprint'
 import type { ModelIndexField } from '../../types/forms.js'
@@ -228,7 +232,7 @@ export default defineComponent({
       {
         key: 'stream_uptime',
         label: t('fields.stream_uptime'),
-        formatter: (value: unknown) => (null === value ? '' : (value as string)),
+        formatter: formatTimestampAsTimeSinceDuration,
         sortable: false,
         renderer: renderAsCode,
         align: 'end',

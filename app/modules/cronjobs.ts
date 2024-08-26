@@ -1,3 +1,4 @@
+import type { ApplicationService } from '@adonisjs/core/types'
 import { ApiServiceModule } from '#services/api'
 import { loadJobs } from '#services/cron'
 import Cronjob from '#models/cronjob'
@@ -6,6 +7,11 @@ import { DateTime } from 'luxon'
 import type { CreateCommandContext, UpdateCommandContext } from '#services/api'
 
 export default class CronjobsModule implements ApiServiceModule {
+  #app: ApplicationService
+  constructor(app: ApplicationService) {
+    this.#app = app
+  }
+
   get description() {
     return 'Cronjob Statuses'
   }
@@ -15,7 +21,10 @@ export default class CronjobsModule implements ApiServiceModule {
   }
 
   async list(context: CreateCommandContext) {
-    const [jobs, rows] = await Promise.all([loadJobs(), Cronjob.query().orderBy('name', 'asc')])
+    const [jobs, rows] = await Promise.all([
+      loadJobs(this.#app),
+      Cronjob.query().orderBy('name', 'asc'),
+    ])
     const { search, page, itemsPerPage, sortBy } = context.payload
     const records = jobs
       .map((j) => {
@@ -53,7 +62,7 @@ export default class CronjobsModule implements ApiServiceModule {
   }
 
   async update(context: UpdateCommandContext) {
-    const jobs = await loadJobs()
+    const jobs = await loadJobs(this.#app)
     const job = jobs.find((j) => j.constructor.name === context.entity)
     if (job) {
       const row = await Cronjob.firstOrCreate(

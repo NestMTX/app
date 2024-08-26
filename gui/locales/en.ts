@@ -680,7 +680,7 @@ export default {
     status: {
       unconfigured: 'Not Configured',
       disabled: 'Disabled',
-      dead: 'Dead',
+      dead: 'Not Streaming',
       stopped: 'Stopped',
       unavailable: 'Unavailable',
       starting: 'Starting',

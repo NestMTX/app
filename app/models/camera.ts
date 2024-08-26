@@ -108,6 +108,9 @@ export default class Camera extends BaseModel {
   @column({ serializeAs: 'is_enabled' })
   declare isEnabled: boolean
 
+  @column({ serializeAs: 'expires_at' })
+  declare expiresAt: DateTime | null
+
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime
 
@@ -123,6 +126,10 @@ export default class Camera extends BaseModel {
     item.uid = encryption.encrypt(item.uid)
     item.info = item.info ? encryption.encrypt(JSON.stringify(item.info)) : null
     item.isEnabled = Boolean(item.isEnabled)
+    if (item.expiresAt instanceof DateTime) {
+      // @ts-expect-error serializing to SQL
+      item.expiresAt = item.expiresAt.toSQL()
+    }
   }
 
   @afterSave()
@@ -141,6 +148,9 @@ export default class Camera extends BaseModel {
     item.uid = encryption.decrypt(item.uid)!
     item.info = item.info ? JSON.parse(encryption.decrypt(item.info)!) : null
     item.isEnabled = Boolean(item.isEnabled)
+    if ('string' === typeof item.expiresAt) {
+      item.expiresAt = DateTime.fromSQL(item.expiresAt)
+    }
   }
 
   @afterFetch()
@@ -772,19 +782,66 @@ export default class Camera extends BaseModel {
   }
 
   async extend() {
-    try {
-      await (this as Camera).load('credential')
-    } catch {
-      throw new Error(`Failed to load Google SDM API Credentials for Camera ${this.id}`)
-    }
     if (
       !this.protocols ||
       (!this.protocols.includes('WEB_RTC') && !this.protocols.includes('RTSP'))
     ) {
       throw new Error(`Camera ${this.id} does not support any recognized protocols`)
     }
+    if (this.#audioCodecs.length === 0) {
+      throw new Error('This devices does not support any Audio codecs')
+    }
+    if (this.#videoCodecs.length === 0) {
+      throw new Error('This device does not support any Video codecs')
+    }
+    if (!this.#audioCodecs.includes('AAC') && !this.#audioCodecs.includes('OPUS')) {
+      throw new Error('Unsupported audio codec. Supported codecs are AAC and OPUS.')
+    }
+    if (!this.#videoCodecs.includes('H264')) {
+      throw new Error('Unsupported video codec. Supported codec is H264.')
+    }
+    if (!this.streamExtensionToken) {
+      throw new Error('No stream extension token found')
+    }
     const service = await this.credential.getSDMClient()
-    throw new Error('Not implemented')
+    let command:
+      | 'sdm.devices.commands.CameraLiveStream.ExtendRtspStream'
+      | 'sdm.devices.commands.CameraLiveStream.ExtendWebRtcStream'
+
+    let key: 'streamExtensionToken' | 'mediaSessionId'
+    if (this.protocols.includes('WEB_RTC')) {
+      command = 'sdm.devices.commands.CameraLiveStream.ExtendWebRtcStream'
+      key = 'mediaSessionId'
+    } else if (this.protocols.includes('RTSP')) {
+      command = 'sdm.devices.commands.CameraLiveStream.ExtendRtspStream'
+      key = 'streamExtensionToken'
+    } else {
+      throw new Error('No supported protocols found')
+    }
+    const {
+      data: { results },
+    } = await service.enterprises.devices.executeCommand({
+      name: this.uid,
+      requestBody: {
+        command,
+        params: {
+          [key]: this.streamExtensionToken,
+        },
+      },
+    })
+    if (!results || !results[key]) {
+      throw new Error('Failed to extend stream')
+    }
+    this.streamExtensionToken = results[key]
+    if (results!.expiresAt) {
+      const expiresAt = DateTime.fromISO(results!.expiresAt)
+      if (expiresAt.isValid) {
+        this.expiresAt = expiresAt
+      }
+    } else {
+      this.expiresAt = null
+    }
+    await this.save()
   }
 
   async stop() {
@@ -889,7 +946,8 @@ export default class Camera extends BaseModel {
         restart: false,
       })
     } catch (error) {
-      logger.error('Error starting GStreamer process:', error)
+      logger.error(error)
+      throw error
     }
 
     const pc = new RTCPeerConnection({
@@ -994,7 +1052,6 @@ export default class Camera extends BaseModel {
     app.pm3.once(`removed:${this.#streamProcessName}`, () => {
       rtpPromiseAbortController.abort()
       peerConnectedAbortController.abort()
-      // process.exit(1) // for debugging
     })
 
     const videoRtpSending = new Promise<void>((resolve, reject) => {
@@ -1087,6 +1144,19 @@ export default class Camera extends BaseModel {
     if (!results!.answerSdp) {
       throw new Error('WebRTC Answer SDP not found')
     }
+    if (!results!.mediaSessionId) {
+      throw new Error('Media Session ID not found')
+    }
+    this.streamExtensionToken = results!.mediaSessionId
+    if (results!.expiresAt) {
+      const expiresAt = DateTime.fromISO(results!.expiresAt)
+      if (expiresAt.isValid) {
+        this.expiresAt = expiresAt
+      }
+    } else {
+      this.expiresAt = null
+    }
+    await this.save()
 
     await pc.setRemoteDescription({
       type: 'answer',
@@ -1119,6 +1189,14 @@ export default class Camera extends BaseModel {
     }
 
     this.streamExtensionToken = results!.streamExtensionToken
+    if (results!.expiresAt) {
+      const expiresAt = DateTime.fromISO(results!.expiresAt)
+      if (expiresAt.isValid) {
+        this.expiresAt = expiresAt
+      }
+    } else {
+      this.expiresAt = null
+    }
     await this.save()
 
     const rtspUrl = results!.streamUrls.rtspUrl
@@ -1183,6 +1261,7 @@ export default class Camera extends BaseModel {
       await app.pm3.add(this.#streamProcessName, {
         file: ffmpegBinary,
         arguments: args,
+        restart: false,
       })
     } catch (error) {
       logger.error('Error starting FFmpeg process:', error)
