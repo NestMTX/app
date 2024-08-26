@@ -4,22 +4,42 @@ layout: home
 
 hero:
   name: "NestMTX"
-  text: "Seamlessly Stream Your Nest, Anytime, Anywhere."
-  tagline: My great project tagline
+  tagline: "Seamlessly Stream Your Nest, Anytime, Anywhere."
+  image:
+    src: /icon.png
+    alt: NestMTX
   actions:
     - theme: brand
-      text: Markdown Examples
-      link: /markdown-examples
+      text: Get Started
+      link: /quickstart
     - theme: alt
-      text: API Examples
-      link: /api-examples
+      text: Find out More
+      link: /introduction
 
 features:
-  - title: Feature A
-    details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
-  - title: Feature B
-    details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
-  - title: Feature C
-    details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
+  - title: Compatible
+    details: NestMTX works with all Cameras which use Google's Smart Device Management API's, including smart displays and doorbell cameras.
+    link: /compatibility/devices
+    linkText: Read More
+  - title: Normalized
+    details: All streams are re-encoded for maximum compatibility across the largest number of streaming protocols
+    link: /compatibility/codecs
+    linkText: Read More
+  - title: Supportive
+    details: Using MediaMTX at its core, NestMTX is able to have clients connect through a variety of protocols
+    link: /compatibility/protocols
+    linkText: Read More
+  - title: Simple
+    details: Designed around a simple yet beautiful UI, controls are straightforward while providing relevant and useful information
+    link: /introduction
+    linkText: Read More
+  - title: Straight Forward
+    details: Deploy as a docker container or on bare metal - it's your choice, and it's easy to do.
+    link: /quickstart
+    linkText: Quick Start
+  - title: Resource Conscious
+    details: Streams only start when requested from a client, so less energy is used by the devices and fewer host resources are utilized to stream
+    link: /design-philosophy
+    linkText: Read More
 ---
 
