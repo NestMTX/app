@@ -15,7 +15,7 @@ export default {
     protocols: 'פרוטוקולים',
     identified_as: 'סוּג',
     resolution: 'הַחְלָטָה',
-    codecs_video: 'קודקים של וידאו',
+    codecs_video: 'Codec וידאו',
     codecs_audio: 'Codec אודיו',
     room: 'חֶדֶר',
     status: 'סטָטוּס',
@@ -28,6 +28,7 @@ export default {
     stream_data_tx: 'נתונים שנשלחו',
     mtx_path: 'נָתִיב',
     is_enabled: 'מופעל',
+    can_login: 'יכול להתחבר',
   },
   actions: {
     login: 'התחבר',
@@ -37,6 +38,9 @@ export default {
     manage: 'לְנַהֵל',
     run: 'לָרוּץ',
     listUrls: 'רשום כתובות אתרים',
+    save: 'לְהַצִיל',
+    disable: 'השבת',
+    enable: 'לְאַפשֵׁר',
   },
   validation: {
     bad: 'הערך אינו {label} חוקי',
@@ -370,6 +374,10 @@ export default {
       single: "קרון ג'וב",
       plural: 'cronjobs',
     },
+    users: {
+      single: 'משתמש',
+      plural: 'משתמשים',
+    },
   },
   components: {
     modelIndex: {
@@ -415,6 +423,15 @@ export default {
         mtxPathAlreadyInUse: 'נתיב המצלמה כבר נמצא בשימוש על ידי מצלמה אחרת',
       },
     },
+    users: {
+      update: {
+        cannotChangeOwnLoginAbility: 'אינך יכול לשנות את יכולת ההתחברות שלך',
+      },
+      delete: {
+        cannotDeleteSystemUser: 'לא ניתן למחוק את משתמש המערכת',
+        cannotDeleteSelf: 'אתה לא יכול למחוק את עצמך',
+      },
+    },
   },
   dialogs: {
     systemInfo: {
@@ -445,6 +462,11 @@ export default {
         title: 'נוצר בהצלחה',
       },
     },
+    update: {
+      success: {
+        title: 'עודכן בהצלחה',
+      },
+    },
     cronjobs: {
       run: {
         success: {
@@ -465,6 +487,28 @@ export default {
         copy: {
           success: 'כתובת האתר הועתקה ללוח',
           failure: 'ההעתקה של כתובת האתר ללוח נכשלה',
+        },
+      },
+    },
+    users: {
+      add: {
+        title: 'צור משתמש',
+      },
+      update: {
+        title: 'עדכן משתמש',
+        success: {
+          title: 'משתמש עודכן בהצלחה',
+        },
+        failure: {
+          title: 'עדכון המשתמש נכשל',
+        },
+      },
+      delete: {
+        success: {
+          title: 'המשתמש נמחק בהצלחה',
+        },
+        failure: {
+          title: 'מחיקת המשתמש נכשלה',
         },
       },
     },
@@ -609,7 +653,7 @@ export default {
       title: 'אישורי הרשאה - NestMTX',
       description: 'אישור אישורי NestMTX',
       header: 'אישורי הרשאה',
-      subtitle: 'אישור אישורי Google Cloud Platform ו-Google Device Access Console שלך',
+      subtitle: 'אישור האישורים של Google Cloud Platform ושל Google Device Access Console',
     },
     'cronjobs': {
       nav: 'Cronjobs',
@@ -625,6 +669,13 @@ export default {
       header: 'מצלמות',
       subtitle: 'הצג ונהל את זרמי המצלמה',
     },
+    'users': {
+      nav: 'ניהול משתמשים',
+      title: 'ניהול משתמשים - NestMTX',
+      description: 'הצג ונהל משתמשי NestMTX',
+      header: 'ניהול משתמשים',
+      subtitle: 'הצג ונהל משתמשי NestMTX',
+    },
   },
   credentials: {
     redirectUrl: {
@@ -633,7 +684,7 @@ export default {
       actions: {
         copy: {
           success: 'כתובת האתר להפניה מחדש הועתקה ללוח',
-          failure: 'נכשלה העתקת כתובת האתר להפניה מחדש ללוח',
+          failure: 'ההעתקה של כתובת האתר להפניה מחדש ללוח נכשלה',
         },
       },
       insecure: {
@@ -666,7 +717,7 @@ export default {
         title: 'NextMTX Paths',
         path: 'נָתִיב',
         ready: 'נְהִירָה',
-        uptime: 'זמן פעילות',
+        uptime: 'זמן פעולה',
         tracks: 'ספירת מסלולים',
         dataRx: 'הנתונים התקבלו',
         dataTx: 'נתונים שנשלחו',

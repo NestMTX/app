@@ -44,3 +44,7 @@ export interface ModelAddField {
   component: 'VTextField' | 'VPasswordField' | 'VAutocomplete' | 'VSwitch'
   bindings: Record<string, any>
 }
+
+export interface ModelUpdateField extends ModelAddField {
+  value?: any
+}

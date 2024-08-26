@@ -28,6 +28,7 @@ export default {
     stream_data_tx: 'Data Sent',
     mtx_path: 'Path',
     is_enabled: 'Enabled',
+    can_login: 'Can Login',
   },
   actions: {
     login: 'Log In',
@@ -37,6 +38,9 @@ export default {
     manage: 'Manage',
     run: 'Run',
     listUrls: 'List URLs',
+    save: 'Save',
+    disable: 'Disable',
+    enable: 'Enable',
   },
   validation: {
     bad: 'The value is not a valid {label}',
@@ -371,6 +375,10 @@ export default {
       single: 'a cronjob',
       plural: 'cronjobs',
     },
+    users: {
+      single: 'a user',
+      plural: 'users',
+    },
   },
   components: {
     modelIndex: {
@@ -416,6 +424,15 @@ export default {
         mtxPathAlreadyInUse: 'The Camera Path is already in use by another camera',
       },
     },
+    users: {
+      update: {
+        cannotChangeOwnLoginAbility: 'You cannot change your own login ability',
+      },
+      delete: {
+        cannotDeleteSystemUser: 'You cannot delete the system user',
+        cannotDeleteSelf: 'You cannot delete yourself',
+      },
+    },
   },
   dialogs: {
     systemInfo: {
@@ -446,6 +463,11 @@ export default {
         title: 'Created Successfully',
       },
     },
+    update: {
+      success: {
+        title: 'Updated Successfully',
+      },
+    },
     cronjobs: {
       run: {
         success: {
@@ -466,6 +488,28 @@ export default {
         copy: {
           success: 'URL copied to clipboard',
           failure: 'Failed to copy URL to clipboard',
+        },
+      },
+    },
+    users: {
+      add: {
+        title: 'Create User',
+      },
+      update: {
+        title: 'Update User',
+        success: {
+          title: 'User Updated Successfully',
+        },
+        failure: {
+          title: 'Failed to Update User',
+        },
+      },
+      delete: {
+        success: {
+          title: 'User Deleted Successfully',
+        },
+        failure: {
+          title: 'Failed to Delete User',
         },
       },
     },
@@ -626,6 +670,13 @@ export default {
       description: 'View & Manage Camera Streams',
       header: 'Cameras',
       subtitle: 'View & Manage Camera Streams',
+    },
+    'users': {
+      nav: 'User Management',
+      title: 'User Management - NestMTX',
+      description: 'View & Manage NestMTX Users',
+      header: 'User Management',
+      subtitle: 'View & Manage NestMTX Users',
     },
   },
   credentials: {

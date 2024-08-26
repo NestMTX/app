@@ -28,6 +28,7 @@ export default {
     stream_data_tx: 'Datos enviados',
     mtx_path: 'Camino',
     is_enabled: 'Activado',
+    can_login: '¿Puede iniciar sesión?',
   },
   actions: {
     login: 'Acceso',
@@ -37,6 +38,9 @@ export default {
     manage: 'Administrar',
     run: 'Correr',
     listUrls: 'Lista de URL',
+    save: 'Ahorrar',
+    disable: 'Desactivar',
+    enable: 'Permitir',
   },
   validation: {
     bad: 'El valor no es válido {label}',
@@ -371,6 +375,10 @@ export default {
       single: 'un trabajo cron',
       plural: 'trabajos cron',
     },
+    users: {
+      single: 'Un usuario',
+      plural: 'usuarios',
+    },
   },
   components: {
     modelIndex: {
@@ -417,6 +425,15 @@ export default {
         mtxPathAlreadyInUse: 'La ruta de la cámara ya está siendo utilizada por otra cámara',
       },
     },
+    users: {
+      update: {
+        cannotChangeOwnLoginAbility: 'No puedes cambiar tu propia capacidad de inicio de sesión',
+      },
+      delete: {
+        cannotDeleteSystemUser: 'No puedes eliminar el usuario del sistema',
+        cannotDeleteSelf: 'No puedes borrarte a ti mismo',
+      },
+    },
   },
   dialogs: {
     systemInfo: {
@@ -447,6 +464,11 @@ export default {
         title: 'Creado exitosamente',
       },
     },
+    update: {
+      success: {
+        title: 'Actualizado exitosamente',
+      },
+    },
     cronjobs: {
       run: {
         success: {
@@ -467,6 +489,28 @@ export default {
         copy: {
           success: 'URL copiada al portapapeles',
           failure: 'No se pudo copiar la URL al portapapeles',
+        },
+      },
+    },
+    users: {
+      add: {
+        title: 'Crear usuario',
+      },
+      update: {
+        title: 'Actualizar usuario',
+        success: {
+          title: 'Usuario actualizado exitosamente',
+        },
+        failure: {
+          title: 'Error al actualizar el usuario',
+        },
+      },
+      delete: {
+        success: {
+          title: 'Usuario eliminado exitosamente',
+        },
+        failure: {
+          title: 'No se pudo eliminar el usuario',
         },
       },
     },
@@ -628,6 +672,13 @@ export default {
       description: 'Ver y administrar transmisiones de cámara',
       header: 'Cámaras',
       subtitle: 'Ver y administrar transmisiones de cámara',
+    },
+    'users': {
+      nav: 'Gestión de usuarios',
+      title: 'Gestión de usuarios - NestMTX',
+      description: 'Ver y administrar usuarios de NestMTX',
+      header: 'Gestión de usuarios',
+      subtitle: 'Ver y administrar usuarios de NestMTX',
     },
   },
   credentials: {

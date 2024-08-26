@@ -28,6 +28,7 @@ export default {
     stream_data_tx: 'Données envoyées',
     mtx_path: 'Chemin',
     is_enabled: 'Activé',
+    can_login: 'Peut se connecter',
   },
   actions: {
     login: 'Se connecter',
@@ -37,6 +38,9 @@ export default {
     manage: 'Gérer',
     run: 'Courir',
     listUrls: 'Liste des URL',
+    save: 'Sauvegarder',
+    disable: 'Désactiver',
+    enable: 'Activer',
   },
   validation: {
     bad: "La valeur n'est pas un {label} valide",
@@ -342,7 +346,7 @@ export default {
     vc: 'Saint-Vincent-et-les Grenadines',
     ve: 'Venezuela, République bolivarienne du',
     vg: 'Îles Vierges britanniques',
-    vi: 'Îles Vierges, États-Unis',
+    vi: 'Îles Vierges des États-Unis',
     vn: 'Viêt Nam',
     vu: 'Vanuatu',
     wf: 'Wallis et Futuna',
@@ -371,6 +375,10 @@ export default {
     cronjobs: {
       single: 'un cronjob',
       plural: 'tâches planifiées',
+    },
+    users: {
+      single: 'un utilisateur',
+      plural: 'utilisateurs',
     },
   },
   components: {
@@ -418,6 +426,16 @@ export default {
         mtxPathAlreadyInUse: 'Le chemin de la caméra est déjà utilisé par une autre caméra',
       },
     },
+    users: {
+      update: {
+        cannotChangeOwnLoginAbility:
+          'Vous ne pouvez pas modifier votre propre capacité de connexion',
+      },
+      delete: {
+        cannotDeleteSystemUser: "Vous ne pouvez pas supprimer l'utilisateur système",
+        cannotDeleteSelf: 'Tu ne peux pas te supprimer toi-même',
+      },
+    },
   },
   dialogs: {
     systemInfo: {
@@ -448,6 +466,11 @@ export default {
         title: 'Créé avec succès',
       },
     },
+    update: {
+      success: {
+        title: 'Mise à jour réussie',
+      },
+    },
     cronjobs: {
       run: {
         success: {
@@ -468,6 +491,28 @@ export default {
         copy: {
           success: 'URL copiée dans le presse-papiers',
           failure: "Impossible de copier l'URL dans le presse-papiers",
+        },
+      },
+    },
+    users: {
+      add: {
+        title: 'Créer un utilisateur',
+      },
+      update: {
+        title: "Mettre à jour l'utilisateur",
+        success: {
+          title: "Mise à jour de l'utilisateur réussie",
+        },
+        failure: {
+          title: "Échec de la mise à jour de l'utilisateur",
+        },
+      },
+      delete: {
+        success: {
+          title: 'Utilisateur supprimé avec succès',
+        },
+        failure: {
+          title: "Impossible de supprimer l'utilisateur",
         },
       },
     },
@@ -628,6 +673,13 @@ export default {
       description: 'Afficher et gérer les flux de caméras',
       header: 'Caméras',
       subtitle: 'Afficher et gérer les flux de caméras',
+    },
+    'users': {
+      nav: 'Gestion des utilisateurs',
+      title: 'Gestion des utilisateurs - NestMTX',
+      description: 'Afficher et gérer les utilisateurs NestMTX',
+      header: 'Gestion des utilisateurs',
+      subtitle: 'Afficher et gérer les utilisateurs NestMTX',
     },
   },
   credentials: {

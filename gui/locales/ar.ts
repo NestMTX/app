@@ -28,6 +28,7 @@ export default {
     stream_data_tx: 'البيانات المرسلة',
     mtx_path: 'طريق',
     is_enabled: 'مُمَكَّن',
+    can_login: 'هل يمكن تسجيل الدخول',
   },
   actions: {
     login: 'تسجيل الدخول',
@@ -37,6 +38,9 @@ export default {
     manage: 'يدير',
     run: 'يجري',
     listUrls: 'قائمة عناوين المواقع',
+    save: 'يحفظ',
+    disable: 'إبطال',
+    enable: 'يُمكَِن',
   },
   validation: {
     bad: 'القيمة ليست صالحة {label}',
@@ -370,6 +374,10 @@ export default {
       single: 'مهمة كرون',
       plural: 'كرونجوبس',
     },
+    users: {
+      single: 'مستخدم',
+      plural: 'المستخدمون',
+    },
   },
   components: {
     modelIndex: {
@@ -415,6 +423,15 @@ export default {
         mtxPathAlreadyInUse: 'مسار الكاميرا قيد الاستخدام بالفعل بواسطة كاميرا أخرى',
       },
     },
+    users: {
+      update: {
+        cannotChangeOwnLoginAbility: 'لا يمكنك تغيير إمكانية تسجيل الدخول الخاصة بك',
+      },
+      delete: {
+        cannotDeleteSystemUser: 'لا يمكنك حذف مستخدم النظام',
+        cannotDeleteSelf: 'لا يمكنك حذف نفسك',
+      },
+    },
   },
   dialogs: {
     systemInfo: {
@@ -445,6 +462,11 @@ export default {
         title: 'تم الإنشاء بنجاح',
       },
     },
+    update: {
+      success: {
+        title: 'تم التحديث بنجاح',
+      },
+    },
     cronjobs: {
       run: {
         success: {
@@ -465,6 +487,28 @@ export default {
         copy: {
           success: 'تم نسخ الرابط إلى الحافظة',
           failure: 'فشل في نسخ عنوان URL إلى الحافظة',
+        },
+      },
+    },
+    users: {
+      add: {
+        title: 'إنشاء مستخدم',
+      },
+      update: {
+        title: 'تحديث المستخدم',
+        success: {
+          title: 'تم تحديث المستخدم بنجاح',
+        },
+        failure: {
+          title: 'فشل تحديث المستخدم',
+        },
+      },
+      delete: {
+        success: {
+          title: 'تم حذف المستخدم بنجاح',
+        },
+        failure: {
+          title: 'فشل في حذف المستخدم',
         },
       },
     },
@@ -624,6 +668,13 @@ export default {
       description: 'عرض وإدارة تدفقات الكاميرا',
       header: 'الكاميرات',
       subtitle: 'عرض وإدارة تدفقات الكاميرا',
+    },
+    'users': {
+      nav: 'إدارة المستخدمين',
+      title: 'إدارة المستخدمين - NestMTX',
+      description: 'عرض وإدارة مستخدمي NestMTX',
+      header: 'إدارة المستخدمين',
+      subtitle: 'عرض وإدارة مستخدمي NestMTX',
     },
   },
   credentials: {

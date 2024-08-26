@@ -101,6 +101,7 @@ export default defineComponent({
         { icon: 'mdi-key-chain', value: 'credentials' },
         { icon: 'mdi-cctv', value: 'cameras' },
         { icon: 'mdi-clock', value: 'cronjobs' },
+        { icon: 'mdi-account', value: 'users' },
       ].map((n) => ({
         'active': rawRouteName.value === n.value,
         'prepend-icon': n.icon,

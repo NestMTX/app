@@ -20,7 +20,11 @@ export default class User extends compose(BaseModel, AuthFinder) {
   @column({ serializeAs: null })
   declare password: string
 
-  @column({ serializeAs: null, prepare: (value) => !!value, consume: (value) => Boolean(value) })
+  @column({
+    serializeAs: 'can_login',
+    prepare: (value) => !!value,
+    consume: (value) => Boolean(value),
+  })
   declare canLogin: boolean
 
   @column.dateTime({ autoCreate: true, serializeAs: null })
