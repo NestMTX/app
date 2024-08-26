@@ -1126,6 +1126,28 @@ $glass_blur_base: 15px !default;
     }
   }
 
+  table {
+    border: none;
+
+    .vp-doc tr {
+      @include background-color(#f6f6f7, $glass_color_alpha_base);
+    }
+  }
+
+  .vp-doc table,
+  .vp-doc table th,
+  .vp-doc table td {
+    white-space: nowrap;
+  }
+
+  .VPDoc.has-aside .content-container {
+    max-width: 100vw !important;
+  }
+
+  img {
+    width: auto;
+  }
+
   &.dark {
     .VPFeature {
       @include background-color(#202127, $glass_color_alpha_base);
@@ -1133,6 +1155,15 @@ $glass_blur_base: 15px !default;
 
     @media (min-width: 768px) {
       .DocSearch-Button {
+        @include background-color(#202127, $glass_color_alpha_base);
+      }
+    }
+
+    .vp-doc table {
+      border: none;
+
+      tr,
+      th {
         @include background-color(#202127, $glass_color_alpha_base);
       }
     }

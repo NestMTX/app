@@ -41,5 +41,9 @@ features:
     details: Streams only start when requested from a client, so less energy is used by the devices and fewer host resources are utilized to stream
     link: /design-philosophy
     linkText: Read More
+  - title: Internationalized
+    details: NextMTX has been translated into several languages, and is capable of being translated into any language desired.
+  - title: Mobile Friendly
+    details: NextMTX has been designed to work on mobile & tablet devices without additional modification. So go ahead, enable your camera feed from your phone! 
 ---
 

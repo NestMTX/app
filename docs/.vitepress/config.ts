@@ -41,9 +41,11 @@ export default defineConfig({
         text: 'Usage',
         items: [
           { text: 'Authentication', link: '/setup/authentication' },
+          { text: 'Control Panel', link: '/setup/control-panel' },
           { text: 'Credentials', link: '/setup/credentials' },
           { text: 'Cameras', link: '/setup/cameras' },
           { text: 'Cron Jobs', link: '/setup/cronjobs' },
+          { text: 'User Management', link: '/setup/users' },
         ],
         collapsed: true
       },
