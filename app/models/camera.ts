@@ -782,6 +782,11 @@ export default class Camera extends BaseModel {
   }
 
   async extend() {
+    try {
+      await (this as Camera).load('credential')
+    } catch {
+      throw new Error(`Failed to load Google SDM API Credentials for Camera ${this.id}`)
+    }
     if (
       !this.protocols ||
       (!this.protocols.includes('WEB_RTC') && !this.protocols.includes('RTSP'))
