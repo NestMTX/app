@@ -5,16 +5,21 @@ import type User from '#models/user'
 import type { ApiService, CommandContext } from '#services/api'
 import type { LoggerService } from '@adonisjs/core/types'
 import type { Logger } from '@adonisjs/logger'
+import type { AuthManager } from '@adonisjs/auth'
+import type { Authenticators } from '@adonisjs/auth/types'
 import { Server as SocketIoServer } from 'socket.io'
 import { Secret } from '@adonisjs/core/helpers'
 import Joi from 'joi'
 import { ApiServiceRequestError } from '#services/api'
 import { inspect } from 'node:util'
 import logEmitter from '#services/emitter.log'
+import { tokensUserProvider } from '@adonisjs/auth/access_tokens'
 
 type HttpServerService = typeof server
 
 type RequestPayload = Omit<CommandContext, 'user'>
+
+type UserProvider = ReturnType<typeof tokensUserProvider>
 
 export type LoggerServiceWithConfig = LoggerService & {
   config: any
@@ -59,13 +64,22 @@ export interface PinoLog {
 export class SocketIoService {
   #io: SocketIoServer
   #logger?: Logger
+  #auth?: AuthManager<Authenticators>
+  readonly #app: ApplicationService
   readonly #api: ApiService
   readonly #sockets: Map<string, AppSocket>
   readonly #logs: PinoLog[] = []
+  readonly #userProvider: UserProvider
 
-  constructor(_app: ApplicationService, api: ApiService) {
+  constructor(app: ApplicationService, api: ApiService) {
+    this.#app = app
     this.#sockets = new Map()
     this.#api = api
+    this.#userProvider = tokensUserProvider({
+      tokens: 'accessTokens',
+      // @ts-ignore it works - shutup!
+      model: () => import('#models/user'),
+    })
     this.#io = new SocketIoServer({
       addTrailingSlash: true,
       allowEIO3: true,
@@ -104,6 +118,7 @@ export class SocketIoService {
    * @private
    */
   async start(httpServerService: HttpServerService) {
+    this.#auth = await this.#app.container.make('auth.manager')
     const server = httpServerService.getNodeServer()
     if (!server) {
       return
@@ -118,7 +133,11 @@ export class SocketIoService {
     return next()
   }
 
-  #authenticationMiddleware(socket: AppSocket, next: (err?: Error) => void) {
+  async #authenticationMiddleware(socket: AppSocket, next: (err?: Error) => void) {
+    if (!this.#auth) {
+      const err = new Error('Authorization is not yet enabled')
+      return next(err)
+    }
     let token: string | undefined
     if (socket.handshake.headers && socket.handshake.headers.authorization) {
       token = socket.handshake.headers.authorization.replace(/^Bearer /, '')
@@ -127,12 +146,20 @@ export class SocketIoService {
     } else if (socket.handshake.query && 'string' === typeof socket.handshake.query.token) {
       token = socket.handshake.query.token
     }
+    let user: User | undefined
     if (token) {
       const bearerToken = new Secret(token)
-      console.log({ bearerToken, token })
-      const err = new Error('Authorization is not yet enabled')
-      return next(err)
+      const t = await this.#userProvider.verifyToken(bearerToken)
+      if (!t) {
+        return next()
+      }
+      const providerUser = await this.#userProvider.findById(t.tokenableId)
+      if (!providerUser) {
+        return next()
+      }
+      user = providerUser.getOriginal() as User
     }
+    socket.user = user
     return next()
   }
 
