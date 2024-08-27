@@ -96,6 +96,9 @@ export default class CommandCommand extends BaseCommand {
     }
     const context: CommandContext = request
     animation.update('Processing')
+    if (!request.payload) {
+      request.payload = {}
+    }
     const res = await api.handle(context)
     if (res instanceof Error) {
       animation.stop()

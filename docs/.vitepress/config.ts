@@ -56,6 +56,7 @@ export default defineConfig({
           { text: 'HTTP API', link: '/apis/http' },
           { text: 'Socket.IO API', link: '/apis/socket.io' },
           { text: 'MQTT API', link: '/apis/mqtt' },
+          { text: 'CLI API', link: '/apis/cli' },
         ],
         collapsed: true
       },

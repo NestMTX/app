@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
-    "docs:preview": "vitepress preview docs"
+    "docs:preview": "vitepress preview docs",
+    "docs:api:generate": "npx jiti bin/make_docs_for_api.ts"
   },
   "imports": {
     "#clients/*": "./app/clients/*.js",
