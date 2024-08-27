@@ -73,11 +73,37 @@ export default defineConfig({
       {
         text: 'Integrations',
         items: [
-          { text: 'Frigate', link: '/integrations/frigate' },
-          { text: 'Home Assistant', link: '/integrations/hass' },
-          { text: 'Blue Iris', link: '/integrations/blue-iris' },
-          { text: 'iSpy Agent DVR', link: '/integrations/ispy' },
-          { text: 'Node Red', link: '/integrations/node-red' },
+          {
+            text: 'DVRs & NVRs',
+            items: [
+              { text: 'Frigate', link: '/integrations/frigate' },
+              { text: 'Home Assistant', link: '/integrations/hass' },
+              { text: 'Blue Iris', link: '/integrations/blue-iris' },
+              { text: 'iSpy Agent DVR', link: '/integrations/ispy' },
+              { text: 'Node Red', link: '/integrations/node-red' },
+            ],
+            collapsed: true
+          },
+          {
+            text: 'Automation Platforms',
+            items: [
+              { text: 'Home Assistant', link: '/integrations/hass' },
+              { text: 'Node Red', link: '/integrations/node-red' },
+            ],
+            collapsed: true
+          },
+          {
+            text: 'Other Applications',
+            items: [
+              { text: 'FFMpeg', link: '/integrations/ffmpeg' },
+              { text: 'GStreamer', link: '/integrations/gstreamer' },
+              { text: 'MediaMTX', link: '/integrations/mediamtx' },
+              { text: 'Go2RTC', link: '/integrations/go2rtc' },
+              { text: 'OBS', link: '/integrations/obs' },
+              { text: 'VLC', link: '/integrations/vlc' },
+            ],
+            collapsed: true
+          },
         ],
         collapsed: true
       },
