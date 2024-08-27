@@ -575,6 +575,12 @@ $glass_blur_base: 15px !default;
   --vp-nav-bg-color: transparent;
   --vp-sidebar-bg-color: transparent;
 
+  background-image: url("/backgrounds/light.svg");
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center center;
+  background-attachment: fixed;
+
   .link-text-value,
   .title,
   .vp-doc a,
@@ -592,11 +598,8 @@ $glass_blur_base: 15px !default;
   }
 
   body {
-    background-image: url("/backgrounds/light.svg");
-    background-repeat: no-repeat;
-    background-size: cover;
-    background-position: center center;
-    background-attachment: local;
+    background: none !important;
+    background-color: none !important;
   }
 
   .aside-curtain {
@@ -1106,9 +1109,7 @@ $glass_blur_base: 15px !default;
     --vp-c-text-2: rgba(235, 235, 245, 0.6);
     --vp-c-text-3: rgba(235, 235, 245, 0.38);
 
-    body {
-      background-image: url("/backgrounds/dark.svg");
-    }
+    background-image: url("/backgrounds/dark.svg");
   }
 
   .VPFeature {
