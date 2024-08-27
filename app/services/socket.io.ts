@@ -5,8 +5,6 @@ import type User from '#models/user'
 import type { ApiService, CommandContext } from '#services/api'
 import type { LoggerService } from '@adonisjs/core/types'
 import type { Logger } from '@adonisjs/logger'
-import type { AuthManager } from '@adonisjs/auth'
-import type { Authenticators } from '@adonisjs/auth/types'
 import { Server as SocketIoServer } from 'socket.io'
 import { Secret } from '@adonisjs/core/helpers'
 import Joi from 'joi'
@@ -39,6 +37,15 @@ const requestPayloadSchema = Joi.object({
   }),
   payload: Joi.alternatives().conditional('command', {
     switch: [
+      {
+        is: 'list',
+        then: Joi.object().default({
+          search: null,
+          page: '1',
+          itemsPerPage: '10',
+          sortBy: null,
+        }),
+      },
       { is: 'create', then: Joi.object().required() },
       { is: 'update', then: Joi.object().required() },
     ],
@@ -64,15 +71,12 @@ export interface PinoLog {
 export class SocketIoService {
   #io: SocketIoServer
   #logger?: Logger
-  #auth?: AuthManager<Authenticators>
-  readonly #app: ApplicationService
   readonly #api: ApiService
   readonly #sockets: Map<string, AppSocket>
   readonly #logs: PinoLog[] = []
   readonly #userProvider: UserProvider
 
-  constructor(app: ApplicationService, api: ApiService) {
-    this.#app = app
+  constructor(_app: ApplicationService, api: ApiService) {
     this.#sockets = new Map()
     this.#api = api
     this.#userProvider = tokensUserProvider({
@@ -118,7 +122,6 @@ export class SocketIoService {
    * @private
    */
   async start(httpServerService: HttpServerService) {
-    this.#auth = await this.#app.container.make('auth.manager')
     const server = httpServerService.getNodeServer()
     if (!server) {
       return
@@ -134,10 +137,6 @@ export class SocketIoService {
   }
 
   async #authenticationMiddleware(socket: AppSocket, next: (err?: Error) => void) {
-    if (!this.#auth) {
-      const err = new Error('Authorization is not yet enabled')
-      return next(err)
-    }
     let token: string | undefined
     if (socket.handshake.headers && socket.handshake.headers.authorization) {
       token = socket.handshake.headers.authorization.replace(/^Bearer /, '')

@@ -155,7 +155,15 @@ export class ApiService {
       }),
       payload: joi.when('command', {
         switch: [
-          { is: 'list', then: joi.object().required() },
+          {
+            is: 'list',
+            then: joi.object().default({
+              search: null,
+              page: '1',
+              itemsPerPage: '10',
+              sortBy: null,
+            }),
+          },
           { is: 'create', then: joi.object().required() },
           { is: 'update', then: joi.object().required() },
         ],

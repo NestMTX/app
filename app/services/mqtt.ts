@@ -2,12 +2,17 @@ import type { ApiService, CommandContext } from '#services/api'
 import type { LoggerService } from '@adonisjs/core/types'
 import type { Logger } from '@adonisjs/logger'
 import type { MqttClient, IPublishPacket } from 'mqtt'
+import type User from '#models/user'
 import { ApiServiceRequestError } from '#services/api'
 import { inspect } from 'node:util'
 import env from '#start/env'
 import Joi from 'joi'
 import Aedes from 'aedes'
 import { createServer } from 'node:net'
+import { tokensUserProvider } from '@adonisjs/auth/access_tokens'
+import { Secret } from '@adonisjs/core/helpers'
+
+type UserProvider = ReturnType<typeof tokensUserProvider>
 
 const requestPayloadSchema = Joi.object({
   command: Joi.string().valid('list', 'read', 'create', 'update', 'delete').required(),
@@ -23,21 +28,37 @@ const requestPayloadSchema = Joi.object({
   }),
   payload: Joi.alternatives().conditional('command', {
     switch: [
+      {
+        is: 'list',
+        then: Joi.object().default({
+          search: null,
+          page: '1',
+          itemsPerPage: '10',
+          sortBy: null,
+        }),
+      },
       { is: 'create', then: Joi.object().required() },
       { is: 'update', then: Joi.object().required() },
     ],
     otherwise: Joi.forbidden(),
   }),
+  token: Joi.string().optional(),
 })
 
 export class MqttService {
   readonly #api: ApiService
   readonly #client: MqttClient
   readonly #logger: Logger
+  readonly #userProvider: UserProvider
 
   constructor(api: ApiService, client: MqttClient, logger: LoggerService) {
     this.#api = api
     this.#client = client
+    this.#userProvider = tokensUserProvider({
+      tokens: 'accessTokens',
+      // @ts-ignore it works - shutup!
+      model: () => import('#models/user'),
+    })
     this.#logger = logger.child({ service: 'mqtt' })
     this.#client.on('connect', () => {
       this.#logger.info('Connected to broker')
@@ -90,6 +111,17 @@ export class MqttService {
     const { value, error } = requestPayloadSchema.validate(payload)
     if (error) {
       return this.#handleError(error)
+    }
+    if (value.token) {
+      const bearerToken = new Secret(value.token)
+      const t = await this.#userProvider.verifyToken(bearerToken)
+      if (t) {
+        const providerUser = await this.#userProvider.findById(t.tokenableId)
+        if (providerUser) {
+          value.user = providerUser.getOriginal() as User
+        }
+      }
+      delete value.token
     }
     const context: CommandContext = value
     const res = await this.#api.handle(context)

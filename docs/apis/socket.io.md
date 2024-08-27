@@ -30,6 +30,8 @@ socket.emit('request', {
 
 This sends a `list` command to the `users` module. The server will respond with the result of the request, which can be handled using the `socket.on` method to listen for the response.
 
+[Read More](/apis/structure)
+
 ### Handling Responses
 
 Responses from the server are emitted back to the client with the same `requestId` you provided. Here's how you can listen for and handle the response:

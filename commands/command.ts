@@ -17,6 +17,15 @@ const requestPayloadSchema = Joi.object({
   requestId: Joi.string().required(),
   payload: Joi.alternatives().conditional('command', {
     switch: [
+      {
+        is: 'list',
+        then: Joi.object().default({
+          search: null,
+          page: '1',
+          itemsPerPage: '10',
+          sortBy: null,
+        }),
+      },
       { is: 'create', then: Joi.object().required() },
       { is: 'update', then: Joi.object().required() },
     ],
@@ -96,9 +105,6 @@ export default class CommandCommand extends BaseCommand {
     }
     const context: CommandContext = request
     animation.update('Processing')
-    if (!request.payload) {
-      request.payload = {}
-    }
     const res = await api.handle(context)
     if (res instanceof Error) {
       animation.stop()
