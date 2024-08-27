@@ -53,6 +53,7 @@ export default defineConfig({
         text: 'APIs',
         items: [
           { text: 'API Basics', link: '/apis/' },
+          { text: 'Modules & Methods', link: '/apis/structure' },
           { text: 'HTTP API', link: '/apis/http' },
           { text: 'Socket.IO API', link: '/apis/socket.io' },
           { text: 'MQTT API', link: '/apis/mqtt' },

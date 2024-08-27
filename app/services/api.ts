@@ -524,6 +524,22 @@ export class ApiService {
                 },
               },
             ],
+            requestBody: updateSchemaKey
+              ? {
+                  content: {
+                    'application/json': {
+                      schema: {
+                        $ref: `#/components/schemas/${updateSchemaKey}`,
+                      },
+                    },
+                    'application/x-www-form-urlencoded': {
+                      schema: {
+                        $ref: `#/components/schemas/${updateSchemaKey}`,
+                      },
+                    },
+                  },
+                }
+              : undefined,
             responses: {
               '201': {
                 description: 'Updated',

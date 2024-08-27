@@ -19,6 +19,8 @@ All NestMTX APIs share a common structure for handling requests. Each request is
 - **Update**: Update an existing entity within the specified module.
 - **Delete**: Remove an entity from the specified module.
 
+[Read More](/apis/structure)
+
 ### Modules
 
 Each module in NestMTX can be accessed through any of the APIs. Modules can define specific behaviors for each L.C.R.U.D. operation, such as validation schemas and custom error handling.

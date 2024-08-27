@@ -24,6 +24,14 @@ const requestPayloadSchema = Joi.object({
   command: Joi.string().valid('list', 'read', 'create', 'update', 'delete').required(),
   module: Joi.string().required(),
   requestId: Joi.string().required(),
+  entity: Joi.alternatives().conditional('command', {
+    switch: [
+      { is: 'read', then: Joi.string().required() },
+      { is: 'update', then: Joi.string().required() },
+      { is: 'delete', then: Joi.string().required() },
+    ],
+    otherwise: Joi.forbidden(),
+  }),
   payload: Joi.alternatives().conditional('command', {
     switch: [
       { is: 'create', then: Joi.object().required() },

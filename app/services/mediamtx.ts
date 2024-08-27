@@ -85,7 +85,12 @@ export class MediaMTXService {
   async boot(logger: LoggerService, nat: NATService, ice: ICEService, pm3: PM3) {
     this.#logger = logger.child({ service: 'mediamtx' })
     pm3.on('stdout:mediamtx', (data) => {
-      this.#logger!.info(data)
+      if (data.includes('INF reloading configuration (file changed)')) {
+        pm3.restart('mediamtx')
+        this.#logger!.warn('Restarting MediaMTX service due to configuration change')
+      } else {
+        this.#logger!.info(data)
+      }
     })
     pm3.on('stderr:mediamtx', (data) => {
       this.#logger!.error(data)
