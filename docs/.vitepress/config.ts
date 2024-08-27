@@ -15,6 +15,7 @@ export default defineConfig({
       { text: 'Introduction', link: '/introduction' },
       { text: 'Quick Start', link: '/quickstart' },
       { text: 'Design Philosophy', link: '/design-philosophy' },
+      { text: 'Acknowledgements', link: '/acknowledgements' },
       { text: 'Releases', link: '/releases' },
       {
         text: 'Compatibility',
@@ -116,6 +117,7 @@ export default defineConfig({
         ],
         collapsed: true
       },
+      { text: 'MIT License', link: 'https://github.com/NestMTX/app?tab=MIT-1-ov-file#readme' },
     ],
 
     socialLinks: [
