@@ -1121,6 +1121,34 @@ $glass_blur_base: 15px !default;
       0 1px 8px 0 var(--v-shadow-key-ambient-opacity, rgba(0, 0, 0, 0.12)) !important;
   }
 
+  .VPFooter {
+    @include background-color(#f6f6f7, $glass_color_alpha_base);
+    border-top: none;
+
+    &.has-sidebar {
+      display: block;
+    }
+  }
+
+  .VPNav {
+    @include background-color(#f6f6f7, $glass_color_alpha_base);
+    border: none !important;
+    box-shadow:
+      0 3px 3px -2px var(--v-shadow-key-umbra-opacity, rgba(0, 0, 0, 0.2)),
+      0 3px 4px 0 var(--v-shadow-key-penumbra-opacity, rgba(0, 0, 0, 0.14)),
+      0 1px 8px 0 var(--v-shadow-key-ambient-opacity, rgba(0, 0, 0, 0.12)) !important;
+
+    .VPNavBar.has-sidebar {
+      .divider {
+        display: none;
+      }
+    }
+  }
+
+  .VPNavBarTitle.has-sidebar .title {
+    border-bottom-color: transparent;
+  }
+
   @media (min-width: 768px) {
     .DocSearch-Button {
       @include background-color(#f6f6f7, $glass_color_alpha_base);
@@ -1151,6 +1179,14 @@ $glass_blur_base: 15px !default;
 
   &.dark {
     .VPFeature {
+      @include background-color(#202127, $glass_color_alpha_base);
+    }
+
+    .VPFooter {
+      @include background-color(#202127, $glass_color_alpha_base);
+    }
+
+    .VPNav {
       @include background-color(#202127, $glass_color_alpha_base);
     }
 

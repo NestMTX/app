@@ -133,6 +133,10 @@ export default defineConfig({
       level: [2, 3]
     },
 
+    footer: {
+      message: 'Released under the <a href="https://github.com/NestMTX/app?tab=MIT-1-ov-file#readme">MIT License</a>.',
+      copyright: 'Copyright © 2022-present <a href="https://github.com/jakguru">Jak Guru</a>'
+    }
   },
   lastUpdated: true
 })

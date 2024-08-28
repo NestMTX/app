@@ -29,11 +29,11 @@ This project may not be for you. While the maintainers of this project are happy
 
 ### Are you looking for a completely free solution?
 
-This project may not be for you. While this project has been released under the [MIT license](https://gitlab.jak.guru/jakg/nest-rtsp/-/blob/master/LICENSE.md), it uses Google's proprietary [Smart Device Management](https://developers.google.com/nest/device-access) API which requires a non-refundable $5 registration to Google's [Device Access Console](https://console.nest.google.com/device-access/) for usage.
+This project may not be for you. While this project has been released under the [MIT license](https://github.com/NestMTX/app?tab=MIT-1-ov-file#readme), it uses Google's proprietary [Smart Device Management](https://developers.google.com/nest/device-access) API which requires a non-refundable $5 registration to Google's [Device Access Console](https://console.nest.google.com/device-access/) for usage.
 
 ### Are you looking for an Open Source Only project?
 
-This project may not be for you. While this project has been released under the [MIT license](https://gitlab.jak.guru/jakg/nest-rtsp/-/blob/master/LICENSE.md), there may be some libraries, codecs and software running under the hood that are being used under what we interpret as "fair use" policy. We're not lawyers nor do we want to deal with licensing issues, so if you have concerns, please consult with someone who has the requisite credentials and education to give you advice on your usage.
+This project may not be for you. While this project has been released under the [MIT license](https://github.com/NestMTX/app?tab=MIT-1-ov-file#readme), there may be some libraries, codecs and software running under the hood that are being used under what we interpret as "fair use" policy. We're not lawyers nor do we want to deal with licensing issues, so if you have concerns, please consult with someone who has the requisite credentials and education to give you advice on your usage.
 
 ### Are you on a metered or limited bandwidth connection?
 
