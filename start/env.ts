@@ -100,4 +100,9 @@ export default await Env.create(new URL('../', import.meta.url), {
    */
   WEBRTC_RTP_MIN_PORT: Env.schema.number.optional(),
   WEBRTC_RTP_MAX_PORT: Env.schema.number.optional(),
+  // /**
+  //  * nginx Configuration
+  //  */
+  // NGINX_BIN: Env.schema.string.optional(),
+  // NGINX_CONFIG_PATH: Env.schema.string.optional(),
 })
