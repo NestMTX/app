@@ -2,8 +2,8 @@
 layout: home
 
 hero:
-  name: "NestMTX"
-  tagline: "Seamlessly Stream Your Nest, Anytime, Anywhere."
+  name: "Looking for Nest RTSP?"
+  tagline: "The Nest RTSP project is now NestMTX"
   image:
     src: /icon.png
     alt: NestMTX
