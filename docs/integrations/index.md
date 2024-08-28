@@ -10,6 +10,7 @@ Don't see a tutorial for the system you want to integrate? You can [open a Githu
 * [How to integrate with Home Assistant](/integrations/hass)
 * [How to integrate with Blue Iris](/integrations/blue-iris)
 * [How to integrate with iSpy Agent DVR](/integrations/ispy)
+* [How to integrate with Scrypted](/integrations/scrypted)
 
 ## Automation Platforms
 

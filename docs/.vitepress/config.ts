@@ -81,7 +81,8 @@ export default defineConfig({
               { text: 'Home Assistant', link: '/integrations/hass' },
               { text: 'Blue Iris', link: '/integrations/blue-iris' },
               { text: 'iSpy Agent DVR', link: '/integrations/ispy' },
-              { text: 'Node Red', link: '/integrations/node-red' },
+              { text: 'Scrypted', link: '/integrations/scrypted' },
+              { text: 'Shinobi', link: '/integrations/shinobi' },
             ],
             collapsed: true
           },
@@ -117,6 +118,7 @@ export default defineConfig({
         ],
         collapsed: true
       },
+      { text: 'Disclaimer', link: '/disclaimer' },
       { text: 'MIT License', link: 'https://github.com/NestMTX/app?tab=MIT-1-ov-file#readme' },
     ],
     
