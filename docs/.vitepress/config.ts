@@ -119,7 +119,7 @@ export default defineConfig({
       },
       { text: 'MIT License', link: 'https://github.com/NestMTX/app?tab=MIT-1-ov-file#readme' },
     ],
-
+    
     socialLinks: [
       { icon: 'github', link: 'https://github.com/NestMTX' },
       { icon: 'discord', link: 'https://discord.gg/hMAEuNa4Fd' }
@@ -131,6 +131,8 @@ export default defineConfig({
 
     outline: {
       level: [2, 3]
-    }
-  }
+    },
+
+  },
+  lastUpdated: true
 })
