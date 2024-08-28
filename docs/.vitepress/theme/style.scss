@@ -1149,6 +1149,10 @@ $glass_blur_base: 15px !default;
     border-bottom-color: transparent;
   }
 
+  .VPSidebar {
+    @include background-color(#f6f6f7, $glass_color_alpha_base);
+  }
+
   @media (min-width: 768px) {
     .DocSearch-Button {
       @include background-color(#f6f6f7, $glass_color_alpha_base);
@@ -1177,15 +1181,14 @@ $glass_blur_base: 15px !default;
     width: auto;
   }
 
+  .VPNavScreen {
+    height: 340px;
+  }
+
   &.dark {
-    .VPFeature {
-      @include background-color(#202127, $glass_color_alpha_base);
-    }
-
-    .VPFooter {
-      @include background-color(#202127, $glass_color_alpha_base);
-    }
-
+    .VPSidebar,
+    .VPFeature,
+    .VPFooter,
     .VPNav {
       @include background-color(#202127, $glass_color_alpha_base);
     }
