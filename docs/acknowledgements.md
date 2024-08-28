@@ -1,10 +1,6 @@
 # Acknowledgements
 
-NestMTX was built on the backs of giants. Without their contributions, this project would not have been built, or would look significantly different.
-
-## Dependencies
-
-Here is a list of the major projects and packages that NestMTX relies on:
+NestMTX was built on the backs of giants. Without contributions to these projects and projects like them, this project would not have been built, or would look significantly different.
 
 | Project / Package                | Link                                                                                                                     |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
