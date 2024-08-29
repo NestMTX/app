@@ -82,6 +82,12 @@ export default class Mediamtx extends BaseCommand {
         })
         break
 
+      case 'v8.tar.gz':
+        await execa('tar', ['-xzf', asset.name, '-C', unzippedDest], {
+          cwd: join(BASE_DIR, 'tmp'),
+        })
+        break
+
       default:
         this.logger.error(`Unsupported archive extension ${extension}`)
         process.exit(1)

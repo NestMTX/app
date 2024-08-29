@@ -154,6 +154,7 @@ export default class AppProvider {
     const files = await fs.readdir(apiModuleDir)
     for (const file of files) {
       if (file.endsWith('.md')) continue
+      if (file.endsWith('.map')) continue
       if ('web' === env) {
         logger.info(`Loading API Module from ${file}...`)
       }

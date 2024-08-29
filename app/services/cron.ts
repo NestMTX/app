@@ -24,7 +24,7 @@ export const loadJobs = async (app: ApplicationService): Promise<Array<CronJob>>
   const files = await readdir(jobsPath)
   const ret = await Promise.all(
     files
-      .filter((file) => file.endsWith('.job.ts'))
+      .filter((file) => file.endsWith('.job.ts') || file.endsWith('.job.js'))
       .map(async (file) => {
         const { default: Job } = await import(resolve(jobsPath, file))
         if (!(Job.prototype instanceof CronJob)) {
