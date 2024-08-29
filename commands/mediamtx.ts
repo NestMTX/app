@@ -29,7 +29,7 @@ export default class Mediamtx extends BaseCommand {
     this.logger.info(`Found MediaMTX Release ${latest.name}`)
     const { name, assets } = latest
     const platform = os.platform()
-    const arch = os.arch()
+    const arch = os.arch().replace('x64', 'amd64')
     const nameMatch = ['mediamtx', name, platform, arch].join('_')
     const asset = assets.find((a) => a.name.startsWith(nameMatch))
     if (!asset) {
