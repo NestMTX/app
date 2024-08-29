@@ -216,6 +216,14 @@ export default defineNuxtConfig({
   },
 
   compatibilityDate: '2024-08-15',
+  hooks: {
+    close: () => {
+      console.log('Build completed. Killing process in 5 seconds...')
+      setTimeout(() => {
+        process.exit(0)
+      }, 5000)
+    },
+  },
 })
 
 declare module '@jakguru/vueprint' {

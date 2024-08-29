@@ -14,6 +14,14 @@
 import 'reflect-metadata'
 import { Ignitor, prettyPrintError } from '@adonisjs/core'
 
+process.env.TZ = 'UTC'
+process.env.PORT = '2000'
+process.env.HTTPS_PORT = '2001'
+process.env.HOST = '0.0.0.0'
+process.env.APP_KEY = process.env.APP_KEY || '2yHkmRqv832ze68zwyIOtBpwzSHIrVzV'
+process.env.LOG_LEVEL = 'info'
+process.env.NODE_ENV = process.env.NODE_ENV || 'development'
+
 /**
  * URL to the application root. AdonisJS need it to resolve
  * paths to file and directories for scaffolding commands
