@@ -45,7 +45,7 @@ jobs:
           nestmtx/${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}:${{ github.ref_type == 'branch' && 'testing' || github.ref_name }}
           ${{ github.ref_type == 'tag' && 'nestmtx/' || '' }}${{ github.ref_type == 'tag' && matrix.platform == 'linux/amd64' && 'amd64:latest' || matrix.platform == 'linux/arm64' && 'arm64:latest' || '' }}
 
-    - name: Inspect image
+    - name: Pull image
       run: docker pull inspect nestmtx/${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}:${{ github.ref_type == 'branch' && 'testing' || github.ref_name }}
 
     - name: Inspect image
