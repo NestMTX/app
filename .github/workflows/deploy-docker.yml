@@ -1,4 +1,4 @@
-name: Build and Push Docker Images
+name: Build and Push NestMTX Docker Images
 
 on:
   push:
@@ -40,8 +40,8 @@ jobs:
         platforms: ${{ matrix.platform }}
         push: true
         tags: |
-          nestmtx/${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}:${{ github.ref_type == 'tag' && github.ref_name || 'testing' }}
-          ${{ github.ref_type == 'tag' && 'nestmtx/' || '' }}${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}:${{ github.ref_type == 'tag' && 'latest' || '' }}
+          nestmtx/${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}:${{ github.ref_type == 'branch' && 'testing' || github.ref_name }}
+          ${{ github.ref_type == 'tag' && 'nestmtx/' || '' }}${{ github.ref_type == 'tag' && matrix.platform == 'linux/amd64' && 'amd64:latest' || matrix.platform == 'linux/arm64' && 'arm64:latest' || '' }}
 
     - name: Inspect image
-      run: docker image inspect nestmtx/${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}:${{ github.ref_type == 'tag' && github.ref_name || 'testing' }}
+      run: docker image inspect nestmtx/${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}:${{ github.ref_type == 'branch' && 'testing' || github.ref_name }}
