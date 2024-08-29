@@ -9,6 +9,7 @@ FROM --platform=${BUILDPLATFORM} ${IMAGE_PREFIX}${NODE_IMAGE} as base
 ENV LC_ALL=C.UTF-8
 RUN apk --no-cache add dumb-init
 RUN mkdir -p /home/node/app && \
+    mkdir -p /home/node/app/tmp && \
     chown node:node /home/node/app && \
     mkdir -p /home/node/mediamtx && \
     chown node:node /home/node/mediamtx
