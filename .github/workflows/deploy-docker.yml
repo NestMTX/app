@@ -1,4 +1,4 @@
-name: Build and Push NestMTX Docker Images
+name: Build and Push Docker Images
 
 on:
   push:
@@ -39,6 +39,8 @@ jobs:
         file: ./Dockerfile
         platforms: ${{ matrix.platform }}
         push: true
+        build-args: |
+          BUILDPLATFORM=${{ matrix.platform }}
         tags: |
           nestmtx/${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}:${{ github.ref_type == 'branch' && 'testing' || github.ref_name }}
           ${{ github.ref_type == 'tag' && 'nestmtx/' || '' }}${{ github.ref_type == 'tag' && matrix.platform == 'linux/amd64' && 'amd64:latest' || matrix.platform == 'linux/arm64' && 'arm64:latest' || '' }}
