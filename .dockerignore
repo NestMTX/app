@@ -20,6 +20,7 @@ yarn-error.log
 # Editors specific
 .fleet
 .idea
+.vscode
 
 # Platform specific
 .DS_Store
@@ -27,3 +28,35 @@ yarn-error.log
 # Vitepress
 docs/.vitepress/cache
 docs/.vitepress/dist
+
+## GUI
+# Nuxt dev/build outputs
+gui/.output
+gui/.data
+gui/.nuxt
+gui/.nitro
+gui/.cache
+gui/dist
+
+# Node dependencies
+gui/node_modules
+
+# Logs
+gui/logs
+gui/*.log
+
+# Misc
+gui/.DS_Store
+gui/.fleet
+gui/.idea
+
+# Local env files
+gui/.env
+gui/.env.*
+gui/!.env.example
+
+# Markdown Files
+*.md
+
+# NestMTX Documentation
+docs

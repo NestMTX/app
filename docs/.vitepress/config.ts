@@ -83,6 +83,7 @@ export default defineConfig({
               { text: 'iSpy Agent DVR', link: '/integrations/ispy' },
               { text: 'Scrypted', link: '/integrations/scrypted' },
               { text: 'Shinobi', link: '/integrations/shinobi' },
+              { text: 'Zoneminder', link: '/integrations/zoneminder' },
             ],
             collapsed: true
           },

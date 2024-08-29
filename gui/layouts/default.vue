@@ -49,6 +49,12 @@
           <slot />
         </v-container>
       </v-main>
+      <v-footer app color="transparent" class="glass-surface text-center d-flex flex-column">
+        <v-tabs :model-value="null" hide-slider>
+          <v-tab hide-slider href="https://nestmtx.com" target="_blank">Docs</v-tab>
+          <v-tab hide-slider href="https://discord.gg/hMAEuNa4Fd" target="_blank">Community</v-tab>
+        </v-tabs>
+      </v-footer>
       <SystemInfoDialog v-if="showSystemInfo" class="glass-surface" @close="showSystemInfo = false">
         <template #toolbar>
           <I18nPicker />

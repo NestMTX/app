@@ -22,6 +22,7 @@ import { IPCService } from '#services/ipc'
 import { MiliCron } from '@jakguru/milicron'
 import { init } from '#services/cron'
 import { PM3 } from '#services/pm3'
+import { HttpsService } from '#services/https'
 
 const base = new URL('../', import.meta.url).pathname
 
@@ -38,6 +39,7 @@ declare module '@adonisjs/core/types' {
     'ice/service': ICEService
     'ipc/service': IPCService
     'cron/service': MiliCron
+    'https/service': HttpsService
   }
 }
 
@@ -54,6 +56,7 @@ declare module '@adonisjs/core/app' {
     iceService: ICEService
     ipcService: IPCService
     cronService: MiliCron
+    httpsService: HttpsService
   }
 }
 
@@ -69,6 +72,7 @@ export default class AppProvider {
   #ipc: IPCService
   #cron: MiliCron
   #pm3: PM3
+  #https: HttpsService
   constructor(protected app: ApplicationService) {
     this.#api = new ApiService()
     this.#io = new SocketIoService(this.app, this.#api)
@@ -79,6 +83,7 @@ export default class AppProvider {
     this.#ipc = new IPCService(this.app)
     this.#cron = new MiliCron()
     this.#pm3 = new PM3()
+    this.#https = new HttpsService(this.app)
   }
 
   /**
@@ -96,6 +101,7 @@ export default class AppProvider {
     this.app.container.singleton('ice/service', () => this.#ice)
     this.app.container.singleton('ipc/service', () => this.#ipc)
     this.app.container.singleton('cron/service', () => this.#cron)
+    this.app.container.singleton('https/service', () => this.#https)
   }
 
   /**
@@ -201,6 +207,7 @@ export default class AppProvider {
     Application.getter('iceService', () => this.#ice)
     Application.getter('ipcService', () => this.#ipc)
     Application.getter('cronService', () => this.#cron)
+    Application.getter('httpsService', () => this.#https)
   }
 
   /**
@@ -224,6 +231,7 @@ export default class AppProvider {
     if ('web' === env) {
       await this.#io.start(server)
       logger.info('Socket.IO Server Attached')
+      await this.#https.boot(logger as LoggerServiceWithConfig)
     }
     if (this.#mqtt) {
       new MqttService(this.#api, this.#mqtt, logger)
@@ -237,6 +245,7 @@ export default class AppProvider {
     const logger = await this.app.container.make('logger')
     const env = this.app.getEnvironment()
     if ('web' === env) {
+      await this.#https.shutdown()
       this.#cron.$off('*/5 * * * * *', this.#mediamtx.cron.bind(this.#mediamtx))
       logger.info('Shutting down child processes')
       await this.#pm3.kill()

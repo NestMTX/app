@@ -12,6 +12,7 @@
 import { Env } from '@adonisjs/core/env'
 
 export default await Env.create(new URL('../', import.meta.url), {
+  HOME: Env.schema.string(),
   NODE_ENV: Env.schema.enum(['development', 'production', 'test'] as const),
   PORT: Env.schema.number(),
   APP_KEY: Env.schema.string(),
@@ -100,9 +101,10 @@ export default await Env.create(new URL('../', import.meta.url), {
    */
   WEBRTC_RTP_MIN_PORT: Env.schema.number.optional(),
   WEBRTC_RTP_MAX_PORT: Env.schema.number.optional(),
-  // /**
-  //  * nginx Configuration
-  //  */
-  // NGINX_BIN: Env.schema.string.optional(),
-  // NGINX_CONFIG_PATH: Env.schema.string.optional(),
+  /**
+   * HTTPS Configuration
+   */
+  HTTPS_PORT: Env.schema.number(),
+  HTTPS_CERT_PATH: Env.schema.string.optional(),
+  HTTPS_KEY_PATH: Env.schema.string.optional(),
 })

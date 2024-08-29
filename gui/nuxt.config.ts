@@ -123,7 +123,7 @@ export default defineNuxtConfig({
 
   devServer: {
     host: '0.0.0.0',
-    port: 2001,
+    port: 2002,
   },
 
   vite: {
