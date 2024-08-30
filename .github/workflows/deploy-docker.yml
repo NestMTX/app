@@ -32,9 +32,13 @@ jobs:
       with:
         buildkitd-flags: --allow-insecure-entitlement security.insecure --allow-insecure-entitlement network.host
 
-    - name: Extract Platform Name
-      id: platform
-      run: echo "PLATFORM_SHORT=$(echo ${{ matrix.platform }} | sed 's|linux/||')" >> $GITHUB_ENV
+    - name: Cache Docker layers
+      uses: actions/cache@v3
+      with:
+        path: /home/runner/.cache/docker
+        key: ${{ runner.os }}-docker-${{ matrix.platform }}-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-docker-${{ matrix.platform }}-
 
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
@@ -46,13 +50,13 @@ jobs:
         cache-from: type=local,src=/home/runner/.cache/docker
         cache-to: type=local,dest=/home/runner/.cache/docker,mode=max
         build-args: |
-          BUILDPLATFORM=$PLATFORM_SHORT
+          BUILDPLATFORM=${{ matrix.platform }}
         tags: |
-          nestmtx/$PLATFORM_SHORT:${{ github.ref_type == 'branch' && 'testing' || github.ref_name }}
-          ${{ github.ref_type == 'tag' && 'nestmtx/' || '' }}$PLATFORM_SHORT:${{ github.ref_type == 'tag' && 'latest' || '' }}
+          nestmtx/${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}:${{ github.ref_type == 'branch' && 'testing' || github.ref_name }}
+          ${{ github.ref_type == 'tag' && 'nestmtx/' || '' }}${{ github.ref_type == 'tag' && matrix.platform == 'linux/amd64' && 'amd64:latest' || matrix.platform == 'linux/arm64' && 'arm64:latest' || '' }}
 
     - name: Pull image
-      run: docker pull nestmtx/$PLATFORM_SHORT:${{ github.ref_type == 'branch' && 'testing' || github.ref_name }}
+      run: docker pull nestmtx/${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}:${{ github.ref_type == 'branch' && 'testing' || github.ref_name }}
 
     - name: Inspect image
-      run: docker image inspect nestmtx/$PLATFORM_SHORT:${{ github.ref_type == 'branch' && 'testing' || github.ref_name }}
+      run: docker image inspect nestmtx/${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}:${{ github.ref_type == 'branch' && 'testing' || github.ref_name }}
