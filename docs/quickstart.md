@@ -24,6 +24,11 @@ docker run -d \
     --name="nestmtx" \
     --restart=unless-stopped \
     -e RTP_MAX_PORT="10100" \
+    -e MEDIA_MTX_RTSP_ENABLED="true" \
+    -e MEDIA_MTX_RTMP_ENABLED="true" \
+    -e MEDIA_MTX_HLS_ENABLED="true" \
+    -e MEDIA_MTX_WEB_RTC_ENABLED="true" \
+    -e MEDIA_MTX_SRT_ENABLED="true" \
     -p "2000:2000" \
     -p "2001:2001" \
     -p "1935:1935" \
@@ -45,6 +50,11 @@ docker run -d \
     --name="nestmtx" \
     --restart=unless-stopped \
     -e RTP_MAX_PORT="10100" \
+    -e MEDIA_MTX_RTSP_ENABLED="true" \
+    -e MEDIA_MTX_RTMP_ENABLED="true" \
+    -e MEDIA_MTX_HLS_ENABLED="true" \
+    -e MEDIA_MTX_WEB_RTC_ENABLED="true" \
+    -e MEDIA_MTX_SRT_ENABLED="true" \
     -p "2000:2000" \
     -p "2001:2001" \
     -p "1935:1935" \

@@ -98,7 +98,6 @@ RUN chown -R node:node /home/node
 USER node
 EXPOSE 2000
 EXPOSE 2001
-EXPOSE 9997
 EXPOSE 9996
 EXPOSE 8554
 EXPOSE 8000/udp
@@ -109,3 +108,4 @@ EXPOSE 8889
 EXPOSE 8189/udp
 EXPOSE 8890
 CMD [ "dumb-init", "node", "bin/docker.js" ]
+VOLUME [ "/home/node/app/tmp" ]
