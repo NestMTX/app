@@ -37,22 +37,104 @@ To map between the `/home/user/nestmtx` directory on your host machine and `/hom
 
 ## Networking Setup
 
-The Networking setup for NestMTX can range between very simplistic to very complex depending on how you would things configured. Without any additional configuration, NestMTX exposes the following ports:
+The Networking setup for NestMTX can range between very simplistic to very complex depending on how you would things configured. Without any additional configuration, NestMTX does not expose any ports. Instead it depends on you to configure port mapping as you see fit.
 
-| Port   | IP Protocol | Service |
-| ------ | ----------- | ------- |
-| `2000` | `tcp`       | HTTP    |
-| `2001` | `tcp`       | HTTPS   |
-| `9996` | `tcp`       | HTTP    |
-| `8554` | `tcp`       | RTSP    |
-| `8000` | `udp`       | RTSP    |
-| `8001` | `udp`       | RTSP    |
-| `1935` | `tcp`       | RTMP    |
-| `8888` | `tcp`       | HLS     |
-| `8889` | `tcp`       | WebRTC  |
-| `8189` | `udp`       | WebRTC  |
-| `8890` | `tcp`       | SRT     |
+:::info Tip: Avoid Host Networking
+NestMTX allocates a LOT of ports for use internally. While it tries to be graceful about conflicts, other applications may not be as flexible. For best results (and for better overall security) it is highly recommended **NOT** to use `--network=host`.
+:::
 
-### Web Servers
+To configure port mapping, add the following before the image name in the command which you use to launch NestMTX:
+
+```bash
+-p {port on host}:{port from container}
+```
+
+:::info Tip
+
+Some ports are UDP only. The format for mapping those ports is
+
+```bash
+-p {port on host}:{port from container}/udp
+```
+
+:::
+
+## Web Server(s)
 
 NestMTX serves it's HTTP(s) API on ports `2000` (http) and `2001` (https). **You do not need to expose both of these.**
+
+## Streaming Protocols
+
+By default, NestMTX does not enable any streaming protocols. This is mainly done for performance reasons, but has the additional benefit of helping prevent port conflicts.
+
+### RTSP Output Streaming
+
+To enable an output stream from NestMTX for the **RTSP** Protocol, you should set the environmental variables:
+
+| Environmental Variable   | Value  |
+| ------------------------ | ------ |
+| `MEDIA_MTX_RTSP_ENABLED` | `true` |
+
+And then forward requests from the host machine to the following ports:
+
+| Port   | Protocol | Use                |
+| ------ | -------- | ------------------ |
+| `8554` | TCP      | RTSP over TCP      |
+| `8000` | UDP      | RTSP over UDP RTP  |
+| `8001` | UDP      | RTSP over UDP RTCP |
+
+### RTMP Output Streaming
+
+To enable an output stream from NestMTX for the **RTMP** Protocol, you should set the environmental variables:
+
+| Environmental Variable   | Value  |
+| ------------------------ | ------ |
+| `MEDIA_MTX_RTMP_ENABLED` | `true` |
+
+And then forward requests from the host machine to the following ports:
+
+| Port | Protocol | Use  |
+| ---- | -------- | ---- |
+| ``   | TCP      | RTMP |
+
+### HLS Output Streaming
+
+To enable an output stream from NestMTX for the **HLS** Protocol, you should set the environmental variables:
+
+| Environmental Variable  | Value  |
+| ----------------------- | ------ |
+| `MEDIA_MTX_HLS_ENABLED` | `true` |
+
+And then forward requests from the host machine to the following ports:
+
+| Port | Protocol | Use |
+| ---- | -------- | --- |
+| ``   | TCP      | HLS |
+
+### WebRTC Output Streaming
+
+To enable an output stream from NestMTX for the **WebRTC** Protocol, you should set the environmental variables:
+
+| Environmental Variable      | Value  |
+| --------------------------- | ------ |
+| `MEDIA_MTX_WEB_RTC_ENABLED` | `true` |
+
+And then forward requests from the host machine to the following ports:
+
+| Port | Protocol | Use    |
+| ---- | -------- | ------ |
+| ``   | TCP      | WebRTC |
+
+### SRT Output Streaming
+
+To enable an output stream from NestMTX for the **SRT** Protocol, you should set the environmental variables:
+
+| Environmental Variable  | Value  |
+| ----------------------- | ------ |
+| `MEDIA_MTX_SRT_ENABLED` | `true` |
+
+And then forward requests from the host machine to the following ports:
+
+| Port | Protocol | Use |
+| ---- | -------- | --- |
+| ``   | TCP      | SRT |
