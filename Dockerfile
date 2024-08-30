@@ -1,7 +1,7 @@
 ARG IMAGE_PREFIX=
 ARG NODE_IMAGE=node:21-alpine
 ARG BUILDPLATFORM=amd64
-FROM --platform=${BUILDPLATFORM} ${IMAGE_PREFIX}${NODE_IMAGE} as base
+FROM --platform=${BUILDPLATFORM} ${IMAGE_PREFIX}${NODE_IMAGE} AS base
 
 ##################################################
 # Setup the Base Container
