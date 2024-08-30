@@ -70,6 +70,6 @@ For a full list of environmental variables which can be used to configure NestMT
 
 :::info Want more details?
 
-For a more detailed breakdown of getting started with NestMTX with Docker, read the [Docker Tutorial](/installation/docker). We also have guides for [Launching with Docker Compose](/installation/-docker-compose) and [Launching from Source](/installation/source).
+For a more detailed breakdown of getting started with NestMTX with Docker, read the [Docker Tutorial](/installation/docker). We also have guides for [Launching with Docker Compose](/installation/docker-compose) and [Launching from Source](/installation/source).
 
 :::
