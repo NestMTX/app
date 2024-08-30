@@ -33,6 +33,7 @@ RUN apk --no-cache add dumb-init \
     chown -R node:node /home/node/mediamtx
 WORKDIR /home/node/app
 USER node
+RUN yarn config set network-timeout 300000 -g
 
 ##################################################
 # Build the GUI
@@ -42,7 +43,6 @@ ENV NODE_ENV=development
 COPY --chown=node:node ./gui/package*.json ./
 COPY --chown=node:node ./gui/npm* ./
 COPY --chown=node:node ./gui/yarn* ./
-RUN echo 'registry: https://registry.npmjs.org/' >> .yarnrc
 RUN yarn install --frozen-lockfile --production=false --ignore-engines
 COPY --chown=node:node ./gui .
 RUN yarn build
@@ -56,7 +56,6 @@ COPY --chown=node:node ./package*.json ./
 COPY --chown=node:node ./npm* ./
 COPY --chown=node:node ./yarn* ./
 USER node
-RUN echo 'registry: https://registry.npmjs.org/' >> .yarnrc
 RUN yarn install --frozen-lockfile
 
 ##################################################
@@ -68,7 +67,6 @@ USER node
 COPY --chown=node:node ./package*.json ./
 COPY --chown=node:node ./npm* ./
 COPY --chown=node:node ./yarn* ./
-RUN echo 'registry: https://registry.npmjs.org/' >> .yarnrc
 RUN yarn install --frozen-lockfile --production=true
 
 ##################################################

@@ -50,7 +50,7 @@ jobs:
         cache-from: type=local,src=/home/runner/.cache/docker
         cache-to: type=local,dest=/home/runner/.cache/docker,mode=max
         build-args: |
-          BUILDPLATFORM=${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}
+          BUILDPLATFORM=${{ matrix.platform }}
         tags: |
           nestmtx/${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}:${{ github.ref_type == 'branch' && 'testing' || github.ref_name }}
           ${{ github.ref_type == 'tag' && 'nestmtx/' || '' }}${{ github.ref_type == 'tag' && matrix.platform == 'linux/amd64' && 'amd64:latest' || matrix.platform == 'linux/arm64' && 'arm64:latest' || '' }}
