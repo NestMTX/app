@@ -6,13 +6,13 @@ NestMTX is designed to offer flexible streaming options, supporting a wide range
 
 The following table outlines the protocols supported by NestMTX, specifically showing the supported codecs for the output streams:
 
-| Protocol   | Variants                                   | Video Codecs | Audio Codecs |
-| ---------- | ------------------------------------------ | ------------ | ------------ |
-| **SRT**    | -                                          | H264         | AAC          |
-| **WebRTC** | Browser-based, WHEP                        | H264         | AAC          |
-| **RTSP**   | UDP, UDP-Multicast, TCP, RTSPS             | H264         | AAC          |
-| **RTMP**   | RTMP, RTMPS, Enhanced RTMP                 | H264         | AAC          |
-| **HLS**    | Low-Latency HLS, MP4-based HLS, legacy HLS | H264         | AAC          |
+| Protocol   | Variants                | Video Codecs | Audio Codecs |
+| ---------- | ----------------------- | ------------ | ------------ |
+| **SRT**    | -                       | H264         | AAC          |
+| **WebRTC** | Browser-based, WHEP     | H264         | AAC          |
+| **RTSP**   | UDP, UDP-Multicast, TCP | H264         | AAC          |
+| **RTMP**   | RTMP,  Enhanced RTMP    | H264         | AAC          |
+| **HLS**    | Low-Latency HLS         | H264         | AAC          |
 
 ## Consistent Output
 

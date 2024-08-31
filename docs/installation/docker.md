@@ -93,9 +93,9 @@ To enable an output stream from NestMTX for the **RTMP** Protocol, you should se
 
 And then forward requests from the host machine to the following ports:
 
-| Port | Protocol | Use  |
-| ---- | -------- | ---- |
-| ``   | TCP      | RTMP |
+| Port   | Protocol | Use  |
+| ------ | -------- | ---- |
+| `1935` | TCP      | RTMP |
 
 ### HLS Output Streaming
 
@@ -107,9 +107,9 @@ To enable an output stream from NestMTX for the **HLS** Protocol, you should set
 
 And then forward requests from the host machine to the following ports:
 
-| Port | Protocol | Use |
-| ---- | -------- | --- |
-| ``   | TCP      | HLS |
+| Port   | Protocol | Use |
+| ------ | -------- | --- |
+| `8888` | TCP      | HLS |
 
 ### WebRTC Output Streaming
 
@@ -121,9 +121,10 @@ To enable an output stream from NestMTX for the **WebRTC** Protocol, you should 
 
 And then forward requests from the host machine to the following ports:
 
-| Port | Protocol | Use    |
-| ---- | -------- | ------ |
-| ``   | TCP      | WebRTC |
+| Port   | Protocol | Use        |
+| ------ | -------- | ---------- |
+| `8889` | TCP      | WebRTC     |
+| `8189` | UDP      | WebRTC UDP |
 
 ### SRT Output Streaming
 
@@ -135,6 +136,27 @@ To enable an output stream from NestMTX for the **SRT** Protocol, you should set
 
 And then forward requests from the host machine to the following ports:
 
-| Port | Protocol | Use |
-| ---- | -------- | --- |
-| ``   | TCP      | SRT |
+| Port   | Protocol | Use |
+| ------ | -------- | --- |
+| `8890` | TCP      | SRT |
+
+## Support for WebRTC Cameras
+
+NestMTX works with WebRTC Cameras out of the box, but in order to enable you will need to open some UDP ports to enable the receipt of the RTP packets which make up the feed.
+This can be configured with the `WEBRTC_RTP_MIN_PORT` and `WEBRTC_RTP_MAX_PORT` environmental variables.
+
+Once you have your minimum and maximum RTP ports set, you'll need to forward them like this:
+
+```bash
+-p "10000-10100:10000-10100/udp"
+```
+
+:::info Note
+
+This example is opening 100 ports, where `WEBRTC_RTP_MIN_PORT` = `10000` and `WEBRTC_RTP_MAX_PORT` = `10100`. You can open more, or less, but be aware that Docker's support for port ranges can be slow, especially for large ranges.
+
+:::
+
+### How many ports do I need open?
+
+The basic math is quite simple: you need 2 ports for every WebRTC camera which you would like to simultanously stream. However it is recommend that you double that in order to have a few extra ports available for things like quick reconnections or other potential issues. *You have 65,535 per network interface, you don't need to be stingy.*
