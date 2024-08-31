@@ -7,7 +7,10 @@ FROM --platform=${BUILDPLATFORM} ${IMAGE_PREFIX}${NODE_IMAGE} AS base
 # Setup the Base Container
 ##################################################
 ENV LC_ALL=C.UTF-8
-RUN apk --no-cache add dumb-init \
+RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/repositories && \
+    echo "http://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories && \
+    echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories && \
+    apk --no-cache add dumb-init \
     openssl \
     ffmpeg \
     gstreamer-tools \
@@ -15,6 +18,7 @@ RUN apk --no-cache add dumb-init \
     gst-plugins-good \
     gst-plugins-bad \
     gst-plugins-ugly \
+    gst-rtsp-server \
     gstreamer-dev \
     gst-libav \
     build-base \
@@ -31,6 +35,7 @@ RUN apk --no-cache add dumb-init \
     chown -R node:node /home/node/app && \
     mkdir -p /home/node/mediamtx && \
     chown -R node:node /home/node/mediamtx
+
 WORKDIR /home/node/app
 USER node
 RUN yarn config set network-timeout 300000 -g
@@ -90,6 +95,7 @@ USER node
 COPY --from=production-dependencies /home/node/app/node_modules /home/node/app/node_modules
 COPY --from=build /home/node/app/build /home/node/app
 ADD --chown=node:node /logger-transports /home/node/app/logger-transports
+ADD --chown=node:node /resources /home/node/app/resources
 RUN rm -rf /home/node/app/public
 COPY --from=gui /home/node/app/.output/public /home/node/app/public
 COPY --from=build /home/node/mediamtx /home/node/mediamtx
