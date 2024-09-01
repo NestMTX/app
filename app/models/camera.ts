@@ -108,7 +108,33 @@ export default class Camera extends BaseModel {
   @column({ serializeAs: 'is_enabled' })
   declare isEnabled: boolean
 
-  @column({ serializeAs: 'expires_at' })
+  @column({ serializeAs: 'is_persistent' })
+  declare isPersistent: boolean
+
+  @column({
+    serializeAs: 'expires_at',
+    consume: (value: any) => {
+      if ('string' === typeof value) {
+        return DateTime.fromISO(value)
+      } else if (value instanceof Date) {
+        return DateTime.fromJSDate(value)
+      } else if (value instanceof DateTime) {
+        return value
+      } else {
+        return null
+      }
+    },
+    prepare: (value: any) => {
+      if (value instanceof DateTime) {
+        return value.toISO()
+      } else if (value instanceof Date) {
+        return DateTime.fromJSDate(value).toISO()
+      } else if ('string' === typeof value) {
+        return value
+      }
+      return null
+    },
+  })
   declare expiresAt: DateTime | null
 
   @column.dateTime({ autoCreate: true })
@@ -1205,72 +1231,38 @@ export default class Camera extends BaseModel {
     await this.save()
 
     const rtspUrl = results!.streamUrls.rtspUrl
-    const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
+    const gstreamerBinary = env.get('GSTREAMER_BIN', 'gst-launch-1.0')
     const outputRtspUrl = `rtsp://127.0.0.1:${env.get('MEDIA_MTX_RTSP_TCP_PORT', 8554)}/${this.mtxPath}`
 
-    const inputVideoCodec = 'h264' // Assuming H264 is always used for video
-    let inputAudioCodec
-    if (this.#audioCodecs.includes('AAC')) {
-      inputAudioCodec = 'aac'
-    } else if (this.#audioCodecs.includes('OPUS')) {
-      inputAudioCodec = 'opus'
-    } else {
-      throw new Error('Unsupported audio codec')
-    }
-
-    const resolutionArgs = []
-    if (this.#videoWidth && this.#videoHeight) {
-      resolutionArgs.push('-s', `${this.#videoWidth}x${this.#videoHeight}`)
-    }
-
     const args = [
-      '-loglevel',
-      'warning',
-      '-c:v',
-      inputVideoCodec, // Specify known input video codec (if you want to decode the input stream)
-      '-c:a',
-      inputAudioCodec, // Specify known input audio codec (if you want to decode the input stream)
-      '-i',
-      rtspUrl, // Input RTSP stream
-      ...resolutionArgs, // Include resolution if known
-      '-r',
-      '10', // Set maximum frame rate to 10fps
-      '-c:v',
-      'libx264', // Re-encode video to H.264
-      '-g',
-      '10', // Set keyframe interval to 10
-      '-bf',
-      '0', // Disable B-frames
-      '-c:a',
-      'aac', // Re-encode audio to AAC
-      '-b:a',
-      '64k', // Lower audio bitrate to reduce CPU usage
-      '-preset',
-      'ultrafast', // Prioritize encoding speed
-      '-tune',
-      'zerolatency', // Reduce latency
-      '-bufsize',
-      '1M', // Buffer size for reducing latency
-      '-threads',
-      '2', // Limit the number of threads to manage CPU load
-      '-vsync',
-      'cfr', // Ensure constant frame rate (CFR)
-      '-f',
-      'rtsp', // Output format
-      '-rtsp_transport',
-      'tcp', // Use TCP for RTSP
-      outputRtspUrl, // Output RTSP stream
+      '-q', // Quiet mode
+      '--gst-debug-level=2', // Log level set to WARNING
+      'rtspsrc',
+      `location=${rtspUrl}`,
+      'latency=0',
+      '!',
+      'rtpjitterbuffer',
+      '!',
+      'rtph264depay',
+      '!',
+      'h264parse',
+      '!',
+      'queue',
+      '!',
+      'rtspclientsink',
+      `location=${outputRtspUrl}`,
+      'async-handling=true',
     ]
 
     try {
       await app.pm3.add(this.#streamProcessName, {
-        file: ffmpegBinary,
+        file: gstreamerBinary,
         arguments: args,
         restart: false,
       })
     } catch (error) {
-      logger.error('Error starting FFmpeg process:', error)
+      logger.error('Error starting GStreamer process:', error)
     }
-    logger.info('Starting FFmpeg process for RTSP stream')
+    logger.info('Starting GStreamer process for RTSP stream')
   }
 }

@@ -42,6 +42,7 @@ export default class UsersModule implements ApiServiceModule {
       // @todo: implement sorting
       // query.orderBy(sortBy)
     }
+    query.orderBy('id', 'desc')
     let pageAsInt = Number.parseInt(page)
     let itemsPerPageAsInt = Number.parseInt(itemsPerPage)
     if (!Number.isNaN(pageAsInt) && !Number.isNaN(itemsPerPageAsInt)) {

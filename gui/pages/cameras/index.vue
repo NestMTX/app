@@ -92,6 +92,7 @@ import {
   renderAsCameraStatusChip,
   renderAsMtxPathForm,
   renderAsCameraEnabledSwitch,
+  renderAsCameraPersistantSwitch,
 } from '../../utilities/renderers'
 import {
   formatInteger,
@@ -177,6 +178,13 @@ export default defineComponent({
         formatter: (value: unknown) => value as string,
         sortable: true,
         renderer: renderAsCameraEnabledSwitch,
+      },
+      {
+        key: 'is_persistent',
+        label: t('fields.is_persistent'),
+        formatter: (value: unknown) => value as string,
+        sortable: true,
+        renderer: renderAsCameraPersistantSwitch,
       },
       {
         key: 'identified_as',

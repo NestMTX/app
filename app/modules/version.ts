@@ -48,7 +48,7 @@ export default class VersionModule implements ApiServiceModule {
         versionDataRaw[key] = value
       })
       if (versionDataRaw.VERSION) {
-        ret.version = versionDataRaw.VERSION
+        ret.release = versionDataRaw.VERSION
       }
       if (versionDataRaw.BUILDPLATFORM) {
         ret.platform = versionDataRaw.BUILDPLATFORM

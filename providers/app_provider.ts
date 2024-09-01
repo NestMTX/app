@@ -3,7 +3,6 @@ import type { LoggerServiceWithConfig } from '#services/socket.io'
 import type { IClientOptions, MqttClient } from 'mqtt'
 import type { Server } from 'node:net'
 import { Application } from '@adonisjs/core/app'
-import { MigrationRunner } from '@adonisjs/lucid/migration'
 import fs from 'node:fs/promises'
 import { join } from 'node:path'
 import string from '@adonisjs/core/helpers/string'
@@ -23,6 +22,7 @@ import { MiliCron } from '@jakguru/milicron'
 import { init } from '#services/cron'
 import { PM3 } from '#services/pm3'
 import { HttpsService } from '#services/https'
+import { execa } from 'execa'
 
 const base = new URL('../', import.meta.url).pathname
 
@@ -121,11 +121,9 @@ export default class AppProvider {
       await this.#ipc.boot(logger as LoggerServiceWithConfig)
       const db = await this.app.container.make('lucid.db')
       const hash = await this.app.container.make('hash')
-      const migrator = new MigrationRunner(db, this.app, {
-        direction: 'up',
-      })
       logger.info('Updating Database...')
-      await migrator.run()
+      const { stdout } = await execa('node', ['ace', 'migration:run', '--force'], { cwd: base })
+      logger.info(stdout)
       const systemUserExists = await db.from('users').where('username', 'system').first()
       if (!systemUserExists) {
         await db.table('users').insert({
