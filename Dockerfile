@@ -109,7 +109,7 @@ RUN { \
     echo "VERSION=${VERSION}"; \
     echo "BUILDPLATFORM=${BUILDPLATFORM}"; \
     echo "SHA=${SHA}"; \
-    } > /home/node/app/.env
+    } > /home/node/app/version.txt
 USER node
 EXPOSE 2000
 EXPOSE 2001
