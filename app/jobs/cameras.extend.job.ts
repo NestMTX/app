@@ -49,6 +49,13 @@ export default class ExtendCameraStreamAuthenticationJob extends CronJob {
           logger.info(
             `Converted camera "${camera.name}" (${camera.id}) expiration to DateTime: ${camera.expiresAt.toISO()}`
           )
+        }
+        // @ts-ignore - this is a hack to get around the fact that the type of camera.expiresAt is not DateTime
+        else if (camera.expiresAt instanceof Date) {
+          camera.expiresAt = DateTime.fromJSDate(camera.expiresAt)
+          logger.info(
+            `Converted camera "${camera.name}" (${camera.id}) expiration to DateTime: ${camera.expiresAt.toISO()}`
+          )
         } else {
           logger.error(
             `Got unexpected type for camera "${camera.name}" (${camera.id}) expiration: ${typeof camera.expiresAt} ${inspect(camera.expiresAt, { depth: 20, colors: false })}`
