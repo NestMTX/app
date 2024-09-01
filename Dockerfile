@@ -44,6 +44,7 @@ RUN yarn config set network-timeout 300000 -g
 # Build the GUI
 ##################################################
 FROM base AS gui
+ARG VERSION=unknown
 ENV NODE_ENV=development
 COPY --chown=node:node ./gui/package*.json ./
 COPY --chown=node:node ./gui/npm* ./

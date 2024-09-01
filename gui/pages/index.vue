@@ -68,7 +68,7 @@
                         v-if="!p.pid"
                         icon
                         color="success-darken-2"
-                        :title="$t('action.start')"
+                        :title="$t('actions.start')"
                         :loading="actionsInProgress[p.name] === 'start'"
                         @click="doAction(p.name, 'start')"
                       >
@@ -78,7 +78,7 @@
                         v-if="!!p.pid"
                         icon
                         color="warning"
-                        :title="$t('action.restart')"
+                        :title="$t('actions.restart')"
                         :loading="actionsInProgress[p.name] === 'restart'"
                         @click="doAction(p.name, 'restart')"
                       >
@@ -88,7 +88,7 @@
                         v-if="!!p.pid"
                         icon
                         color="error"
-                        :title="$t('action.stop')"
+                        :title="$t('actions.stop')"
                         :loading="actionsInProgress[p.name] === 'stop'"
                         @click="doAction(p.name, 'stop')"
                       >

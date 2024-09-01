@@ -41,6 +41,9 @@ export default {
     save: 'Save',
     disable: 'Disable',
     enable: 'Enable',
+    restart: 'Restart',
+    start: 'Start',
+    stop: 'Stop',
   },
   validation: {
     bad: 'The value is not a valid {label}',

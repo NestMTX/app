@@ -275,7 +275,7 @@ export default defineComponent({
         },
       ] as ModelUpdateField[],
       id: modelIdToUpdate.value!,
-      updateEndPoint: '/api/users/',
+      updateEndPoint: '/api/users',
     }))
     const onModelUpdateSubmitted = () => {
       modelIdToUpdate.value = undefined
