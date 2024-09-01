@@ -91,9 +91,4 @@ If you attempt to access the feed for a disabled camera, a feed showing a messag
 </table>
 :::
 
-For more information on how to use these URL's, see the [integrations](/integrations/) guides:
-
-* [Frigate Integration](/integrations/frigate)
-* [Home Assistant Integration](/integrations/hass)
-* [Blue Iris Integration](/integrations/blue-iris)
-* [iSpy Agent DVR Integration](/integrations/ispy)
+For more information on how to use these URL's, see the [integration guides](/integrations/).

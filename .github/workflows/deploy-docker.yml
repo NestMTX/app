@@ -15,6 +15,11 @@ jobs:
         platform: [linux/amd64, linux/arm64/v8]
 
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
     - name: Checkout code
       uses: actions/checkout@v3
 
@@ -51,7 +56,7 @@ jobs:
         cache-to: type=local,dest=/home/runner/.cache/docker,mode=max
         build-args: |
           BUILDPLATFORM=${{ matrix.platform }}
-          VERSION=${{ github.ref_type == 'tag' && github.ref_name || github.ref }}
+          VERSION=${{ github.ref_type == 'tag' && github.ref_name || github.sha }}
         tags: |
           nestmtx/${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}:${{ github.ref_type == 'branch' && 'testing' || github.ref_name }}
           ${{ github.ref_type == 'tag' && 'nestmtx/' || '' }}${{ github.ref_type == 'tag' && (matrix.platform == 'linux/amd64' && 'amd64:latest' || matrix.platform == 'linux/arm64/v8' && 'arm64:latest') || '' }}
