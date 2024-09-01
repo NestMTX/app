@@ -44,9 +44,16 @@ export default class ExtendCameraStreamAuthenticationJob extends CronJob {
       // if the expiration date/time is within the next 2 minutes, extend it
       const inFiveMinutes = DateTime.now().plus({ minutes: 2 })
       if (!(camera.expiresAt instanceof DateTime)) {
-        logger.error(
-          `Got unexpected type for camera "${camera.name}" (${camera.id}) expiration: ${inspect(camera.expiresAt, { depth: 20, colors: false })}`
-        )
+        if ('string' === typeof camera.expiresAt) {
+          camera.expiresAt = DateTime.fromISO(camera.expiresAt)
+          logger.info(
+            `Converted camera "${camera.name}" (${camera.id}) expiration to DateTime: ${camera.expiresAt.toISO()}`
+          )
+        } else {
+          logger.error(
+            `Got unexpected type for camera "${camera.name}" (${camera.id}) expiration: ${typeof camera.expiresAt} ${inspect(camera.expiresAt, { depth: 20, colors: false })}`
+          )
+        }
       } else if (camera.expiresAt < inFiveMinutes) {
         logger.info(`Extending authentication for camera "${camera.name}" (${camera.id})`)
         await camera.extend()
