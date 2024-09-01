@@ -155,7 +155,7 @@ export class MediaMTXService {
       /**
        * Update the RTSP configuration
        */
-      rtsp: true === env.get('MEDIA_MTX_RTSP_ENABLED', true) ? true : false,
+      rtsp: true,
       encryption: 'no',
       protocols: ['tcp', 'udp'],
       rtspAddress: `${env.get('HOST')}:${env.get('MEDIA_MTX_RTSP_TCP_PORT', 8554)}`,
