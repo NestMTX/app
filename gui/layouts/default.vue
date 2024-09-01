@@ -7,9 +7,13 @@
         color="transparent"
         class="glass-surface"
       >
+        <v-toolbar-items v-if="smAndDown">
+          <v-btn icon @click="() => (showNav = !showNav)">
+            <v-icon>mdi-menu</v-icon>
+          </v-btn>
+        </v-toolbar-items>
         <img src="~/assets/icon.png" alt="NestMTX" class="ms-4" height="32" width="32" />
         <v-toolbar-title class="font-raleway font-weight-bold">NestMTX</v-toolbar-title>
-        <v-spacer />
         <I18nPicker />
         <ThemeToggle />
         <v-toolbar-items v-if="authenticated">
@@ -20,6 +24,7 @@
       </v-app-bar>
       <v-navigation-drawer
         v-if="complete && authenticated && !showSystemInfo"
+        v-model="showNav"
         app
         color="transparent"
         class="glass-surface"
@@ -74,18 +79,29 @@
 </template>
 
 <script lang="ts">
-import { defineComponent } from 'vue'
+import { defineComponent, ref, watch } from 'vue'
 import { useVueprint } from '@jakguru/vueprint/utilities'
 import LoginForm from '@/components/forms/login.vue'
 import SystemInfoDialog from '@/components/dialogs/systemInfo.vue'
 import { useI18n } from 'vue-i18n'
 import languages from '@/constants/languages'
 import { useRoute } from 'vue-router'
+import { useDisplay } from 'vuetify'
 import type { IdentityService } from '@jakguru/vueprint'
 export default defineComponent({
   name: 'DefaultLayout',
   components: { LoginForm, SystemInfoDialog },
   setup() {
+    const { smAndDown } = useDisplay()
+    const showNav = ref(false)
+    watch(
+      () => smAndDown.value,
+      (is) => {
+        if (is) {
+          showNav.value = false
+        }
+      }
+    )
     const localeRoute = useLocaleRoute()
     const { locale, t } = useI18n()
     const { mounted, booted, ready } = useVueprint({}, true)
@@ -134,6 +150,8 @@ export default defineComponent({
       navs,
       header,
       subtitle,
+      smAndDown,
+      showNav,
     }
   },
 })
