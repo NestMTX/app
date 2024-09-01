@@ -62,7 +62,13 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n({ useScope: 'global' })
     const fields = computed(() => props.fields)
-    const updateEndPoint = computed(() => props.updateEndPoint)
+    const updateEndPoint = computed(() => {
+      let endPoint = props.updateEndPoint
+      while (endPoint.endsWith('/')) {
+        endPoint = endPoint.slice(0, -1)
+      }
+      return endPoint
+    })
     const initialValues = Object.assign(
       {},
       ...[...fields.value].map((field) => ({ [field.key]: field.value || field.default }))
