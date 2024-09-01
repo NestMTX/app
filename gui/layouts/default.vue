@@ -103,7 +103,12 @@ export default defineComponent({
       (is) => {
         if (is) {
           showNav.value = false
+        } else {
+          showNav.value = true
         }
+      },
+      {
+        immediate: true,
       }
     )
     const localeRoute = useLocaleRoute()
