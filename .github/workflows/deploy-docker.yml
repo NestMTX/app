@@ -15,6 +15,11 @@ jobs:
         platform: [linux/amd64, linux/arm64/v8]
 
     steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
     - name: Checkout code
       uses: actions/checkout@v3
 
