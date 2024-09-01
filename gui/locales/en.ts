@@ -450,6 +450,9 @@ export default {
         uptime: 'Uptime',
       },
     },
+    debugInfo: {
+      title: 'Debug Information',
+    },
     credentials: {
       add: {
         title: 'Add Credentials',

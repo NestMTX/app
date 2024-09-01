@@ -145,6 +145,7 @@ export default defineComponent({
       if (logContainer.value) {
         logContainer.value.$el.scrollTop = logContainer.value.$el.scrollHeight
       } else {
+        // do nothing
       }
     }
     watch(

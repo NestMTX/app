@@ -92,6 +92,9 @@ RUN node ace mediamtx:install
 ##################################################
 FROM base AS production
 ENV NODE_ENV=production
+ARG VERSION=unknown
+ARG BUILDPLATFORM=local
+ARG SHA=unknown
 USER node
 COPY --from=production-dependencies /home/node/app/node_modules /home/node/app/node_modules
 COPY --from=build /home/node/app/build /home/node/app
@@ -102,6 +105,11 @@ COPY --from=gui /home/node/app/.output/public /home/node/app/public
 COPY --from=build /home/node/mediamtx /home/node/mediamtx
 USER root
 RUN chown -R node:node /home/node
+RUN { \
+    echo "VERSION=${VERSION}"; \
+    echo "BUILDPLATFORM=${BUILDPLATFORM}"; \
+    echo "SHA=${SHA}"; \
+    } > /home/node/app/.env
 USER node
 EXPOSE 2000
 EXPOSE 2001

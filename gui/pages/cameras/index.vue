@@ -346,6 +346,7 @@ export default defineComponent({
         })
       }
       cloudSyncRunning.value = false
+      refreshEveryMinute()
     }
     const refreshEveryMinute = () => {
       if (modelIndex.value) {

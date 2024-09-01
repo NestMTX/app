@@ -34,6 +34,9 @@ process.env.MEDIA_MTX_SRT_PORT = '8890'
 process.env.GSTREAMER_BIN = 'gst-launch-1.0'
 process.env.FFMPEG_BIN = 'ffmpeg'
 process.env.IP_RESOLVERS_ENABLED = process.env.IP_RESOLVERS_ENABLED || 'cloudflare,aws,httpBin'
+process.env.VERSION = process.env.VERSION || 'source'
+process.env.BUILDPLATFORM = process.env.BUILDPLATFORM || 'local'
+process.env.SHA = process.env.SHA || 'unknown'
 
 /**
  * URL to the application root. AdonisJS need it to resolve

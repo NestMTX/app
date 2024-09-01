@@ -56,9 +56,9 @@
       </v-main>
       <v-footer app color="transparent" class="glass-surface text-center d-flex flex-column">
         <v-tabs :model-value="null" hide-slider>
-          <v-tab hide-slider href="https://github.com/NestMTX/app/releases" target="_blank">{{
-            version
-          }}</v-tab>
+          <v-tab hide-slider @click="doShowDebugInfo">
+            {{ showVersion }}
+          </v-tab>
           <v-tab hide-slider href="https://nestmtx.com" target="_blank">Docs</v-tab>
           <v-tab hide-slider href="https://discord.gg/hMAEuNa4Fd" target="_blank">Community</v-tab>
         </v-tabs>
@@ -69,6 +69,72 @@
           <ThemeToggle />
         </template>
       </SystemInfoDialog>
+      <v-dialog v-model="showDebugInfo" opacity="0" max-width="800">
+        <v-card color="transparent" class="glass-surface">
+          <v-toolbar color="transparent">
+            <v-toolbar-title class="font-raleway font-weight-bold">{{
+              $t('dialogs.debugInfo.title')
+            }}</v-toolbar-title>
+            <v-spacer />
+            <slot name="toolbar" />
+            <v-toolbar-items>
+              <v-btn icon @click="doShowDebugInfo">
+                <v-icon>mdi-refresh</v-icon>
+              </v-btn>
+              <v-btn icon @click="showDebugInfo = false">
+                <v-icon>mdi-close</v-icon>
+              </v-btn>
+            </v-toolbar-items>
+          </v-toolbar>
+          <v-divider />
+          <v-table style="background: transparent">
+            <tbody>
+              <tr>
+                <th>Release</th>
+                <td>
+                  <code>{{ debugInfo.release }}</code>
+                </td>
+              </tr>
+              <tr>
+                <th>Commit</th>
+                <td>
+                  <code>{{ debugInfo.commit }}</code>
+                </td>
+              </tr>
+              <tr>
+                <th>CPU Arch</th>
+                <td>
+                  <code>{{ debugInfo.platform }}</code>
+                </td>
+              </tr>
+              <tr>
+                <th>Database</th>
+                <td>
+                  <code>{{ debugInfo.database }}</code>
+                </td>
+              </tr>
+              <tr>
+                <th>MediaMTX</th>
+                <td>
+                  <code>{{ debugInfo.mediamtx }}</code>
+                </td>
+              </tr>
+              <tr>
+                <th>GStreamer</th>
+                <td>
+                  <code>{{ debugInfo.gstreamer }}</code>
+                </td>
+              </tr>
+              <tr>
+                <th>FFMpeg</th>
+                <td>
+                  <code>{{ debugInfo.ffmpeg }}</code>
+                </td>
+              </tr>
+            </tbody>
+          </v-table>
+        </v-card>
+      </v-dialog>
     </v-locale-provider>
     <v-fab
       v-if="!showSystemInfo"
@@ -82,7 +148,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, computed } from 'vue'
+import { defineComponent, ref, watch, computed, inject } from 'vue'
 import { useVueprint } from '@jakguru/vueprint/utilities'
 import LoginForm from '@/components/forms/login.vue'
 import SystemInfoDialog from '@/components/dialogs/systemInfo.vue'
@@ -90,12 +156,24 @@ import { useI18n } from 'vue-i18n'
 import languages from '@/constants/languages'
 import { useRoute } from 'vue-router'
 import { useDisplay } from 'vuetify'
-import type { IdentityService } from '@jakguru/vueprint'
+import type { IdentityService, ApiService } from '@jakguru/vueprint'
 export default defineComponent({
   name: 'DefaultLayout',
   components: { LoginForm, SystemInfoDialog },
   setup() {
-    const version = computed(() => import.meta.env.VERSION)
+    const version = computed(() => import.meta.env.VERSION || 'source')
+    const showVersion = computed(() => version.value.substring(0, 7))
+    const showDebugInfo = ref(false)
+    const debugInfo = ref<Record<string, string>>({})
+    const api = inject<ApiService>('api')!
+    const doShowDebugInfo = async (e: MouseEvent) => {
+      e.preventDefault()
+      showDebugInfo.value = true
+      const { status, data } = await api.get('/api/version')
+      if (status === 200) {
+        debugInfo.value = data
+      }
+    }
     const { smAndDown } = useDisplay()
     const showNav = ref(false)
     watch(
@@ -162,6 +240,10 @@ export default defineComponent({
       smAndDown,
       showNav,
       version,
+      showVersion,
+      showDebugInfo,
+      doShowDebugInfo,
+      debugInfo,
     }
   },
 })
