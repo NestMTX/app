@@ -232,7 +232,7 @@ export class PM3 extends EventEmitter<PM3ProcessEventMap> {
     }
   }
 
-  async stop(name: string, signal: NodeJS.Signals | number = 'SIGTERM') {
+  async stop(name: string, _signal: NodeJS.Signals | number = 'SIGTERM') {
     this.#debug(`Stopping process: ${name}`)
     if (!this.#desired.has(name)) {
       this.#debug(`No process with name ${name} exists`)

@@ -84,6 +84,7 @@ export default defineConfig({
               { text: 'Scrypted', link: '/integrations/scrypted' },
               { text: 'Shinobi', link: '/integrations/shinobi' },
               { text: 'Zoneminder', link: '/integrations/zoneminder' },
+              { text: 'Synology', link: '/integrations/synology' },
             ],
             collapsed: true
           },

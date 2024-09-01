@@ -13,6 +13,7 @@ Don't see a tutorial for the system you want to integrate? You can [open a Githu
 * [How to integrate with Scrypted](/integrations/scrypted)
 * [How to integrate with Shinobi](/integrations/shinobi)
 * [How to integrate with Zoneminder](/integrations/zoneminder)
+* [How to integrate with Synology](/integrations/synology)
 
 ## Automation Platforms
 
