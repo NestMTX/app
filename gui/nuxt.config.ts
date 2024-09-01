@@ -142,6 +142,10 @@ export default defineNuxtConfig({
     optimizeDeps: {
       // exclude: ['sweetalert2'],
     },
+    define: {
+      'process.env.VERSION': JSON.stringify(process.env.VERSION || 'source'),
+      'import.meta.env.VERSION': JSON.stringify(process.env.VERSION || 'source'),
+    },
   },
 
   modules: [

@@ -56,6 +56,9 @@
       </v-main>
       <v-footer app color="transparent" class="glass-surface text-center d-flex flex-column">
         <v-tabs :model-value="null" hide-slider>
+          <v-tab hide-slider href="https://github.com/NestMTX/app/releases" target="_blank">{{
+            version
+          }}</v-tab>
           <v-tab hide-slider href="https://nestmtx.com" target="_blank">Docs</v-tab>
           <v-tab hide-slider href="https://discord.gg/hMAEuNa4Fd" target="_blank">Community</v-tab>
         </v-tabs>
@@ -79,7 +82,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch } from 'vue'
+import { defineComponent, ref, watch, computed } from 'vue'
 import { useVueprint } from '@jakguru/vueprint/utilities'
 import LoginForm from '@/components/forms/login.vue'
 import SystemInfoDialog from '@/components/dialogs/systemInfo.vue'
@@ -92,6 +95,7 @@ export default defineComponent({
   name: 'DefaultLayout',
   components: { LoginForm, SystemInfoDialog },
   setup() {
+    const version = computed(() => import.meta.env.VERSION)
     const { smAndDown } = useDisplay()
     const showNav = ref(false)
     watch(
@@ -152,6 +156,7 @@ export default defineComponent({
       subtitle,
       smAndDown,
       showNav,
+      version,
     }
   },
 })
