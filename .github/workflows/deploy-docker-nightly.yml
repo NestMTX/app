@@ -1,0 +1,60 @@
+name: Build and Push Docker Images
+
+on:
+  push:
+    branches:
+      - nightly
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: [linux/amd64, linux/arm64/v8]
+
+    steps:
+    - name: Remove unnecessary files
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      with:
+        buildkitd-flags: --allow-insecure-entitlement security.insecure --allow-insecure-entitlement network.host
+
+    - name: Cache Docker layers
+      uses: actions/cache@v3
+      with:
+        path: /home/runner/.cache/docker
+        key: ${{ runner.os }}-docker-${{ matrix.platform }}-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-docker-${{ matrix.platform }}-
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        platforms: ${{ matrix.platform }}
+        push: true
+        cache-from: type=local,src=/home/runner/.cache/docker
+        cache-to: type=local,dest=/home/runner/.cache/docker,mode=max
+        build-args: |
+          BUILDPLATFORM=${{ matrix.platform }}
+          VERSION=${{ github.ref_type == 'tag' && github.ref_name || github.sha }}
+        tags: |
+          nestmtx/${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}:${{ github.ref_type == 'branch' && 'nightly' || github.ref_name }}
+          ${{ github.ref_type == 'tag' && 'nestmtx/' || '' }}${{ github.ref_type == 'tag' && (matrix.platform == 'linux/amd64' && 'amd64:latest' || matrix.platform == 'linux/arm64/v8' && 'arm64:latest') || '' }}
