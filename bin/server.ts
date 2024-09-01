@@ -18,6 +18,9 @@ process.env.HOST = '0.0.0.0'
 process.env.APP_KEY = process.env.APP_KEY || '2yHkmRqv832ze68zwyIOtBpwzSHIrVzV'
 process.env.LOG_LEVEL = 'info'
 process.env.NODE_ENV = process.env.NODE_ENV || 'development'
+process.env.VERSION = process.env.VERSION || 'source'
+process.env.BUILDPLATFORM = process.env.BUILDPLATFORM || 'local'
+process.env.SHA = process.env.SHA || 'unknown'
 
 /**
  * URL to the application root. AdonisJS need it to resolve
