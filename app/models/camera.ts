@@ -482,13 +482,13 @@ export default class Camera extends BaseModel {
     return `${width}x${height}`
   }
 
-  get #videoWidth() {
-    return this.resolution ? Number.parseInt(this.resolution.split('x')[0]) : null
-  }
+  // get #videoWidth() {
+  //   return this.resolution ? Number.parseInt(this.resolution.split('x')[0]) : null
+  // }
 
-  get #videoHeight() {
-    return this.resolution ? Number.parseInt(this.resolution.split('x')[1]) : null
-  }
+  // get #videoHeight() {
+  //   return this.resolution ? Number.parseInt(this.resolution.split('x')[1]) : null
+  // }
 
   get #videoCodecs() {
     return Array.isArray(this.#dottedTraits['sdm.devices.traits.CameraLiveStream.videoCodecs'])
