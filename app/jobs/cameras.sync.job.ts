@@ -72,7 +72,7 @@ export default class SyncCloudCamerasJob extends CronJob {
         if ('string' === typeof device.name) {
           let camera = await Camera.query()
             .where('credential_id', credential.id)
-            .where('uid', device.name)
+            .where('checksum', makeChecksum(device.name))
             .first()
           if (!camera) {
             camera = new Camera()

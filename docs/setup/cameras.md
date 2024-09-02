@@ -22,6 +22,7 @@ The Cameras list has the following columns:
 | **Name**           | The name as identified in the Nest or Google Home Application.                                                                                                        |
 | **Path**           | The MTX Path that the camera's stream will be made accessble on                                                                                                       |
 | **Enabled**        | When set as disabled, any clients attempting to access the stream of the camera <br />will see a "Camera Disabled" stream instead of the video stream from the camera |
+| **Persistent**     | When set as enabled, NestMTX will start streaming the camera automatically regardless of if there are any consumers of the feed.                                      |
 | **Type**           | Icon(s) representing the inferred device type based on the device's traits.                                                                                           |
 | **Protocols**      | The protocols which NestMTX is able to access for the device.                                                                                                         |
 | **Resolution**     | The reported resolution of the device, if available.                                                                                                                  |

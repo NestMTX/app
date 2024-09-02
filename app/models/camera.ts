@@ -60,6 +60,7 @@ export class IceCandidateError extends Error {
 }
 
 import type { smartdevicemanagement_v1 } from 'googleapis'
+import { inspect } from 'node:util'
 
 type CameraModel =
   | 'Nest Cam (legacy)'
@@ -105,35 +106,14 @@ export default class Camera extends BaseModel {
   @column({ serializeAs: null })
   declare streamExtensionToken: string | null
 
-  @column({ serializeAs: 'is_enabled' })
+  @column({ serializeAs: 'is_enabled', consume: Boolean, prepare: Boolean })
   declare isEnabled: boolean
 
-  @column({ serializeAs: 'is_persistent' })
+  @column({ serializeAs: 'is_persistent', consume: Boolean, prepare: Boolean })
   declare isPersistent: boolean
 
-  @column({
+  @column.dateTime({
     serializeAs: 'expires_at',
-    consume: (value: any) => {
-      if ('string' === typeof value) {
-        return DateTime.fromISO(value)
-      } else if (value instanceof Date) {
-        return DateTime.fromJSDate(value)
-      } else if (value instanceof DateTime) {
-        return value
-      } else {
-        return null
-      }
-    },
-    prepare: (value: any) => {
-      if (value instanceof DateTime) {
-        return value.toISO()
-      } else if (value instanceof Date) {
-        return DateTime.fromJSDate(value).toISO()
-      } else if ('string' === typeof value) {
-        return value
-      }
-      return null
-    },
   })
   declare expiresAt: DateTime | null
 
@@ -808,6 +788,8 @@ export default class Camera extends BaseModel {
   }
 
   async extend() {
+    const mainLogger = await app.container.make('logger')
+    const logger = mainLogger.child({ service: `camera-${this.id}` })
     try {
       await (this as Camera).load('credential')
     } catch {
@@ -849,6 +831,7 @@ export default class Camera extends BaseModel {
     } else {
       throw new Error('No supported protocols found')
     }
+    logger.info(`Requesting authentication extension from Google with command ${command}`)
     const {
       data: { results },
     } = await service.enterprises.devices.executeCommand({
@@ -863,15 +846,19 @@ export default class Camera extends BaseModel {
     if (!results || !results[key]) {
       throw new Error('Failed to extend stream')
     }
+    logger.info(
+      `Got results: ${inspect(results, { depth: 20, colors: false })}. Setting token from property ${key} to ${results[key]}`
+    )
     this.streamExtensionToken = results[key]
-    if (results!.expiresAt) {
-      const expiresAt = DateTime.fromISO(results!.expiresAt)
-      if (expiresAt.isValid) {
-        this.expiresAt = expiresAt
-      }
-    } else {
-      this.expiresAt = null
-    }
+    // if (results!.expiresAt) {
+    //   const expiresAt = DateTime.fromISO(results!.expiresAt)
+    //   if (expiresAt.isValid) {
+    //     this.expiresAt = expiresAt
+    //   }
+    // } else {
+    //   this.expiresAt = null
+    // }
+    this.expiresAt = DateTime.utc().plus({ minutes: 5 })
     await this.save()
   }
 
@@ -976,8 +963,9 @@ export default class Camera extends BaseModel {
         arguments: args,
         restart: false,
       })
+      logger.info('Added GStreamer process for WebRTC stream')
     } catch (error) {
-      logger.error(error)
+      logger.error(`Error adding GStreamer for WebRTC process: ${(error as Error).message}`)
       throw error
     }
 
@@ -1179,14 +1167,15 @@ export default class Camera extends BaseModel {
       throw new Error('Media Session ID not found')
     }
     this.streamExtensionToken = results!.mediaSessionId
-    if (results!.expiresAt) {
-      const expiresAt = DateTime.fromISO(results!.expiresAt)
-      if (expiresAt.isValid) {
-        this.expiresAt = expiresAt
-      }
-    } else {
-      this.expiresAt = null
-    }
+    // if (results!.expiresAt) {
+    //   const expiresAt = DateTime.fromISO(results!.expiresAt)
+    //   if (expiresAt.isValid) {
+    //     this.expiresAt = expiresAt
+    //   }
+    // } else {
+    //   this.expiresAt = null
+    // }
+    this.expiresAt = DateTime.utc().plus({ minutes: 5 })
     await this.save()
 
     await pc.setRemoteDescription({
@@ -1220,14 +1209,17 @@ export default class Camera extends BaseModel {
     }
 
     this.streamExtensionToken = results!.streamExtensionToken
-    if (results!.expiresAt) {
-      const expiresAt = DateTime.fromISO(results!.expiresAt)
-      if (expiresAt.isValid) {
-        this.expiresAt = expiresAt
-      }
-    } else {
-      this.expiresAt = null
-    }
+    // if (results!.expiresAt) {
+    //   const expiresAt = DateTime.fromISO(results!.expiresAt)
+    //   if (expiresAt.isValid) {
+    //     this.expiresAt = expiresAt
+    //   } else {
+    //     logger.warn(`Got invalid expiresAt: ${results!.expiresAt}`)
+    //   }
+    // } else {
+    //   this.expiresAt = null
+    // }
+    this.expiresAt = DateTime.utc().plus({ minutes: 5 })
     await this.save()
 
     const rtspUrl = results!.streamUrls.rtspUrl
@@ -1260,9 +1252,9 @@ export default class Camera extends BaseModel {
         arguments: args,
         restart: false,
       })
+      logger.info('Starting GStreamer process for RTSP stream')
     } catch (error) {
-      logger.error('Error starting GStreamer process:', error)
+      logger.error(`Error starting GStreamer for RTSP process: ${(error as Error).message}`)
     }
-    logger.info('Starting GStreamer process for RTSP stream')
   }
 }
