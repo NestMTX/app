@@ -19,6 +19,7 @@ import { RTCPeerConnection, RTCRtpCodecParameters } from 'werift'
 import { pickPort } from 'pick-port'
 import { createSocket } from 'node:dgram'
 import { EventEmitter } from 'node:events'
+import { execa } from 'execa'
 
 dot.keepArray = true
 
@@ -32,6 +33,29 @@ interface PickPortOptions {
   minPort?: number
   maxPort?: number
   reserveTimeout?: number
+}
+
+interface RtspStreamInfo {
+  streamID?: string
+  width?: number
+  height?: number
+  depth?: number
+  frameRate?: string
+  pixelAspectRatio?: string
+  interlaced?: boolean
+  bitrate?: number
+  maxBitrate?: number
+  language?: string
+  channels?: number
+  sampleRate?: number
+}
+
+interface RtspStreamCharacteristics {
+  video: RtspStreamInfo
+  audio: RtspStreamInfo
+  duration?: string
+  seekable?: boolean
+  live?: boolean
 }
 
 const makeChecksum = (data: string) => {
@@ -850,15 +874,13 @@ export default class Camera extends BaseModel {
       `Got results: ${inspect(results, { depth: 20, colors: false })}. Setting token from property ${key} to ${results[key]}`
     )
     this.streamExtensionToken = results[key]
-    // if (results!.expiresAt) {
-    //   const expiresAt = DateTime.fromISO(results!.expiresAt)
-    //   if (expiresAt.isValid) {
-    //     this.expiresAt = expiresAt
-    //   }
-    // } else {
-    //   this.expiresAt = null
-    // }
     this.expiresAt = DateTime.utc().plus({ minutes: 5 })
+    if (results!.expiresAt) {
+      const expiresAt = DateTime.fromISO(results!.expiresAt)
+      if (expiresAt.isValid) {
+        this.expiresAt = expiresAt
+      }
+    }
     await this.save()
   }
 
@@ -1167,26 +1189,114 @@ export default class Camera extends BaseModel {
       throw new Error('Media Session ID not found')
     }
     this.streamExtensionToken = results!.mediaSessionId
-    // if (results!.expiresAt) {
-    //   const expiresAt = DateTime.fromISO(results!.expiresAt)
-    //   if (expiresAt.isValid) {
-    //     this.expiresAt = expiresAt
-    //   }
-    // } else {
-    //   this.expiresAt = null
-    // }
     this.expiresAt = DateTime.utc().plus({ minutes: 5 })
+    if (results!.expiresAt) {
+      const expiresAt = DateTime.fromISO(results!.expiresAt)
+      if (expiresAt.isValid) {
+        this.expiresAt = expiresAt
+      }
+    }
     await this.save()
 
     await pc.setRemoteDescription({
       type: 'answer',
       sdp: results!.answerSdp,
     })
-
-    // await Promise.all([peerConnected, videoRtpSending, audioRtpSending])
-    // logger.info('WebRTC Peer connection established. Starting GStreamer process for WebRTC stream')
     await Promise.all([videoRtpSending, audioRtpSending])
     logger.info('Starting GStreamer process for WebRTC stream')
+  }
+
+  async #getRtspStreamCharacteristics(url: string) {
+    try {
+      const { stdout } = await execa('gst-discoverer-1.0', [url], {
+        reject: true,
+      })
+
+      const characteristics: RtspStreamCharacteristics = {
+        audio: {},
+        video: {},
+      }
+
+      // Parse the output for key stream characteristics
+      const toCamelCase = (str: string) =>
+        str
+          .replace(/(?:^\w|[A-Z]|\b\w)/g, (word, index) =>
+            index === 0 ? word.toLowerCase() : word.toUpperCase()
+          )
+          .replace(/\s+/g, '')
+      const toInteger = (str: string) => Number.parseInt(str.replace(/\D/g, ''))
+      const toBoolean = (str: string) => str === 'true' || str === 'yes'
+      const lines = stdout.split('\n')
+      let reachedProperties = false
+      const goodLines: Array<{ key: string; value: string; spaces: number }> = []
+      for (const line of lines) {
+        // get the number of preceeding spaces
+        const match = line.match(/^\s*/)
+        const spaces = match ? match[0].length : 0
+        reachedProperties = reachedProperties || line.includes('Properties:')
+        if (!reachedProperties) continue
+        const parts = line.split(':')
+        const key = parts.shift()?.trim()
+        const value = parts.join(':').trim()
+        if (key) {
+          goodLines.push({ key, value, spaces })
+        }
+      }
+      goodLines.forEach((line: { key: string; value: any; spaces: number }, i) => {
+        switch (toCamelCase(line.key)) {
+          case 'channels':
+          case 'sampleRate':
+          case 'depth':
+          case 'bitrate':
+          case 'maxBitrate':
+          case 'width':
+          case 'height':
+            line.value = toInteger(line.value)
+            break
+
+          case 'interlaced':
+          case 'seekable':
+          case 'live':
+            line.value = toBoolean(line.value)
+            break
+        }
+        if (line.spaces === 2 && !line.key.includes('container')) {
+          // @ts-ignore - we've confused typescript
+          characteristics[toCamelCase(line.key) as keyof RtspStreamCharacteristics] = line.value
+        }
+        if (line.spaces > 6) {
+          // find the parent entry which will have 6 spaces
+          const parent = goodLines
+            .slice(0, i)
+            .reverse()
+            .find((l) => l.spaces === 6)
+          if (parent) {
+            if (parent.key.includes('video')) {
+              // @ts-ignore - we've confused typescript
+              characteristics.video[toCamelCase(line.key) as keyof RtspStreamInfo] = line.value
+            }
+            if (parent.key.includes('audio')) {
+              // @ts-ignore - we've confused typescript
+              characteristics.audio[toCamelCase(line.key) as keyof RtspStreamInfo] = line.value
+            }
+          }
+        }
+      })
+      // Add validation checks
+      if (
+        characteristics.video?.width === 0 ||
+        characteristics.video?.height === 0 ||
+        characteristics.video?.frameRate === '0/1' ||
+        characteristics.audio?.channels === 0 ||
+        characteristics.audio?.sampleRate === 0
+      ) {
+        throw new Error('Invalid stream characteristics detected.')
+      }
+
+      return characteristics
+    } catch (error) {
+      throw error
+    }
   }
 
   async #startRTSP(service: smartdevicemanagement_v1.Smartdevicemanagement) {
@@ -1209,42 +1319,57 @@ export default class Camera extends BaseModel {
     }
 
     this.streamExtensionToken = results!.streamExtensionToken
-    // if (results!.expiresAt) {
-    //   const expiresAt = DateTime.fromISO(results!.expiresAt)
-    //   if (expiresAt.isValid) {
-    //     this.expiresAt = expiresAt
-    //   } else {
-    //     logger.warn(`Got invalid expiresAt: ${results!.expiresAt}`)
-    //   }
-    // } else {
-    //   this.expiresAt = null
-    // }
     this.expiresAt = DateTime.utc().plus({ minutes: 5 })
+    if (results!.expiresAt) {
+      const expiresAt = DateTime.fromISO(results!.expiresAt)
+      if (expiresAt.isValid) {
+        this.expiresAt = expiresAt
+      } else {
+        logger.warn(`Got invalid expiresAt: ${results!.expiresAt}`)
+      }
+    }
     await this.save()
 
     const rtspUrl = results!.streamUrls.rtspUrl
     const gstreamerBinary = env.get('GSTREAMER_BIN', 'gst-launch-1.0')
     const outputRtspUrl = `rtsp://127.0.0.1:${env.get('MEDIA_MTX_RTSP_TCP_PORT', 8554)}/${this.mtxPath}`
 
+    const characteristics = await this.#getRtspStreamCharacteristics(rtspUrl)
+    if (
+      !characteristics.video?.width ||
+      !characteristics.video?.height ||
+      !characteristics.video?.frameRate
+    ) {
+      throw new Error('Missing stream characteristics')
+    }
+
     const args = [
-      '-q', // Quiet mode
-      '--gst-debug-level=2', // Log level set to WARNING
+      '-v', // Verbose mode
+      '--gst-debug-level=3', // Increase log level to DEBUG
       'rtspsrc',
       `location=${rtspUrl}`,
-      'latency=0',
+      'protocols=tcp', // Force the input connection to use TCP
+      'latency=500',
       '!',
       'rtpjitterbuffer',
+      'latency=1000',
       '!',
       'rtph264depay',
       '!',
       'h264parse',
       '!',
-      'queue',
+      'capsfilter',
+      `caps=video/x-h264,profile=main,width=${characteristics.video.width},height=${characteristics.video.height},framerate=${characteristics.video.frameRate}`,
+      '!',
+      'rtph264pay',
       '!',
       'rtspclientsink',
       `location=${outputRtspUrl}`,
+      'protocols=tcp', // Force the output connection to use TCP
       'async-handling=true',
     ]
+
+    logger.info([gstreamerBinary, ...args].join(' '))
 
     try {
       await app.pm3.add(this.#streamProcessName, {
