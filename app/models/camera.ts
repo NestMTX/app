@@ -20,6 +20,7 @@ import { pickPort } from 'pick-port'
 import { createSocket } from 'node:dgram'
 import { EventEmitter } from 'node:events'
 import { execa } from 'execa'
+import { MissingStreamCharacteristicsException } from '#exceptions/missing_stream_characteristics_exception'
 
 dot.keepArray = true
 
@@ -56,6 +57,7 @@ interface RtspStreamCharacteristics {
   duration?: string
   seekable?: boolean
   live?: boolean
+  raw: string
 }
 
 const makeChecksum = (data: string) => {
@@ -1235,6 +1237,7 @@ export default class Camera extends BaseModel {
       const characteristics: RtspStreamCharacteristics = {
         audio: {},
         video: {},
+        raw: stdout,
       }
 
       // Parse the output for key stream characteristics
@@ -1360,12 +1363,22 @@ export default class Camera extends BaseModel {
     const outputRtspUrl = `rtsp://127.0.0.1:${env.get('MEDIA_MTX_RTSP_TCP_PORT', 8554)}/${this.mtxPath}`
 
     const characteristics = await this.#getRtspStreamCharacteristics(rtspSrc)
-    if (
-      !characteristics.video?.width ||
-      !characteristics.video?.height ||
-      !characteristics.video?.frameRate
-    ) {
-      throw new Error('Missing stream characteristics')
+    const missingCharacteristics = []
+
+    if (!characteristics.video?.width) {
+      missingCharacteristics.push('video.width')
+    }
+
+    if (!characteristics.video?.height) {
+      missingCharacteristics.push('video.height')
+    }
+
+    if (!characteristics.video?.frameRate) {
+      missingCharacteristics.push('video.frameRate')
+    }
+
+    if (missingCharacteristics.length > 0) {
+      throw new MissingStreamCharacteristicsException(missingCharacteristics, characteristics)
     }
 
     const inputVideoCodec = 'h264' // Assuming H264 is always used for video
@@ -1386,6 +1399,8 @@ export default class Camera extends BaseModel {
     const args = [
       '-loglevel',
       'warning',
+      '-fflags',
+      'nobuffer', // Disable input buffering
       '-listen_timeout',
       '-1',
       '-timeout',
@@ -1397,9 +1412,9 @@ export default class Camera extends BaseModel {
       '-i',
       rtspSrc, // Input RTSP stream
       '-rtsp_transport',
-      'tcp', // Use TCP for RTSP
-      '-rtsp_flags',
-      'prefer_tcp', // Prefer TCP for RTSP
+      'udp', // Use TCP for RTSP
+      // '-rtsp_flags',
+      // 'prefer_tcp', // Prefer TCP for RTSP
       '-rtpflags',
       'skip_rtcp', // Skip RTCP packets
       ...resolutionArgs, // Include resolution if known
@@ -1419,16 +1434,22 @@ export default class Camera extends BaseModel {
       'ultrafast', // Prioritize encoding speed
       '-tune',
       'zerolatency', // Reduce latency
+      '-pix_fmt',
+      'yuv420p', // Set pixel format to fix deprecated warning
+      '-maxrate',
+      '2M', // Set maximum bitrate to avoid VBV error
       '-bufsize',
-      '1M', // Buffer size for reducing latency
+      '512k', // Keep buffer size small
       '-threads',
       '1', // Limit the number of threads to manage CPU load
-      '-vsync',
+      '-fps_mode',
       'cfr', // Ensure constant frame rate (CFR)
       '-f',
       'rtsp', // Output format
       '-rtsp_transport',
-      'tcp', // Use TCP for RTSP
+      'udp', // Use TCP for RTSP
+      '-use_wallclock_as_timestamps',
+      '1',
       outputRtspUrl, // Output RTSP stream
     ]
 

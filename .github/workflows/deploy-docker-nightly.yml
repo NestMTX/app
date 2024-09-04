@@ -43,6 +43,16 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-docker-${{ matrix.platform }}-
 
+    - name: Notify Discord on successful build
+      if: ${{ success() }}  # Only runs if the build was successful
+      run: |
+        SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
+        curl -H "Content-Type: application/json" \
+        -d "{\"content\": \"Nightly Build `$SHORT_SHA` is starting\"}" \
+        ${DISCORD_WEBHOOK}
+      env:
+        DISCORD_WEBHOOK: ${{ secrets.DISCORD_NIGHTLY_WEBHOOK }}
+
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
@@ -65,7 +75,7 @@ jobs:
       run: |
         SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
         curl -H "Content-Type: application/json" \
-        -d "{\"content\": \"Nightly Build $SHORT_SHA has been released\"}" \
+        -d "{\"content\": \"Nightly Build `$SHORT_SHA` has been released\"}" \
         ${DISCORD_WEBHOOK}
       env:
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_NIGHTLY_WEBHOOK }}
