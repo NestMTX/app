@@ -24,8 +24,8 @@ export class GStreamerService {
   readonly #shuttingDownProcesses: Set<string>
   readonly #undemandTimeouts: Map<string, NodeJS.Timeout>
   #logger?: Logger
-  // #ffmpegHwAccelerator?: string
-  // #ffmpegHwAcceleratorDevice?: string
+  #ffmpegHwAccelerator?: string
+  #ffmpegHwAcceleratorDevice?: string
 
   constructor(app: ApplicationService) {
     this.#app = app
@@ -42,8 +42,16 @@ export class GStreamerService {
     return [...this.#shuttingDownProcesses]
   }
 
+  get ffmpegHwAccelerator() {
+    return this.#ffmpegHwAccelerator
+  }
+
+  get ffmpegHwAcceleratorDevice() {
+    return this.#ffmpegHwAcceleratorDevice
+  }
+
   async boot(logger: LoggerService, _nat: NATService, _ice: ICEService, pm3: PM3, ipc: IPCService) {
-    this.#logger = logger.child({ service: 'gstreamer' })
+    this.#logger = logger.child({ service: 'streamer' })
     const gstreamerBinary = env.get('GSTREAMER_BIN', 'gst-launch-1.0')
     const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
     this.#logger.info(`Checking for GStreamer Binary`)
@@ -60,20 +68,20 @@ export class GStreamerService {
       throw new Error(`FFmpeg binary not found`)
     }
     this.#logger.info(`FFmpeg Binary Confirmed`)
-    // const ffmpegHwAccelerator = env.get('FFMPEG_HW_ACCELERATOR')
-    // const ffmpegHwAcceleratorDevice = env.get('FFMPEG_HW_ACCELERATOR_DEVICE')
-    // if (ffmpegHwAccelerator) {
-    //   const availableHwAccelerators = await this.#getAvailableHwAccelerators()
-    //   if (availableHwAccelerators.includes(ffmpegHwAccelerator)) {
-    //     this.#ffmpegHwAccelerator = ffmpegHwAccelerator
-    //     this.#ffmpegHwAcceleratorDevice = ffmpegHwAcceleratorDevice
-    //     this.#logger.info(`FFmpeg HW Accelerator "${ffmpegHwAccelerator}" is available`)
-    //   } else {
-    //     this.#logger.error(
-    //       `FFmpeg HW Accelerator "${ffmpegHwAccelerator}" is not available and will not be used`
-    //     )
-    //   }
-    // }
+    const ffmpegHwAccelerator = env.get('FFMPEG_HW_ACCELERATOR')
+    const ffmpegHwAcceleratorDevice = env.get('FFMPEG_HW_ACCELERATOR_DEVICE')
+    if (ffmpegHwAccelerator) {
+      const availableHwAccelerators = await this.#getAvailableHwAccelerators()
+      if (availableHwAccelerators.includes(ffmpegHwAccelerator)) {
+        this.#ffmpegHwAccelerator = ffmpegHwAccelerator
+        this.#ffmpegHwAcceleratorDevice = ffmpegHwAcceleratorDevice
+        this.#logger.info(`FFmpeg HW Accelerator "${ffmpegHwAccelerator}" is available`)
+      } else {
+        this.#logger.error(
+          `FFmpeg HW Accelerator "${ffmpegHwAccelerator}" is not available and will not be used`
+        )
+      }
+    }
     ipc.on('demand', this.#onDemand.bind(this))
     ipc.on('unDemand', this.#onUnDemand.bind(this))
     this.#logger.info(`GStreamer Service booted`)
@@ -81,15 +89,15 @@ export class GStreamerService {
     pm3.on('log:err', this.#logProcessToError)
   }
 
-  // async #getAvailableHwAccelerators() {
-  //   const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
-  //   const { stdout } = await execa(ffmpegBinary, ['-hwaccels'])
-  //   return stdout
-  //     .split('\n')
-  //     .filter((line) => line.length > 0)
-  //     .map((line) => line.trim())
-  //     .filter((l) => l !== 'Hardware acceleration methods:')
-  // }
+  async #getAvailableHwAccelerators() {
+    const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
+    const { stdout } = await execa(ffmpegBinary, ['-hwaccels'])
+    return stdout
+      .split('\n')
+      .filter((line) => line.length > 0)
+      .map((line) => line.trim())
+      .filter((l) => l !== 'Hardware acceleration methods:')
+  }
 
   // #logToInfo = (data: string) => {
   //   if (this.#logger) {
@@ -148,6 +156,7 @@ export class GStreamerService {
         // this.#app.pm3.on(`error:${connectingProcessName}`, this.#logToError.bind(this))
         // this.#app.pm3.start(connectingProcessName)
         await camera.start()
+        // await this.#app.pm3.stop(connectingProcessName)
         // await this.#app.pm3.remove(connectingProcessName)
         // this.#app.pm3.off(`stdout:${connectingProcessName}`, this.#logToInfo.bind(this))
         // this.#app.pm3.off(`stderr:${connectingProcessName}`, this.#logToError.bind(this))
@@ -214,6 +223,11 @@ export class GStreamerService {
     const filepath = this.#app.makePath('resources/mediamtx/camera-disabled.jpg')
     return await this.#addFFmpegStreamFromJpegProcess(name, path, filepath)
   }
+
+  // async #addCameraConnectingCameraStreamProcess(name: string, path: string) {
+  //   const filepath = this.#app.makePath('resources/mediamtx/connecting.jpg')
+  //   return await this.#addFFmpegStreamFromJpegProcess(name, path, filepath)
+  // }
 
   async #addFFmpegStreamFromJpegProcess(name: string, path: string, filepath: string) {
     const cmd = env.get('FFMPEG_BIN', 'ffmpeg')

@@ -890,6 +890,19 @@ export default class Camera extends BaseModel {
     return await this.#killExistingProcesses()
   }
 
+  #shouldIgnoreError(error: Error) {
+    const match = `Process with name "camera-${this.id}" already exists`
+    return error.message.includes(match)
+  }
+
+  async #getIsAlreadyRunning() {
+    const process = app.pm3.get(this.#streamProcessName)
+    if (process && process.pid) {
+      return true
+    }
+    return false
+  }
+
   async #getWebRTCUdpPorts() {
     const getPortOptions: PickPortOptions = {
       type: 'udp',
@@ -906,6 +919,11 @@ export default class Camera extends BaseModel {
   async #startWebRTC(service: smartdevicemanagement_v1.Smartdevicemanagement) {
     const mainLogger = await app.container.make('logger')
     const logger = mainLogger.child({ service: `camera-${this.id}` })
+    const isRunning = await this.#getIsAlreadyRunning()
+    if (isRunning) {
+      logger.info(`GStreamer process for WebRTC stream already running`)
+      return
+    }
     const udp: DGramSocket = createSocket('udp4')
     app.pm3.once(`removed:${this.#streamProcessName}`, () => {
       logger.info('GStreamer process removed. Closing UDP socket.')
@@ -955,7 +973,7 @@ export default class Camera extends BaseModel {
       '!',
       'rtspclientsink',
       'name=s',
-      `location=${location}`,
+      `location="${location}"`,
       'async-handling=true',
       // Video pipeline
       'udpsrc',
@@ -987,7 +1005,9 @@ export default class Camera extends BaseModel {
       })
       logger.info('Added GStreamer process for WebRTC stream')
     } catch (error) {
-      logger.error(`Error adding GStreamer for WebRTC process: ${(error as Error).message}`)
+      if (!this.#shouldIgnoreError(error as Error)) {
+        logger.error(`Error starting GStreamer for WebRTC process: ${(error as Error).message}`)
+      }
       throw error
     }
 
@@ -1302,6 +1322,11 @@ export default class Camera extends BaseModel {
   async #startRTSP(service: smartdevicemanagement_v1.Smartdevicemanagement) {
     const mainLogger = await app.container.make('logger')
     const logger = mainLogger.child({ service: `camera-${this.id}` })
+    const isRunning = await this.#getIsAlreadyRunning()
+    if (isRunning) {
+      logger.info(`GStreamer process for RTSP stream already running`)
+      return
+    }
     const {
       data: { results },
     } = await service.enterprises.devices.executeCommand({
@@ -1330,11 +1355,11 @@ export default class Camera extends BaseModel {
     }
     await this.save()
 
-    const rtspUrl = results!.streamUrls.rtspUrl
-    const gstreamerBinary = env.get('GSTREAMER_BIN', 'gst-launch-1.0')
+    const rtspSrc = results!.streamUrls.rtspUrl
+    const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
     const outputRtspUrl = `rtsp://127.0.0.1:${env.get('MEDIA_MTX_RTSP_TCP_PORT', 8554)}/${this.mtxPath}`
 
-    const characteristics = await this.#getRtspStreamCharacteristics(rtspUrl)
+    const characteristics = await this.#getRtspStreamCharacteristics(rtspSrc)
     if (
       !characteristics.video?.width ||
       !characteristics.video?.height ||
@@ -1343,43 +1368,73 @@ export default class Camera extends BaseModel {
       throw new Error('Missing stream characteristics')
     }
 
+    const inputVideoCodec = 'h264' // Assuming H264 is always used for video
+    let inputAudioCodec
+    if (this.#audioCodecs.includes('AAC')) {
+      inputAudioCodec = 'aac'
+    } else if (this.#audioCodecs.includes('OPUS')) {
+      inputAudioCodec = 'opus'
+    } else {
+      throw new Error('Unsupported audio codec')
+    }
+
+    const resolutionArgs = []
+    if (characteristics.video.width && characteristics.video.height) {
+      resolutionArgs.push('-s', `${characteristics.video.width}x${characteristics.video.height}`)
+    }
+
     const args = [
-      '-v', // Verbose mode
-      '--gst-debug-level=3', // Increase log level to DEBUG
-      'rtspsrc',
-      `location=${rtspUrl}`,
-      'protocols=tcp', // Force the input connection to use TCP
-      'latency=500',
-      '!',
-      'rtpjitterbuffer',
-      'latency=1000',
-      '!',
-      'rtph264depay',
-      '!',
-      'h264parse',
-      '!',
-      'capsfilter',
-      `caps=video/x-h264,profile=main,width=${characteristics.video.width},height=${characteristics.video.height},framerate=${characteristics.video.frameRate}`,
-      '!',
-      'rtph264pay',
-      '!',
-      'rtspclientsink',
-      `location=${outputRtspUrl}`,
-      'protocols=tcp', // Force the output connection to use TCP
-      'async-handling=true',
+      '-loglevel',
+      'warning',
+      '-c:v',
+      inputVideoCodec, // Specify known input video codec (if you want to decode the input stream)
+      '-c:a',
+      inputAudioCodec, // Specify known input audio codec (if you want to decode the input stream)
+      '-i',
+      rtspSrc, // Input RTSP stream
+      ...resolutionArgs, // Include resolution if known
+      '-r',
+      '10', // Set maximum frame rate to 10fps
+      '-c:v',
+      'libx264', // Re-encode video to H.264
+      '-g',
+      '10', // Set keyframe interval to 10
+      '-bf',
+      '0', // Disable B-frames
+      '-c:a',
+      'aac', // Re-encode audio to AAC
+      '-b:a',
+      '64k', // Lower audio bitrate to reduce CPU usage
+      '-preset',
+      'ultrafast', // Prioritize encoding speed
+      '-tune',
+      'zerolatency', // Reduce latency
+      '-bufsize',
+      '1M', // Buffer size for reducing latency
+      '-threads',
+      '1', // Limit the number of threads to manage CPU load
+      '-vsync',
+      'cfr', // Ensure constant frame rate (CFR)
+      '-f',
+      'rtsp', // Output format
+      '-rtsp_transport',
+      'tcp', // Use TCP for RTSP
+      outputRtspUrl, // Output RTSP stream
     ]
 
-    logger.info([gstreamerBinary, ...args].join(' '))
-
+    // logger.info([ffmpegBinary, ...args].join(' '))
+    // logger.info(`const characteristics = ${inspect(characteristics, { depth: 20, colors: false })}`)
     try {
       await app.pm3.add(this.#streamProcessName, {
-        file: gstreamerBinary,
+        file: ffmpegBinary,
         arguments: args,
         restart: false,
       })
-      logger.info('Starting GStreamer process for RTSP stream')
+      logger.info('Starting FFMpeg process for RTSP stream')
     } catch (error) {
-      logger.error(`Error starting GStreamer for RTSP process: ${(error as Error).message}`)
+      if (!this.#shouldIgnoreError(error as Error)) {
+        logger.error(`Error starting FFMpeg for RTSP process: ${(error as Error).message}`)
+      }
     }
   }
 }
