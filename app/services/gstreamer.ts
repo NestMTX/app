@@ -133,20 +133,20 @@ export class GStreamerService {
     // this.#logToError(`[${name}] ${data}`)
   }
 
-  async #onDemand(payload: DemandEventPayload) {
+  async #onDemand(payload: DemandEventPayload, force: boolean = false) {
     const undemandTimeout = this.#undemandTimeouts.get(payload.MTX_PATH)
     if (undemandTimeout) {
       clearTimeout(undemandTimeout)
       this.#undemandTimeouts.delete(payload.MTX_PATH)
     }
-    if (this.#demands.has(payload.MTX_PATH)) {
+    if (this.#demands.has(payload.MTX_PATH) && !force) {
       return
     }
     this.#demands.add(payload.MTX_PATH)
     this.#logger?.info(`Received demand for ${payload.MTX_PATH}`)
+    let processName: string | undefined
     try {
       const camera = await Camera.findBy({ mtx_path: payload.MTX_PATH })
-      let processName: string
       if (!camera) {
         processName = `ffmpeg-no-such-camera-${payload.MTX_PATH}`
         await this.#addNoSuchCameraStreamProcess(processName, payload.MTX_PATH)
@@ -155,22 +155,8 @@ export class GStreamerService {
         await this.#addCameraDisabledCameraStreamProcess(processName, payload.MTX_PATH)
       } else {
         processName = `camera-${camera.id}`
-        // const connectingProcessName = `camera-connecting-${camera.id}`
-        // await this.#addCameraConnectingCameraStreamProcess(connectingProcessName, payload.MTX_PATH)
-        // this.#app.pm3.on(`stdout:${connectingProcessName}`, this.#logToInfo.bind(this))
-        // this.#app.pm3.on(`stderr:${connectingProcessName}`, this.#logToError.bind(this))
-        // this.#app.pm3.on(`error:${connectingProcessName}`, this.#logToError.bind(this))
-        // this.#app.pm3.start(connectingProcessName)
         await camera.start()
-        // await this.#app.pm3.stop(connectingProcessName)
-        // await this.#app.pm3.remove(connectingProcessName)
-        // this.#app.pm3.off(`stdout:${connectingProcessName}`, this.#logToInfo.bind(this))
-        // this.#app.pm3.off(`stderr:${connectingProcessName}`, this.#logToError.bind(this))
-        // this.#app.pm3.off(`error:${connectingProcessName}`, this.#logToError.bind(this))
       }
-      // this.#app.pm3.on(`stdout:${processName}`, this.#logToInfo.bind(this))
-      // this.#app.pm3.on(`stderr:${processName}`, this.#logToError.bind(this))
-      // this.#app.pm3.on(`error:${processName}`, this.#logToError.bind(this))
       this.#app.pm3.start(processName)
       const process = this.#app.pm3.get(processName)
       if (process) {
@@ -179,17 +165,24 @@ export class GStreamerService {
           this.#logger?.info(
             `Process ${processName} has exited and is being removed from the process manager.`
           )
-          this.#app.pm3.remove(processName)
-          this.#managedProcesses.delete(processName)
+          this.#app.pm3.remove(processName!)
+          this.#managedProcesses.delete(processName!)
           if (this.#demands.has(payload.MTX_PATH)) {
-            this.#onDemand(payload)
+            this.#onDemand(payload, true)
           }
         })
+        this.#managedProcesses.add(processName)
       }
-      this.#managedProcesses.add(processName)
     } catch (error) {
       if (this.#logger) {
         this.#logger.error(error)
+      }
+      if (this.#demands.has(payload.MTX_PATH)) {
+        this.#onDemand(payload, true)
+      }
+      if (processName) {
+        this.#app.pm3.remove(processName)
+        this.#managedProcesses.delete(processName)
       }
     }
   }

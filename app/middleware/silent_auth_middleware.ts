@@ -18,7 +18,6 @@ export default class SilentAuthMiddleware {
       await ctx.auth.authenticateUsing(options.guards)
     } catch (e) {
       console.log(e)
-      // Do nothing
     }
     return next()
   }
