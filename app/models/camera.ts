@@ -1386,6 +1386,10 @@ export default class Camera extends BaseModel {
     const args = [
       '-loglevel',
       'warning',
+      '-listen_timeout',
+      '-1',
+      '-timeout',
+      '-1',
       '-c:v',
       inputVideoCodec, // Specify known input video codec (if you want to decode the input stream)
       '-c:a',
