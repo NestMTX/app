@@ -133,13 +133,13 @@ export class GStreamerService {
     // this.#logToError(`[${name}] ${data}`)
   }
 
-  async #onDemand(payload: DemandEventPayload) {
+  async #onDemand(payload: DemandEventPayload, force: boolean = false) {
     const undemandTimeout = this.#undemandTimeouts.get(payload.MTX_PATH)
     if (undemandTimeout) {
       clearTimeout(undemandTimeout)
       this.#undemandTimeouts.delete(payload.MTX_PATH)
     }
-    if (this.#demands.has(payload.MTX_PATH)) {
+    if (this.#demands.has(payload.MTX_PATH) && !force) {
       return
     }
     this.#demands.add(payload.MTX_PATH)
@@ -168,17 +168,17 @@ export class GStreamerService {
           this.#app.pm3.remove(processName!)
           this.#managedProcesses.delete(processName!)
           if (this.#demands.has(payload.MTX_PATH)) {
-            this.#onDemand(payload)
+            this.#onDemand(payload, true)
           }
         })
+        this.#managedProcesses.add(processName)
       }
-      this.#managedProcesses.add(processName)
     } catch (error) {
       if (this.#logger) {
         this.#logger.error(error)
       }
       if (this.#demands.has(payload.MTX_PATH)) {
-        this.#onDemand(payload)
+        this.#onDemand(payload, true)
       }
       if (processName) {
         this.#app.pm3.remove(processName)
