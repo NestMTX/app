@@ -123,5 +123,6 @@ EXPOSE 8888
 EXPOSE 8889
 EXPOSE 8189/udp
 EXPOSE 8890
-CMD [ "dumb-init", "node", "bin/docker.js" ]
+WORKDIR /home/nestmtx/app
+CMD [ "dumb-init", "node", "/home/nestmtx/app/bin/docker.js" ]
 VOLUME [ "/home/nestmtx/app/tmp" ]
