@@ -59,3 +59,13 @@ jobs:
         tags: |
           nestmtx/${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}:${{ github.ref_type == 'branch' && 'nightly' || github.ref_name }}
           ${{ github.ref_type == 'tag' && 'nestmtx/' || '' }}${{ github.ref_type == 'tag' && (matrix.platform == 'linux/amd64' && 'amd64:latest' || matrix.platform == 'linux/arm64/v8' && 'arm64:latest') || '' }}
+
+    - name: Notify Discord on successful build
+      if: ${{ success() }}  # Only runs if the build was successful
+      run: |
+        SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
+        curl -H "Content-Type: application/json" \
+        -d "{\"content\": \"Nightly Build $SHORT_SHA has been released\"}" \
+        ${DISCORD_WEBHOOK}
+      env:
+        DISCORD_WEBHOOK: ${{ secrets.DISCORD_NIGHTLY_WEBHOOK }}
