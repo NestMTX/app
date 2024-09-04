@@ -48,7 +48,7 @@ jobs:
       run: |
         SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
         curl -H "Content-Type: application/json" \
-        -d "{\"content\": \"Nightly Build `$SHORT_SHA` is starting\"}" \
+        -d "{\"content\": \"Nightly Build $SHORT_SHA is starting\"}" \
         ${DISCORD_WEBHOOK}
       env:
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_NIGHTLY_WEBHOOK }}
@@ -75,7 +75,7 @@ jobs:
       run: |
         SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
         curl -H "Content-Type: application/json" \
-        -d "{\"content\": \"Nightly Build `$SHORT_SHA` has been released\"}" \
+        -d "{\"content\": \"Nightly Build $SHORT_SHA has been released\"}" \
         ${DISCORD_WEBHOOK}
       env:
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_NIGHTLY_WEBHOOK }}
