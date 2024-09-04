@@ -7,6 +7,7 @@ FROM --platform=${BUILDPLATFORM} ${IMAGE_PREFIX}${NODE_IMAGE} AS base
 # Setup the Base Container
 ##################################################
 ENV LC_ALL=C.UTF-8
+RUN addgroup -S nestmtx && adduser -S nestmtx -G nestmtx -u 1001
 RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/repositories && \
     echo "http://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories && \
     echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories && \

@@ -109,11 +109,11 @@ To map between the `/home/user/nestmtx` directory on your host machine and `/hom
 
 ### Folder Permissions
 
-By default, the `nestmtx` user in the docker container has the ID `1000` and the group id `1000`. That means that if your local folder doesn't have very permissive permissions (i.e. `777`) then you will encounter errors when attempting to load NestMTX with a persistent volume. To work around this, there are 2 options:
+By default, the `nestmtx` user in the docker container has the ID `1001` and the group id `1001`. That means that if your local folder doesn't have very permissive permissions (i.e. `777`) then you will encounter errors when attempting to load NestMTX with a persistent volume. To work around this, there are 2 options:
 
 #### Change the ownership of the folder
 
-You can change the ownership of the folder to `1000:1000` using `chown 1000:1000 /path/to/folder` on the host machine. This will allow the dockerized application to read and write files there without any issues.
+You can change the ownership of the folder to `1001:1001` using `chown 1001:1001 /path/to/folder` on the host machine. This will allow the dockerized application to read and write files there without any issues.
 
 #### Change the ID and Group ID of the Docker Container
 
