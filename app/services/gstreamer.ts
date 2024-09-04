@@ -144,9 +144,9 @@ export class GStreamerService {
     }
     this.#demands.add(payload.MTX_PATH)
     this.#logger?.info(`Received demand for ${payload.MTX_PATH}`)
+    let processName: string | undefined
     try {
       const camera = await Camera.findBy({ mtx_path: payload.MTX_PATH })
-      let processName: string
       if (!camera) {
         processName = `ffmpeg-no-such-camera-${payload.MTX_PATH}`
         await this.#addNoSuchCameraStreamProcess(processName, payload.MTX_PATH)
@@ -190,9 +190,13 @@ export class GStreamerService {
     } catch (error) {
       if (this.#logger) {
         this.#logger.error(error)
-        if (this.#demands.has(payload.MTX_PATH)) {
-          this.#onDemand(payload)
-        }
+      }
+      if (this.#demands.has(payload.MTX_PATH)) {
+        this.#onDemand(payload)
+      }
+      if (processName) {
+        this.#app.pm3.remove(processName)
+        this.#managedProcesses.delete(processName)
       }
     }
   }
