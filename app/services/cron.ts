@@ -62,5 +62,8 @@ export const init = async (
   jobs.forEach((job) => {
     cron.$on(job.crontab, doJob.bind(null, job))
     logger.info(`Added job "${job.constructor.name}" with crontab "${job.crontab}"`)
+    if (job.constructor.name === 'PersistCameraJob') {
+      doJob(job)
+    }
   })
 }

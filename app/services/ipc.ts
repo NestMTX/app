@@ -61,7 +61,7 @@ export class IPCService extends EventEmitter {
 
   async boot(logger: LoggerService) {
     this.#logger = logger.child({ service: 'ipc' })
-    const ipcSocketPath = this.#app.tmpPath('ipc.sock')
+    const ipcSocketPath = this.#app.makePath('resources/ipc.sock')
     await rm(ipcSocketPath, { force: true })
     this.#server.listen(ipcSocketPath, () => {
       this.#log.info(`IPC Server listening on ${ipcSocketPath}`)

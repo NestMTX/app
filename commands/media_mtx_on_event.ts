@@ -66,7 +66,7 @@ export default class MediaMtxOnEvent extends BaseCommand {
       process.exit(1)
     }
     const payload = JSON.stringify([event, body])
-    const ipcSocketPath = this.app.tmpPath('ipc.sock')
+    const ipcSocketPath = this.app.makePath('resources/ipc.sock')
     let client: Socket
     try {
       await new Promise<void>((resolve, reject) => {

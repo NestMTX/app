@@ -108,6 +108,7 @@ export class MediaMTXService {
     const baseRunOnCommand = ['node', this.#app.makePath('ace.js'), 'mediamtx:on:event']
     const updated: any = {
       ...mediaMtxConfig,
+      writeQueueSize: 1024,
       metrics: false,
       metricsEncryption: false,
       pprof: false,
@@ -196,6 +197,7 @@ export class MediaMTXService {
        * Update the SRT configuration
        */
       srt: true === env.get('MEDIA_MTX_SRT_ENABLED', false) ? true : false,
+      // srt: true,
       srtAddress: `${env.get('HOST')}:${env.get('MEDIA_MTX_SRT_PORT', 8890)}`,
       /**
        * Update the path defaults configuration

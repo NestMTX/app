@@ -29,6 +29,7 @@ export default {
     mtx_path: 'Path',
     is_enabled: 'Enabled',
     can_login: 'Can Login',
+    is_persistent: 'Persistent',
   },
   actions: {
     login: 'Log In',

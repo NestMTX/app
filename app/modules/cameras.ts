@@ -14,6 +14,7 @@ export default class CamerasModule implements ApiServiceModule {
           .allow(null)
           .regex(/^[A-Za-z0-9\-._~]+$/),
         is_enabled: Joi.boolean().required(),
+        is_persistent: Joi.boolean().optional(),
       }),
     }
   }
@@ -35,6 +36,7 @@ export default class CamerasModule implements ApiServiceModule {
       // @todo: implement sorting
       // query.orderBy(sortBy)
     }
+    query.orderBy('id', 'desc')
     let pageAsInt = Number.parseInt(page)
     let itemsPerPageAsInt = Number.parseInt(itemsPerPage)
     if (!Number.isNaN(pageAsInt) && !Number.isNaN(itemsPerPageAsInt)) {
@@ -68,8 +70,12 @@ export default class CamerasModule implements ApiServiceModule {
   }
 
   async update(context: UpdateCommandContext) {
-    const { mtx_path: mtxPath, is_enabled: isEnabled } = context.payload
-    if (isEnabled && !mtxPath) {
+    const {
+      mtx_path: mtxPath,
+      is_enabled: isEnabled,
+      is_persistent: isPersistent,
+    } = context.payload
+    if ((isEnabled && !mtxPath) || (isPersistent && !mtxPath)) {
       throw new I18NException('errors.cameras.update.mtxPathIsRequired')
     }
     const camera = await Camera.findOrFail(Number.parseInt(context.entity))
@@ -82,6 +88,9 @@ export default class CamerasModule implements ApiServiceModule {
       }
     }
     camera.mtxPath = mtxPath
+    if ('undefined' !== typeof isPersistent && null !== isPersistent) {
+      camera.isPersistent = isPersistent
+    }
     await camera.save()
     if (isEnabled) {
       await camera.enable()

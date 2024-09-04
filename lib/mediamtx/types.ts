@@ -37,6 +37,7 @@ declare namespace Components {
       authHTTPAddress?: string
       authHTTPExclude?: AuthInternalUserPermission[]
       authJWTJWKS?: string
+      authJWTClaimKey?: string
       api?: boolean
       apiAddress?: string
       apiEncryption?: boolean
@@ -189,17 +190,19 @@ declare namespace Components {
       rpiCameraTuningFile?: string
       rpiCameraMode?: string
       rpiCameraFPS?: number
-      rpiCameraIDRPeriod?: number
-      rpiCameraBitrate?: number
-      rpiCameraProfile?: string
-      rpiCameraLevel?: string
       rpiCameraAfMode?: string
       rpiCameraAfRange?: string
       rpiCameraAfSpeed?: string
       rpiCameraLensPosition?: number
       rpiCameraAfWindow?: string
+      rpiCameraFlickerPeriod?: number
       rpiCameraTextOverlayEnable?: boolean
       rpiCameraTextOverlay?: string
+      rpiCameraCodec?: string
+      rpiCameraIDRPeriod?: number
+      rpiCameraBitrate?: number
+      rpiCameraProfile?: string
+      rpiCameraLevel?: string
       runOnInit?: string
       runOnInitRestart?: boolean
       runOnDemand?: string

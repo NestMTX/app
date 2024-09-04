@@ -212,6 +212,9 @@ export class PM3 extends EventEmitter<PM3ProcessEventMap> {
         if (restartable && attempt < maxRestarts) {
           this.#processes.delete(name)
           this.#start(name, attempt + 1)
+        } else {
+          abortController.abort()
+          process!.kill()
         }
       })
       process.catch((e) => {
@@ -342,5 +345,9 @@ export class PM3 extends EventEmitter<PM3ProcessEventMap> {
 
   #debug(message: string) {
     super.emit('debug', message)
+  }
+
+  get(name: string): ExecaChildProcess | undefined {
+    return this.#processes.get(name)
   }
 }
