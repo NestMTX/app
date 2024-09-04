@@ -1412,9 +1412,7 @@ export default class Camera extends BaseModel {
       '-i',
       rtspSrc, // Input RTSP stream
       '-rtsp_transport',
-      'udp', // Use TCP for RTSP
-      // '-rtsp_flags',
-      // 'prefer_tcp', // Prefer TCP for RTSP
+      'udp', // Use UDP for RTSP
       '-rtpflags',
       'skip_rtcp', // Skip RTCP packets
       ...resolutionArgs, // Include resolution if known
@@ -1447,7 +1445,7 @@ export default class Camera extends BaseModel {
       '-f',
       'rtsp', // Output format
       '-rtsp_transport',
-      'udp', // Use TCP for RTSP
+      'udp', // Use UDP for RTSP
       '-use_wallclock_as_timestamps',
       '1',
       outputRtspUrl, // Output RTSP stream

@@ -108,6 +108,7 @@ export class MediaMTXService {
     const baseRunOnCommand = ['node', this.#app.makePath('ace.js'), 'mediamtx:on:event']
     const updated: any = {
       ...mediaMtxConfig,
+      writeQueueSize: 1024,
       metrics: false,
       metricsEncryption: false,
       pprof: false,

@@ -19,6 +19,7 @@ interface DemandEventPayload {
  * A class for managing the MediaMTX service process
  */
 export class GStreamerService {
+  readonly #demands: Set<string>
   readonly #app: ApplicationService
   readonly #managedProcesses: Set<string>
   readonly #shuttingDownProcesses: Set<string>
@@ -32,6 +33,7 @@ export class GStreamerService {
     this.#managedProcesses = new Set()
     this.#shuttingDownProcesses = new Set()
     this.#undemandTimeouts = new Map()
+    this.#demands = new Set()
   }
 
   get managedProcesses() {
@@ -125,7 +127,7 @@ export class GStreamerService {
     if (['camera-', 'ffmpeg-', 'gstreamer-'].some((prefix) => name.startsWith(prefix))) {
       if (this.#logger) {
         const logger = this.#logger.child({ camera: name })
-        logger.error(data)
+        logger.warn(data)
       }
     }
     // this.#logToError(`[${name}] ${data}`)
@@ -133,6 +135,7 @@ export class GStreamerService {
 
   async #onDemand(payload: DemandEventPayload) {
     this.#logger?.info(`Received demand for ${payload.MTX_PATH}`)
+    this.#demands.add(payload.MTX_PATH)
     const undemandTimeout = this.#undemandTimeouts.get(payload.MTX_PATH)
     if (undemandTimeout) {
       clearTimeout(undemandTimeout)
@@ -166,6 +169,20 @@ export class GStreamerService {
       // this.#app.pm3.on(`stderr:${processName}`, this.#logToError.bind(this))
       // this.#app.pm3.on(`error:${processName}`, this.#logToError.bind(this))
       this.#app.pm3.start(processName)
+      const process = this.#app.pm3.get(processName)
+      if (process) {
+        this.#logger?.info(`Started process ${processName} with PID ${process.pid}`)
+        process.on('exit', () => {
+          this.#logger?.info(
+            `Process ${processName} has exited and is being removed from the process manager.`
+          )
+          this.#app.pm3.remove(processName)
+          this.#managedProcesses.delete(processName)
+          if (this.#demands.has(payload.MTX_PATH)) {
+            this.#onDemand(payload)
+          }
+        })
+      }
       this.#managedProcesses.add(processName)
     } catch (error) {
       if (this.#logger) {
@@ -176,6 +193,7 @@ export class GStreamerService {
 
   async #onUnDemandTimeout(payload: DemandEventPayload) {
     this.#logger?.info(`Undemand Delay for ${payload.MTX_PATH} has been reached`)
+    this.#demands.delete(payload.MTX_PATH)
     try {
       const camera = await Camera.findBy({ mtx_path: payload.MTX_PATH })
       let processName: string
