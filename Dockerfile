@@ -7,7 +7,6 @@ FROM --platform=${BUILDPLATFORM} ${IMAGE_PREFIX}${NODE_IMAGE} AS base
 # Setup the Base Container
 ##################################################
 ENV LC_ALL=C.UTF-8
-RUN addgroup -S nestmtx && adduser -S nestmtx -G nestmtx -u 1001
 RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/repositories && \
     echo "http://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories && \
     echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories && \
@@ -31,14 +30,14 @@ RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/repositori
     giflib-dev \
     g++ \
     make && \
-    mkdir -p /home/nestmtx/app && \
-    mkdir -p /home/nestmtx/app/tmp && \
-    chown -R nestmtx:nestmtx /home/nestmtx/app && \
-    mkdir -p /home/nestmtx/mediamtx && \
-    chown -R nestmtx:nestmtx /home/nestmtx/mediamtx
+    mkdir -p /home/node/app && \
+    mkdir -p /home/node/app/tmp && \
+    chown -R node:node /home/node/app && \
+    mkdir -p /home/node/mediamtx && \
+    chown -R node:node /home/node/mediamtx
 
-WORKDIR /home/nestmtx/app
-USER nestmtx
+WORKDIR /home/node/app
+USER node
 RUN yarn config set network-timeout 300000 -g
 
 ##################################################
@@ -47,11 +46,11 @@ RUN yarn config set network-timeout 300000 -g
 FROM base AS gui
 ARG VERSION=unknown
 ENV NODE_ENV=development
-COPY --chown=nestmtx:nestmtx ./gui/package*.json ./
-COPY --chown=nestmtx:nestmtx ./gui/npm* ./
-COPY --chown=nestmtx:nestmtx ./gui/yarn* ./
+COPY --chown=node:node ./gui/package*.json ./
+COPY --chown=node:node ./gui/npm* ./
+COPY --chown=node:node ./gui/yarn* ./
 RUN yarn install --frozen-lockfile --production=false --ignore-engines
-COPY --chown=nestmtx:nestmtx ./gui .
+COPY --chown=node:node ./gui .
 RUN yarn build
 
 ##################################################
@@ -59,10 +58,10 @@ RUN yarn build
 ##################################################
 FROM base AS dependencies
 ENV NODE_ENV=development
-COPY --chown=nestmtx:nestmtx ./package*.json ./
-COPY --chown=nestmtx:nestmtx ./npm* ./
-COPY --chown=nestmtx:nestmtx ./yarn* ./
-USER nestmtx
+COPY --chown=node:node ./package*.json ./
+COPY --chown=node:node ./npm* ./
+COPY --chown=node:node ./yarn* ./
+USER node
 RUN yarn install --frozen-lockfile
 
 ##################################################
@@ -70,10 +69,10 @@ RUN yarn install --frozen-lockfile
 ##################################################
 FROM base AS production-dependencies
 ENV NODE_ENV=production
-USER nestmtx
-COPY --chown=nestmtx:nestmtx ./package*.json ./
-COPY --chown=nestmtx:nestmtx ./npm* ./
-COPY --chown=nestmtx:nestmtx ./yarn* ./
+USER node
+COPY --chown=node:node ./package*.json ./
+COPY --chown=node:node ./npm* ./
+COPY --chown=node:node ./yarn* ./
 RUN yarn install --frozen-lockfile --production=true
 
 ##################################################
@@ -81,11 +80,11 @@ RUN yarn install --frozen-lockfile --production=true
 ##################################################
 FROM base AS build
 ENV NODE_ENV=production
-COPY --from=dependencies /home/nestmtx/app/node_modules /home/nestmtx/app/node_modules
-ADD --chown=nestmtx:nestmtx . .
+COPY --from=dependencies /home/node/app/node_modules /home/node/app/node_modules
+ADD --chown=node:node . .
 RUN node ace build
-ENV MEDIA_MTX_PATH=/home/nestmtx/mediamtx/mediamtx
-ENV MEDIA_MTX_CONFIG_PATH=/home/nestmtx/mediamtx/mediamtx.yml
+ENV MEDIA_MTX_PATH=/home/node/mediamtx/mediamtx
+ENV MEDIA_MTX_CONFIG_PATH=/home/node/mediamtx/mediamtx.yml
 RUN node ace mediamtx:install
 
 ##################################################
@@ -96,22 +95,22 @@ ENV NODE_ENV=production
 ARG VERSION=unknown
 ARG BUILDPLATFORM=local
 ARG SHA=unknown
-USER nestmtx
-COPY --from=production-dependencies /home/nestmtx/app/node_modules /home/nestmtx/app/node_modules
-COPY --from=build /home/nestmtx/app/build /home/nestmtx/app
-ADD --chown=nestmtx:nestmtx /logger-transports /home/nestmtx/app/logger-transports
-ADD --chown=nestmtx:nestmtx /resources /home/nestmtx/app/resources
-RUN rm -rf /home/nestmtx/app/public
-COPY --from=gui /home/nestmtx/app/.output/public /home/nestmtx/app/public
-COPY --from=build /home/nestmtx/mediamtx /home/nestmtx/mediamtx
+USER node
+COPY --from=production-dependencies /home/node/app/node_modules /home/node/app/node_modules
+COPY --from=build /home/node/app/build /home/node/app
+ADD --chown=node:node /logger-transports /home/node/app/logger-transports
+ADD --chown=node:node /resources /home/node/app/resources
+RUN rm -rf /home/node/app/public
+COPY --from=gui /home/node/app/.output/public /home/node/app/public
+COPY --from=build /home/node/mediamtx /home/node/mediamtx
 USER root
-RUN chown -R nestmtx:nestmtx /home/nestmtx
+RUN chown -R node:node /home/node
 RUN { \
     echo "VERSION=${VERSION}"; \
     echo "BUILDPLATFORM=${BUILDPLATFORM}"; \
     echo "SHA=${SHA}"; \
-    } > /home/nestmtx/app/version.txt
-USER nestmtx
+    } > /home/node/app/version.txt
+USER node
 EXPOSE 2000
 EXPOSE 2001
 EXPOSE 9996
@@ -123,6 +122,5 @@ EXPOSE 8888
 EXPOSE 8889
 EXPOSE 8189/udp
 EXPOSE 8890
-WORKDIR /home/nestmtx/app
-CMD [ "dumb-init", "node", "/home/nestmtx/app/bin/docker.js" ]
-VOLUME [ "/home/nestmtx/app/tmp" ]
+CMD [ "dumb-init", "node", "bin/docker.js" ]
+VOLUME [ "/home/node/app/tmp" ]
