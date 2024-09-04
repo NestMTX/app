@@ -872,9 +872,6 @@ export default class Camera extends BaseModel {
     if (!results || !results[key]) {
       throw new Error('Failed to extend stream')
     }
-    // logger.info(
-    //   `Got results: ${inspect(results, { depth: 20, colors: false })}. Setting token from property ${key} to ${results[key]}`
-    // )
     this.streamExtensionToken = results[key]
     this.expiresAt = DateTime.utc().plus({ minutes: 5 })
     if (results!.expiresAt) {
