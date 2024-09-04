@@ -870,9 +870,9 @@ export default class Camera extends BaseModel {
     if (!results || !results[key]) {
       throw new Error('Failed to extend stream')
     }
-    logger.info(
-      `Got results: ${inspect(results, { depth: 20, colors: false })}. Setting token from property ${key} to ${results[key]}`
-    )
+    // logger.info(
+    //   `Got results: ${inspect(results, { depth: 20, colors: false })}. Setting token from property ${key} to ${results[key]}`
+    // )
     this.streamExtensionToken = results[key]
     this.expiresAt = DateTime.utc().plus({ minutes: 5 })
     if (results!.expiresAt) {
@@ -1392,6 +1392,12 @@ export default class Camera extends BaseModel {
       inputAudioCodec, // Specify known input audio codec (if you want to decode the input stream)
       '-i',
       rtspSrc, // Input RTSP stream
+      '-rtsp_transport',
+      'tcp', // Use TCP for RTSP
+      '-rtsp_flags',
+      'prefer_tcp', // Prefer TCP for RTSP
+      '-rtpflags',
+      'skip_rtcp', // Skip RTCP packets
       ...resolutionArgs, // Include resolution if known
       '-r',
       '10', // Set maximum frame rate to 10fps
