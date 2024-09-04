@@ -45,6 +45,14 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-docker-${{ matrix.platform }}-
 
+    - name: Notify Discord on build start
+      run: |
+        curl -H "Content-Type: application/json" \
+        -d "{\"content\": \"A new version of nestmtx/${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}:${{ github.ref_type == 'branch' && 'testing' || github.ref_name }} has started building \"}" \
+        ${DISCORD_WEBHOOK}
+      env:
+        DISCORD_WEBHOOK: ${{ secrets.DISCORD_RELEASES_WEBHOOK }}
+
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
@@ -61,3 +69,12 @@ jobs:
         tags: |
           nestmtx/${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}:${{ github.ref_type == 'branch' && 'testing' || github.ref_name }}
           ${{ github.ref_type == 'tag' && 'nestmtx/' || '' }}${{ github.ref_type == 'tag' && (matrix.platform == 'linux/amd64' && 'amd64:latest' || matrix.platform == 'linux/arm64/v8' && 'arm64:latest') || '' }}
+
+    - name: Notify Discord on successful build
+      if: ${{ success() }}  # Only runs if the build was successful
+      run: |
+        curl -H "Content-Type: application/json" \
+        -d "{\"content\": \"A new version of nestmtx/${{ matrix.platform == 'linux/amd64' && 'amd64' || 'arm64' }}:${{ github.ref_type == 'branch' && 'testing' || github.ref_name }} has been deployed \"}" \
+        ${DISCORD_WEBHOOK}
+      env:
+        DISCORD_WEBHOOK: ${{ secrets.DISCORD_RELEASES_WEBHOOK }}

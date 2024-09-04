@@ -43,8 +43,7 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-docker-${{ matrix.platform }}-
 
-    - name: Notify Discord on successful build
-      if: ${{ success() }}  # Only runs if the build was successful
+    - name: Notify Discord on build start
       run: |
         SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
         curl -H "Content-Type: application/json" \
