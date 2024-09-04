@@ -134,13 +134,16 @@ export class GStreamerService {
   }
 
   async #onDemand(payload: DemandEventPayload) {
-    this.#logger?.info(`Received demand for ${payload.MTX_PATH}`)
-    this.#demands.add(payload.MTX_PATH)
     const undemandTimeout = this.#undemandTimeouts.get(payload.MTX_PATH)
     if (undemandTimeout) {
       clearTimeout(undemandTimeout)
       this.#undemandTimeouts.delete(payload.MTX_PATH)
     }
+    if (this.#demands.has(payload.MTX_PATH)) {
+      return
+    }
+    this.#demands.add(payload.MTX_PATH)
+    this.#logger?.info(`Received demand for ${payload.MTX_PATH}`)
     try {
       const camera = await Camera.findBy({ mtx_path: payload.MTX_PATH })
       let processName: string

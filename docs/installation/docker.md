@@ -96,13 +96,43 @@ To use the testing version of `nestmtx/amd64`, you would use the image `nestmtx/
 
 ## Persistent Volume & Sharing between host and container
 
-There are some situations where you way want to persist files (like the NestMTX SQLite Database) or share files from the host machine to the container (like SSL certificates). NestMTX has a built in directory ready to receive this mapping: `/home/node/app/tmp`.
+There are some situations where you way want to persist files (like the NestMTX SQLite Database) or share files from the host machine to the container (like SSL certificates). NestMTX has a built in directory ready to receive this mapping: `/home/nestmtx/app/tmp`.
 
 :::info Example
-To map between the `/home/user/nestmtx` directory on your host machine and `/home/node/app/tmp` in the container, add the following before the image name in the command which you use to launch NestMTX:
+To map between the `/home/user/nestmtx` directory on your host machine and `/home/nestmtx/app/tmp` in the container, add the following before the image name in the command which you use to launch NestMTX:
 
 ```bash
--v /home/user/nestmtx:/home/node/app/tmp
+-v /home/user/nestmtx:/home/nestmtx/app/tmp
+```
+
+:::
+
+### Folder Permissions
+
+By default, the `nestmtx` user in the docker container has the ID `1000` and the group id `1000`. That means that if your local folder doesn't have very permissive permissions (i.e. `777`) then you will encounter errors when attempting to load NestMTX with a persistent volume. To work around this, there are 2 options:
+
+#### Change the ownership of the folder
+
+You can change the ownership of the folder to `1000:1000` using `chown 1000:1000 /path/to/folder` on the host machine. This will allow the dockerized application to read and write files there without any issues.
+
+#### Change the ID and Group ID of the Docker Container
+
+You can change the ID and Group ID of the docker container by passing the `--user` flag to the command. For example:
+
+:::info Example
+
+```bash
+--user 100:100
+```
+
+:::
+
+If you want to use your own user's ID and Group ID, you can use:
+
+:::info Example
+
+```bash
+--user $(id -u):$(id -g)
 ```
 
 :::
@@ -147,11 +177,11 @@ NestMTX serves HTTPS requests with a self-signed certificate which is automatica
 If you use a relative file path (i.e. one which doesn't start with `/`) NestMTX assumes that your file path is relative to `/home/app/nestmtx/tmp` so `nestmtx.crt` will be assumed to be `/home/app/nestmtx/tmp/nestmtx.crt`
 :::
 
-The easiest way to configure your own SSL certifcates is to map a volume between your host machine and the NestMTX `/home/node/app/tmp` directory, place your certificate and certificate key files in the folder on your host machine, and configure the `HTTPS_CERT_PATH` and `HTTPS_KEY_PATH` appropriately.
+The easiest way to configure your own SSL certifcates is to map a volume between your host machine and the NestMTX `/home/nestmtx/app/tmp` directory, place your certificate and certificate key files in the folder on your host machine, and configure the `HTTPS_CERT_PATH` and `HTTPS_KEY_PATH` appropriately.
 
 ## Database
 
-NestMTX is configured by default to use an SQLite database which is generated and stored in `/home/node/app/tmp/db.sqlite3`, however you are able to use your own custom database server including:
+NestMTX is configured by default to use an SQLite database which is generated and stored in `/home/nestmtx/app/tmp/db.sqlite3`, however you are able to use your own custom database server including:
 
 * MySQL / MariaDB
 * PostgreSQL<sup>1</sup>
