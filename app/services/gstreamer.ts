@@ -190,6 +190,9 @@ export class GStreamerService {
     } catch (error) {
       if (this.#logger) {
         this.#logger.error(error)
+        if (this.#demands.has(payload.MTX_PATH)) {
+          this.#onDemand(payload)
+        }
       }
     }
   }
