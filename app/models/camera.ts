@@ -21,6 +21,8 @@ import { createSocket } from 'node:dgram'
 import { EventEmitter } from 'node:events'
 import { execa } from 'execa'
 import { MissingStreamCharacteristicsException } from '#exceptions/missing_stream_characteristics_exception'
+import { dropcamPossibleHostnames, dropcamRetryHostnameFailureMessages } from '#config/dropcam'
+import { getUrlObjectForRtspUrl, getHostnameFromRtspUrl } from '#utilities/url'
 
 dot.keepArray = true
 
@@ -88,6 +90,11 @@ export class IceCandidateError extends Error {
 
 import type { smartdevicemanagement_v1 } from 'googleapis'
 // import { inspect } from 'node:util'
+
+let DROPCAM_MAX_CASCADES = env.get('DROPCAM_MAX_CASCADES', 5)
+if (DROPCAM_MAX_CASCADES <= 0) {
+  DROPCAM_MAX_CASCADES = 5
+}
 
 type CameraModel =
   | 'Nest Cam (legacy)'
@@ -1240,20 +1247,53 @@ export default class Camera extends BaseModel {
     logger.info('Starting GStreamer process for WebRTC stream')
   }
 
-  // #getAlternativeRtspUrl(current: string, tried: string[]) {
-  // }
+  #getAlternativeRtspUrl(current: string, tried: string[]): string {
+    const currentHostname = getHostnameFromRtspUrl(current)
+    const previouslyTriedHostnames = tried.map((url) => getHostnameFromRtspUrl(url))
+    const possibleHosts: Array<string> = [...dropcamPossibleHostnames].filter(
+      (h) => h !== currentHostname && !previouslyTriedHostnames.includes(h)
+    )
+    if (possibleHosts.length === 0) {
+      throw new Error(
+        'Failed to get RTSP stream characteristics after exhausting all possible hostnames'
+      )
+    }
+    const randomIndex = Math.floor(Math.random() * possibleHosts.length)
+    const possibleHost = possibleHosts[randomIndex]
+    const updatedUrl = getUrlObjectForRtspUrl(current)
+    updatedUrl.hostname = possibleHost
+    return updatedUrl.toString().replace('https://', 'rtsps://')
+  }
 
-  async #getRtspStreamCharacteristics(url: string) {
-    // const mainLogger = await app.container.make('logger')
-    // const logger = mainLogger.child({ service: `getRtspStreamCharacteristics` })
-    // logger.info(`Getting RTSP stream characteristics for ${url}`)
+  async #getRtspStreamCharacteristics(
+    url: string,
+    tried: string[] = []
+  ): Promise<RtspStreamCharacteristics> {
+    const mainLogger = await app.container.make('logger')
+    const logger = mainLogger.child({ service: `getRtspStreamCharacteristics` })
+    logger.info(
+      `Getting RTSP stream characteristics camera being served by ${getHostnameFromRtspUrl(url)}`
+    )
     try {
       const { stdout } = await execa('gst-discoverer-1.0', [url], {
         reject: true,
       })
 
-      if (stdout.includes('Analyzing URI timed out')) {
-        throw new Error('Nest RTSP stream is not accessible')
+      if (dropcamRetryHostnameFailureMessages.some((m) => stdout.includes(m))) {
+        if (
+          tried.length >= dropcamPossibleHostnames.length ||
+          tried.length >= DROPCAM_MAX_CASCADES
+        ) {
+          throw new Error(
+            `Failed to get RTSP stream characteristics after ${tried.length} attempts`
+          )
+        }
+        const current = url
+        url = this.#getAlternativeRtspUrl(url, tried)
+        logger.info(
+          `${getHostnameFromRtspUrl(current)} is not serving the stream. Trying ${getHostnameFromRtspUrl(url)}`
+        )
+        return await this.#getRtspStreamCharacteristics(url, [...tried, current])
       }
 
       const characteristics: RtspStreamCharacteristics = {
@@ -1433,7 +1473,7 @@ export default class Camera extends BaseModel {
       '-c:a',
       inputAudioCodec, // Specify known input audio codec (if you want to decode the input stream)
       '-i',
-      rtspSrc, // Input RTSP stream
+      characteristics.url, // Input RTSP stream
       '-rtsp_transport',
       'udp', // Use UDP for RTSP
       '-rtpflags',
