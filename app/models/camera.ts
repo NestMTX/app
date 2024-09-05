@@ -21,6 +21,8 @@ import { createSocket } from 'node:dgram'
 import { EventEmitter } from 'node:events'
 import { execa } from 'execa'
 import { MissingStreamCharacteristicsException } from '#exceptions/missing_stream_characteristics_exception'
+import { dropcamPossibleHostnames, dropcamRetryHostnameFailureMessages } from '#config/dropcam'
+import { getUrlObjectForRtspUrl, getHostnameFromRtspUrl } from '#utilities/url'
 
 dot.keepArray = true
 
@@ -52,6 +54,7 @@ interface RtspStreamInfo {
 }
 
 interface RtspStreamCharacteristics {
+  url: string
   video: RtspStreamInfo
   audio: RtspStreamInfo
   duration?: string
@@ -87,6 +90,11 @@ export class IceCandidateError extends Error {
 
 import type { smartdevicemanagement_v1 } from 'googleapis'
 // import { inspect } from 'node:util'
+
+let DROPCAM_MAX_CASCADES = env.get('DROPCAM_MAX_CASCADES', 5)
+if (DROPCAM_MAX_CASCADES <= 0) {
+  DROPCAM_MAX_CASCADES = 5
+}
 
 type CameraModel =
   | 'Nest Cam (legacy)'
@@ -612,7 +620,7 @@ export default class Camera extends BaseModel {
     if (!enabled) {
       return null
     }
-    const port = env.get('MEDIA_MTX_RTSP_TCP_PORT', 8554)
+    const port = env.get('NESTMTX_RTSP_TCP_PORT', env.get('MEDIA_MTX_RTSP_TCP_PORT', 8554))
     if (port <= 0) {
       return null
     }
@@ -630,7 +638,7 @@ export default class Camera extends BaseModel {
     if (!enabled) {
       return null
     }
-    const port = env.get('MEDIA_MTX_RTSP_UDP_RTP_PORT', 8000)
+    const port = env.get('NESTMTX_RTSP_UDP_RTP_PORT', env.get('MEDIA_MTX_RTSP_UDP_RTP_PORT', 8000))
     if (port <= 0) {
       return null
     }
@@ -648,7 +656,10 @@ export default class Camera extends BaseModel {
     if (!enabled) {
       return null
     }
-    const port = env.get('MEDIA_MTX_RTSP_UDP_RTCP_PORT', 8001)
+    const port = env.get(
+      'NESTMTX_RTSP_UDP_RTCP_PORT',
+      env.get('MEDIA_MTX_RTSP_UDP_RTCP_PORT', 8001)
+    )
     if (port <= 0) {
       return null
     }
@@ -666,7 +677,7 @@ export default class Camera extends BaseModel {
     if (!enabled) {
       return null
     }
-    const port = env.get('MEDIA_MTX_RTMP_PORT', 1935)
+    const port = env.get('NESTMTX_RTMP_PORT', env.get('MEDIA_MTX_RTMP_PORT', 1935))
     if (port <= 0) {
       return null
     }
@@ -684,7 +695,7 @@ export default class Camera extends BaseModel {
     if (!enabled) {
       return null
     }
-    const port = env.get('MEDIA_MTX_HLS_PORT', 8888)
+    const port = env.get('NESTMTX_HLS_PORT', env.get('MEDIA_MTX_HLS_PORT', 8888))
     if (port <= 0) {
       return null
     }
@@ -702,7 +713,7 @@ export default class Camera extends BaseModel {
     if (!enabled) {
       return null
     }
-    const port = env.get('MEDIA_MTX_HLS_PORT', 8888)
+    const port = env.get('NESTMTX_HLS_PORT', env.get('MEDIA_MTX_HLS_PORT', 8888))
     if (port <= 0) {
       return null
     }
@@ -720,7 +731,7 @@ export default class Camera extends BaseModel {
     if (!enabled) {
       return null
     }
-    const port = env.get('MEDIA_MTX_WEB_RTC_PORT', 8889)
+    const port = env.get('NESTMTX_WEB_RTC_PORT', env.get('MEDIA_MTX_WEB_RTC_PORT', 8889))
     if (port <= 0) {
       return null
     }
@@ -738,7 +749,7 @@ export default class Camera extends BaseModel {
     if (!enabled) {
       return null
     }
-    const port = env.get('MEDIA_MTX_SRT_PORT', 8890)
+    const port = env.get('NESTMTX_SRT_PORT', env.get('MEDIA_MTX_SRT_PORT', 8890))
     if (port <= 0) {
       return null
     }
@@ -912,7 +923,8 @@ export default class Camera extends BaseModel {
     }
     const audioPort = await pickPort(getPortOptions)
     const videoPort = await pickPort(getPortOptions)
-    return { audioPort, videoPort }
+    const opusAudioPort = await pickPort(getPortOptions)
+    return { audioPort, videoPort, opusAudioPort }
   }
 
   async #startWebRTC(service: smartdevicemanagement_v1.Smartdevicemanagement) {
@@ -940,7 +952,7 @@ export default class Camera extends BaseModel {
       throw new Error('Failed to get ICE servers')
     }
 
-    const { audioPort, videoPort } = await this.#getWebRTCUdpPorts()
+    const { audioPort, videoPort, opusAudioPort } = await this.#getWebRTCUdpPorts()
 
     const gstreamerBinary = env.get('GSTREAMER_BIN', 'gst-launch-1.0')
     const location = `rtsp://127.0.0.1:${env.get('MEDIA_MTX_RTSP_TCP_PORT', 8554)}/${this.mtxPath}`
@@ -974,6 +986,8 @@ export default class Camera extends BaseModel {
       'name=s',
       `location="${location}"`,
       'async-handling=true',
+      'protocols=udp', // Use UDP for the RTSP feed
+
       // Video pipeline
       'udpsrc',
       `port=${videoPort}`,
@@ -1155,6 +1169,14 @@ export default class Camera extends BaseModel {
               logger.debug(`Sent ${bytes} bytes of audio data to 0.0.0.0:${audioPort}`)
               audioRtpBus.emit('sent')
             })
+            udp.send(rtp.serialize(), opusAudioPort, '0.0.0.0', (error, bytes) => {
+              if (error) {
+                logger.error(error)
+                return
+              }
+              logger.debug(`Sent ${bytes} bytes of audio data to 0.0.0.0:${opusAudioPort}`)
+              audioRtpBus.emit('sent')
+            })
             break
 
           default:
@@ -1225,13 +1247,57 @@ export default class Camera extends BaseModel {
     logger.info('Starting GStreamer process for WebRTC stream')
   }
 
-  async #getRtspStreamCharacteristics(url: string) {
+  #getAlternativeRtspUrl(current: string, tried: string[]): string {
+    const currentHostname = getHostnameFromRtspUrl(current)
+    const previouslyTriedHostnames = tried.map((url) => getHostnameFromRtspUrl(url))
+    const possibleHosts: Array<string> = [...dropcamPossibleHostnames].filter(
+      (h) => h !== currentHostname && !previouslyTriedHostnames.includes(h)
+    )
+    if (possibleHosts.length === 0) {
+      throw new Error(
+        'Failed to get RTSP stream characteristics after exhausting all possible hostnames'
+      )
+    }
+    const randomIndex = Math.floor(Math.random() * possibleHosts.length)
+    const possibleHost = possibleHosts[randomIndex]
+    const updatedUrl = getUrlObjectForRtspUrl(current)
+    updatedUrl.hostname = possibleHost
+    return updatedUrl.toString().replace('https://', 'rtsps://')
+  }
+
+  async #getRtspStreamCharacteristics(
+    url: string,
+    tried: string[] = []
+  ): Promise<RtspStreamCharacteristics> {
+    const mainLogger = await app.container.make('logger')
+    const logger = mainLogger.child({ service: `getRtspStreamCharacteristics` })
+    logger.info(
+      `Getting RTSP stream characteristics camera being served by ${getHostnameFromRtspUrl(url)}`
+    )
     try {
       const { stdout } = await execa('gst-discoverer-1.0', [url], {
         reject: true,
       })
 
+      if (dropcamRetryHostnameFailureMessages.some((m) => stdout.includes(m))) {
+        if (
+          tried.length >= dropcamPossibleHostnames.length ||
+          tried.length >= DROPCAM_MAX_CASCADES
+        ) {
+          throw new Error(
+            `Failed to get RTSP stream characteristics after ${tried.length} attempts`
+          )
+        }
+        const current = url
+        url = this.#getAlternativeRtspUrl(url, tried)
+        logger.info(
+          `${getHostnameFromRtspUrl(current)} is not serving the stream. Trying ${getHostnameFromRtspUrl(url)}`
+        )
+        return await this.#getRtspStreamCharacteristics(url, [...tried, current])
+      }
+
       const characteristics: RtspStreamCharacteristics = {
+        url,
         audio: {},
         video: {},
         raw: stdout,
@@ -1407,7 +1473,7 @@ export default class Camera extends BaseModel {
       '-c:a',
       inputAudioCodec, // Specify known input audio codec (if you want to decode the input stream)
       '-i',
-      rtspSrc, // Input RTSP stream
+      characteristics.url, // Input RTSP stream
       '-rtsp_transport',
       'udp', // Use UDP for RTSP
       '-rtpflags',

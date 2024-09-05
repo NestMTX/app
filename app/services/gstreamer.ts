@@ -23,6 +23,7 @@ export class GStreamerService {
   readonly #app: ApplicationService
   readonly #managedProcesses: Set<string>
   readonly #shuttingDownProcesses: Set<string>
+  readonly #demandTimeouts: Map<string, NodeJS.Timeout>
   readonly #undemandTimeouts: Map<string, NodeJS.Timeout>
   #logger?: Logger
   #ffmpegHwAccelerator?: string
@@ -33,6 +34,7 @@ export class GStreamerService {
     this.#managedProcesses = new Set()
     this.#shuttingDownProcesses = new Set()
     this.#undemandTimeouts = new Map()
+    this.#demandTimeouts = new Map()
     this.#demands = new Set()
   }
 
@@ -144,6 +146,11 @@ export class GStreamerService {
     }
     this.#demands.add(payload.MTX_PATH)
     this.#logger?.info(`Received demand for ${payload.MTX_PATH}`)
+    const demandTimeout = this.#demandTimeouts.get(payload.MTX_PATH)
+    if (demandTimeout) {
+      clearTimeout(demandTimeout)
+      this.#demandTimeouts.delete(payload.MTX_PATH)
+    }
     let processName: string | undefined
     try {
       const camera = await Camera.findBy({ mtx_path: payload.MTX_PATH })
@@ -168,7 +175,12 @@ export class GStreamerService {
           this.#app.pm3.remove(processName!)
           this.#managedProcesses.delete(processName!)
           if (this.#demands.has(payload.MTX_PATH)) {
-            this.#onDemand(payload, true)
+            if (!this.#demandTimeouts.has(payload.MTX_PATH)) {
+              this.#demandTimeouts.set(
+                payload.MTX_PATH,
+                setTimeout(() => this.#onDemand(payload, true), 30000)
+              )
+            }
           }
         })
         this.#managedProcesses.add(processName)
@@ -178,7 +190,12 @@ export class GStreamerService {
         this.#logger.error(error)
       }
       if (this.#demands.has(payload.MTX_PATH)) {
-        this.#onDemand(payload, true)
+        if (!this.#demandTimeouts.has(payload.MTX_PATH)) {
+          this.#demandTimeouts.set(
+            payload.MTX_PATH,
+            setTimeout(() => this.#onDemand(payload, true), 30000)
+          )
+        }
       }
       if (processName) {
         this.#app.pm3.remove(processName)

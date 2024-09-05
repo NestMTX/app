@@ -107,4 +107,23 @@ export default await Env.create(new URL('../', import.meta.url), {
   HTTPS_PORT: Env.schema.number(),
   HTTPS_CERT_PATH: Env.schema.string.optional(),
   HTTPS_KEY_PATH: Env.schema.string.optional(),
+  /**
+   * NestMTX Configuration
+   */
+  NESTMTX_RTSP_TCP_PORT: Env.schema.number.optional(),
+  NESTMTX_RTSP_UDP_RTP_PORT: Env.schema.number.optional(),
+  NESTMTX_RTSP_UDP_RTCP_PORT: Env.schema.number.optional(),
+  NESTMTX_RTMP_PORT: Env.schema.number.optional(),
+  NESTMTX_HLS_PORT: Env.schema.number.optional(),
+  NESTMTX_WEB_RTC_PORT: Env.schema.number.optional(),
+  NESTMTX_WEB_RTC_UDP_PORT: Env.schema.number.optional(),
+  NESTMTX_SRT_PORT: Env.schema.number.optional(),
+  /**
+   * Dropcam Configuration
+   */
+  DROPCAM_EXCLUDED_DATACENTERS: Env.schema.string.optional(),
+  DROPCAM_EXCLUDED_PHONETICS: Env.schema.string.optional(),
+  DROPCAM_EXCLUDED_DATACENTER_ZONES: Env.schema.string.optional(),
+  DROPCAM_EXCLUDED_HOSTNAMES: Env.schema.string.optional(),
+  DROPCAM_MAX_CASCADES: Env.schema.number.optional(),
 })

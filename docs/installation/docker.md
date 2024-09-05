@@ -243,6 +243,20 @@ You can use an external MQTT Server with NestMTX by setting the following enviro
 
 By default, NestMTX does not enable any streaming protocols. This is mainly done for performance reasons, but has the additional benefit of helping prevent port conflicts.
 
+### Updating the ports shown in the UI
+
+You can use the following environmental variables to change the port shown in the UI. This is especially useful when you have mapped a different host port to the protocol's port.
+
+| Environmental Variable       | Default |
+| ---------------------------- | ------- |
+| `NESTMTX_RTSP_TCP_PORT`      | `8554`  |
+| `NESTMTX_RTSP_UDP_RTP_PORT`  | `8000`  |
+| `NESTMTX_RTSP_UDP_RTCP_PORT` | `8001`  |
+| `NESTMTX_RTMP_PORT`          | `1935`  |
+| `NESTMTX_HLS_PORT`           | `8888`  |
+| `NESTMTX_WEB_RTC_PORT`       | `8889`  |
+| `NESTMTX_SRT_PORT`           | `8890`  |
+
 ### RTSP Output Streaming
 
 To enable an output stream from NestMTX for the **RTSP** Protocol, you should set the environmental variables:

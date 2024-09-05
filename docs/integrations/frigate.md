@@ -58,3 +58,18 @@ My_NestMtx_Camera:
         width: 640
         height: 480
 ```
+
+## Setting up Go2RTC for Live View
+
+In order to allow the Frigate UI to use a higher quality live view, you can also set your camera feed under the `go2rtc` > `streams` configuration. For example:
+
+```yaml
+go2rtc:
+  streams:
+    My_NestMtx_Camera:
+      - rtsp://my.nestmtx.local:8554/my_nestmtx_camera
+```
+
+## Special Notes
+
+Special thanks to [NickM-27](https://github.com/NickM-27), a contributor to [Frigate](https://frigate.video) who reviewed the documentation and advised on improvements.

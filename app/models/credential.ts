@@ -127,4 +127,19 @@ export default class Credential extends BaseModel {
       auth: oac,
     })
   }
+
+  async refreshAuthentication(redirectUrl?: string | null) {
+    if (!redirectUrl) {
+      redirectUrl = this.tokenRedirectUrl
+    }
+    if (!redirectUrl) {
+      throw new Error('No redirect URL found')
+    }
+    const oac = await this.getOauthClient(redirectUrl)
+    oac.setCredentials(this.tokens)
+    const { credentials: tokens } = await oac.refreshAccessToken()
+    this.tokens = tokens
+    this.tokenRedirectUrl = redirectUrl.toString()
+    await this.save()
+  }
 }

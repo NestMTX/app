@@ -2,12 +2,22 @@ import Credential from '#models/credential'
 import { CronJob } from '#services/cron'
 import { DateTime } from 'luxon'
 
+import type { ApplicationService } from '@adonisjs/core/types'
+
 export default class CredentialsJob extends CronJob {
+  #app: ApplicationService
+  constructor(protected app: ApplicationService) {
+    super(app)
+    this.#app = app
+  }
+
   get crontab() {
     return '* * * * *'
   }
 
   async run() {
+    const mainLogger = await this.#app.container.make('logger')
+    const logger = mainLogger.child({ service: `job-CredentialsJob` })
     const authenticatedCredentials = await Credential.query().whereNotNull('tokens')
     for (const credential of authenticatedCredentials) {
       if (
@@ -16,12 +26,33 @@ export default class CredentialsJob extends CronJob {
         'number' === typeof credential.tokens.expiry_date
       ) {
         const expiryDate = DateTime.fromMillis(credential.tokens.expiry_date)
-        const inFiveMinutes = DateTime.now().plus({ minutes: 5 })
-        const now = DateTime.now()
-        if (expiryDate < now) {
-          console.log(credential.description, 'has expired')
-        } else if (expiryDate < inFiveMinutes) {
-          console.log(credential.description, 'is about to expire')
+        let refresh = false
+        if (expiryDate.diffNow().toMillis() < 0) {
+          logger.info(
+            `Credentials ${credential.description} expired ${expiryDate.diffNow().rescale().toHuman()}`
+          )
+          logger.info(`${credential.description} has expired`)
+          refresh = true
+        } else if (expiryDate.diffNow().toMillis() <= 2 * 60 * 1000) {
+          logger.info(
+            `Credentials ${credential.description} expires ${expiryDate.diffNow().rescale().toHuman()}`
+          )
+          logger.info(`${credential.description} is about to expire`)
+          refresh = true
+        } else {
+          logger.info(
+            `Credentials ${credential.description} expires ${expiryDate.diffNow().rescale().toHuman()}`
+          )
+        }
+        if (refresh) {
+          logger.info(`Refreshing ${credential.description}`)
+          try {
+            await credential.refreshAuthentication()
+          } catch (error) {
+            logger.error(`Failed to refresh ${credential.description}: ${error.message}`)
+            credential.tokens = null
+            await credential.save()
+          }
         }
       }
     }
