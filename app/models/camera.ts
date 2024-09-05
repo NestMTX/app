@@ -52,6 +52,7 @@ interface RtspStreamInfo {
 }
 
 interface RtspStreamCharacteristics {
+  url: string
   video: RtspStreamInfo
   audio: RtspStreamInfo
   duration?: string
@@ -612,7 +613,7 @@ export default class Camera extends BaseModel {
     if (!enabled) {
       return null
     }
-    const port = env.get('MEDIA_MTX_RTSP_TCP_PORT', 8554)
+    const port = env.get('NESTMTX_RTSP_TCP_PORT', env.get('MEDIA_MTX_RTSP_TCP_PORT', 8554))
     if (port <= 0) {
       return null
     }
@@ -630,7 +631,7 @@ export default class Camera extends BaseModel {
     if (!enabled) {
       return null
     }
-    const port = env.get('MEDIA_MTX_RTSP_UDP_RTP_PORT', 8000)
+    const port = env.get('NESTMTX_RTSP_UDP_RTP_PORT', env.get('MEDIA_MTX_RTSP_UDP_RTP_PORT', 8000))
     if (port <= 0) {
       return null
     }
@@ -648,7 +649,10 @@ export default class Camera extends BaseModel {
     if (!enabled) {
       return null
     }
-    const port = env.get('MEDIA_MTX_RTSP_UDP_RTCP_PORT', 8001)
+    const port = env.get(
+      'NESTMTX_RTSP_UDP_RTCP_PORT',
+      env.get('MEDIA_MTX_RTSP_UDP_RTCP_PORT', 8001)
+    )
     if (port <= 0) {
       return null
     }
@@ -666,7 +670,7 @@ export default class Camera extends BaseModel {
     if (!enabled) {
       return null
     }
-    const port = env.get('MEDIA_MTX_RTMP_PORT', 1935)
+    const port = env.get('NESTMTX_RTMP_PORT', env.get('MEDIA_MTX_RTMP_PORT', 1935))
     if (port <= 0) {
       return null
     }
@@ -684,7 +688,7 @@ export default class Camera extends BaseModel {
     if (!enabled) {
       return null
     }
-    const port = env.get('MEDIA_MTX_HLS_PORT', 8888)
+    const port = env.get('NESTMTX_HLS_PORT', env.get('MEDIA_MTX_HLS_PORT', 8888))
     if (port <= 0) {
       return null
     }
@@ -702,7 +706,7 @@ export default class Camera extends BaseModel {
     if (!enabled) {
       return null
     }
-    const port = env.get('MEDIA_MTX_HLS_PORT', 8888)
+    const port = env.get('NESTMTX_HLS_PORT', env.get('MEDIA_MTX_HLS_PORT', 8888))
     if (port <= 0) {
       return null
     }
@@ -720,7 +724,7 @@ export default class Camera extends BaseModel {
     if (!enabled) {
       return null
     }
-    const port = env.get('MEDIA_MTX_WEB_RTC_PORT', 8889)
+    const port = env.get('NESTMTX_WEB_RTC_PORT', env.get('MEDIA_MTX_WEB_RTC_PORT', 8889))
     if (port <= 0) {
       return null
     }
@@ -738,7 +742,7 @@ export default class Camera extends BaseModel {
     if (!enabled) {
       return null
     }
-    const port = env.get('MEDIA_MTX_SRT_PORT', 8890)
+    const port = env.get('NESTMTX_SRT_PORT', env.get('MEDIA_MTX_SRT_PORT', 8890))
     if (port <= 0) {
       return null
     }
@@ -912,7 +916,8 @@ export default class Camera extends BaseModel {
     }
     const audioPort = await pickPort(getPortOptions)
     const videoPort = await pickPort(getPortOptions)
-    return { audioPort, videoPort }
+    const opusAudioPort = await pickPort(getPortOptions)
+    return { audioPort, videoPort, opusAudioPort }
   }
 
   async #startWebRTC(service: smartdevicemanagement_v1.Smartdevicemanagement) {
@@ -940,7 +945,7 @@ export default class Camera extends BaseModel {
       throw new Error('Failed to get ICE servers')
     }
 
-    const { audioPort, videoPort } = await this.#getWebRTCUdpPorts()
+    const { audioPort, videoPort, opusAudioPort } = await this.#getWebRTCUdpPorts()
 
     const gstreamerBinary = env.get('GSTREAMER_BIN', 'gst-launch-1.0')
     const location = `rtsp://127.0.0.1:${env.get('MEDIA_MTX_RTSP_TCP_PORT', 8554)}/${this.mtxPath}`
@@ -974,6 +979,8 @@ export default class Camera extends BaseModel {
       'name=s',
       `location="${location}"`,
       'async-handling=true',
+      'protocols=udp', // Use UDP for the RTSP feed
+
       // Video pipeline
       'udpsrc',
       `port=${videoPort}`,
@@ -1155,6 +1162,14 @@ export default class Camera extends BaseModel {
               logger.debug(`Sent ${bytes} bytes of audio data to 0.0.0.0:${audioPort}`)
               audioRtpBus.emit('sent')
             })
+            udp.send(rtp.serialize(), opusAudioPort, '0.0.0.0', (error, bytes) => {
+              if (error) {
+                logger.error(error)
+                return
+              }
+              logger.debug(`Sent ${bytes} bytes of audio data to 0.0.0.0:${opusAudioPort}`)
+              audioRtpBus.emit('sent')
+            })
             break
 
           default:
@@ -1225,13 +1240,24 @@ export default class Camera extends BaseModel {
     logger.info('Starting GStreamer process for WebRTC stream')
   }
 
+  // #getAlternativeRtspUrl(current: string, tried: string[]) {
+  // }
+
   async #getRtspStreamCharacteristics(url: string) {
+    // const mainLogger = await app.container.make('logger')
+    // const logger = mainLogger.child({ service: `getRtspStreamCharacteristics` })
+    // logger.info(`Getting RTSP stream characteristics for ${url}`)
     try {
       const { stdout } = await execa('gst-discoverer-1.0', [url], {
         reject: true,
       })
 
+      if (stdout.includes('Analyzing URI timed out')) {
+        throw new Error('Nest RTSP stream is not accessible')
+      }
+
       const characteristics: RtspStreamCharacteristics = {
+        url,
         audio: {},
         video: {},
         raw: stdout,
