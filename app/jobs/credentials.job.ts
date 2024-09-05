@@ -26,15 +26,23 @@ export default class CredentialsJob extends CronJob {
         'number' === typeof credential.tokens.expiry_date
       ) {
         const expiryDate = DateTime.fromMillis(credential.tokens.expiry_date)
-        const inTwoMinutes = DateTime.now().plus({ minutes: 2 })
-        const now = DateTime.now()
         let refresh = false
-        if (expiryDate < now) {
+        if (expiryDate.diffNow().toMillis() < 0) {
+          logger.info(
+            `Credentials ${credential.description} expired ${expiryDate.diffNow().rescale().toHuman()}`
+          )
           logger.info(`${credential.description} has expired`)
           refresh = true
-        } else if (expiryDate < inTwoMinutes) {
+        } else if (expiryDate.diffNow().toMillis() <= 2 * 60 * 1000) {
+          logger.info(
+            `Credentials ${credential.description} expires ${expiryDate.diffNow().rescale().toHuman()}`
+          )
           logger.info(`${credential.description} is about to expire`)
           refresh = true
+        } else {
+          logger.info(
+            `Credentials ${credential.description} expires ${expiryDate.diffNow().rescale().toHuman()}`
+          )
         }
         if (refresh) {
           logger.info(`Refreshing ${credential.description}`)
