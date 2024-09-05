@@ -47,7 +47,7 @@ export default class CredentialsJob extends CronJob {
         if (refresh) {
           logger.info(`Refreshing ${credential.description}`)
           try {
-            await credential.refresh()
+            await credential.refreshAuthentication()
           } catch (error) {
             logger.error(`Failed to refresh ${credential.description}: ${error.message}`)
             credential.tokens = null
