@@ -12,7 +12,7 @@
             <v-divider />
             <v-container fluid>
               <v-row>
-                <v-col v-for="(c, i) in cpu" :key="`cpi-${i}`" cols="12" :sm="cpuCols">
+                <v-col v-for="(c, i) in cpu" :key="`cpi-${i}`" cols="6" :sm="cpuCols">
                   <v-card color="transparent" class="glass-surface" style="position: relative">
                     <v-progress-linear v-bind="c">
                       <template #default="{ value }">

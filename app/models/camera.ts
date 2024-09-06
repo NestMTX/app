@@ -1382,10 +1382,12 @@ export default class Camera extends BaseModel {
       inputVideoCodec, // Specify known input video codec (if you want to decode the input stream)
       '-c:a',
       inputAudioCodec, // Specify known input audio codec (if you want to decode the input stream)
-      '-i',
-      characteristics.url, // Input RTSP stream
+      '-f',
+      'rtsp', // Output format
       '-rtsp_transport',
       'udp', // Use UDP for RTSP
+      '-i',
+      characteristics.url, // Input RTSP stream
       '-rtpflags',
       'skip_rtcp', // Skip RTCP packets
       ...resolutionArgs, // Include resolution if known

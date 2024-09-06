@@ -95,6 +95,19 @@ export class GStreamerService {
     pm3.on('log:err', this.#logProcessToError)
   }
 
+  async cronjob() {
+    const livePaths = this.#app.mediamtx.paths.map((path) => path.path)
+    const liveCameras = await Camera.query()
+      .whereIn('mtx_path', livePaths)
+      .where('is_enabled', true)
+    if (liveCameras.length === 0) {
+      return
+    }
+    // const liveCamerasMissingProcesses = liveCameras.filter(
+    //   (camera) => 'undefined' === typeof this.#app.pm3.get(`camera-${camera.id}`)
+    // )
+  }
+
   async #getAvailableHwAccelerators() {
     const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
     const { stdout } = await execa(ffmpegBinary, ['-hwaccels'])
@@ -147,11 +160,10 @@ export class GStreamerService {
       return
     }
     let abortController = this.#abortControllers.get(payload.MTX_PATH)
-    if (abortController) {
-      abortController.abort()
+    if (!abortController || abortController.signal.aborted) {
+      abortController = new AbortController()
+      this.#abortControllers.set(payload.MTX_PATH, abortController)
     }
-    abortController = new AbortController()
-    this.#abortControllers.set(payload.MTX_PATH, abortController)
     this.#demands.add(payload.MTX_PATH)
     this.#logger?.info(`Received demand for ${payload.MTX_PATH}`)
     const demandTimeout = this.#demandTimeouts.get(payload.MTX_PATH)
@@ -197,6 +209,11 @@ export class GStreamerService {
                 setTimeout(() => this.#onDemand(payload, true), 30000)
               )
             }
+          }
+          if (camera) {
+            camera.streamExtensionToken = null
+            camera.expiresAt = null
+            camera.save()
           }
         })
         this.#managedProcesses.add(processName)

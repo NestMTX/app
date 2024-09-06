@@ -685,6 +685,13 @@ export default {
       header: 'User Management',
       subtitle: 'View & Manage NestMTX Users',
     },
+    'logs': {
+      nav: 'Logs',
+      title: 'Logs - NestMTX',
+      description: 'View NestMTX Logs',
+      header: 'Logs',
+      subtitle: 'View NestMTX Logs',
+    },
   },
   credentials: {
     redirectUrl: {
