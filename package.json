@@ -74,7 +74,7 @@
     "@octokit/rest": "^20.1.0",
     "@vinejs/vine": "^1.7.1",
     "aedes": "^0.51.1",
-    "axios": "^1.6.8",
+    "axios": "^1.7.4",
     "better-sqlite3": "^9.5.0",
     "canvas": "^2.11.2",
     "dot-object": "^2.1.5",
@@ -84,16 +84,15 @@
     "http-proxy": "^1.18.1",
     "joi": "^17.12.3",
     "luxon": "^3.4.4",
-    "mqtt": "^5.5.2",
+    "mqtt": "^5.10.1",
     "mssql": "^10.0.2",
-    "mysql2": "^3.9.4",
+    "mysql2": "^3.9.8",
     "openapi-client-axios": "^7.5.5",
     "openapi-client-axios-typegen": "^7.6.2",
     "pg": "^8.11.5",
     "pick-port": "^2.1.0",
     "pidusage": "^3.0.2",
     "pino-abstract-transport": "^1.2.0",
-    "pm2": "^5.3.1",
     "reflect-metadata": "^0.2.1",
     "socket.io": "^4.7.5",
     "twilio": "^5.0.4",
@@ -103,5 +102,8 @@
   "eslintConfig": {
     "extends": "@adonisjs/eslint-config/app"
   },
-  "prettier": "@adonisjs/prettier-config"
+  "prettier": "@adonisjs/prettier-config",
+  "resolutions": {
+    "ws": "^8.17.1"
+  }
 }
