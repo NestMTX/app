@@ -50,7 +50,7 @@ services:
       - "8890:8890"
       - "10000-10100:10000-10100/udp"
     volumes:
-      - /home/user/nestmtx:/home/nestmtx/app/tmp
+      - /home/user/nestmtx:/home/node/app/tmp
 ```
 
 ```yaml [arm64]
@@ -82,7 +82,7 @@ services:
       - "8890:8890"
       - "10000-10100:10000-10100/udp"
     volumes:
-      - /home/user/nestmtx:/home/nestmtx/app/tmp
+      - /home/user/nestmtx:/home/node/app/tmp
 ```
 
 :::warning IMPORTANT NOTE
@@ -123,14 +123,14 @@ To use the testing version of `nestmtx/amd64`, you would use the image `nestmtx/
 
 ## Persistent Volume & Sharing between host and container
 
-There are some situations where you way want to persist files (like the NestMTX SQLite Database) or share files from the host machine to the container (like SSL certificates). NestMTX has a built in directory ready to receive this mapping: `/home/nestmtx/app/tmp`.
+There are some situations where you way want to persist files (like the NestMTX SQLite Database) or share files from the host machine to the container (like SSL certificates). NestMTX has a built in directory ready to receive this mapping: `/home/node/app/tmp`.
 
 :::info Example
-To map between the `/home/user/nestmtx` directory on your host machine and `/home/nestmtx/app/tmp` in the container, add the following before the image name in the command which you use to launch NestMTX:
+To map between the `/home/user/nestmtx` directory on your host machine and `/home/node/app/tmp` in the container, add the following before the image name in the command which you use to launch NestMTX:
 
 ```yaml
 volumes:
-    - /home/user/nestmtx:/home/nestmtx/app/tmp
+    - /home/user/nestmtx:/home/node/app/tmp
 ```
 
 :::
@@ -207,11 +207,11 @@ NestMTX serves HTTPS requests with a self-signed certificate which is automatica
 If you use a relative file path (i.e. one which doesn't start with `/`) NestMTX assumes that your file path is relative to `/home/app/nestmtx/tmp` so `nestmtx.crt` will be assumed to be `/home/app/nestmtx/tmp/nestmtx.crt`
 :::
 
-The easiest way to configure your own SSL certifcates is to map a volume between your host machine and the NestMTX `/home/nestmtx/app/tmp` directory, place your certificate and certificate key files in the folder on your host machine, and configure the `HTTPS_CERT_PATH` and `HTTPS_KEY_PATH` appropriately.
+The easiest way to configure your own SSL certifcates is to map a volume between your host machine and the NestMTX `/home/node/app/tmp` directory, place your certificate and certificate key files in the folder on your host machine, and configure the `HTTPS_CERT_PATH` and `HTTPS_KEY_PATH` appropriately.
 
 ## Database
 
-NestMTX is configured by default to use an SQLite database which is generated and stored in `/home/nestmtx/app/tmp/db.sqlite3`, however you are able to use your own custom database server including:
+NestMTX is configured by default to use an SQLite database which is generated and stored in `/home/node/app/tmp/db.sqlite3`, however you are able to use your own custom database server including:
 
 - MySQL / MariaDB
 - PostgreSQL<sup>1</sup>
