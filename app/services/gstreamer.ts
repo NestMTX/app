@@ -197,6 +197,11 @@ export class GStreamerService {
               )
             }
           }
+          if (camera) {
+            camera.streamExtensionToken = null
+            camera.expiresAt = null
+            camera.save()
+          }
         })
         this.#managedProcesses.add(processName)
       }
