@@ -147,11 +147,10 @@ export class GStreamerService {
       return
     }
     let abortController = this.#abortControllers.get(payload.MTX_PATH)
-    if (abortController) {
-      abortController.abort()
+    if (!abortController) {
+      abortController = new AbortController()
+      this.#abortControllers.set(payload.MTX_PATH, abortController)
     }
-    abortController = new AbortController()
-    this.#abortControllers.set(payload.MTX_PATH, abortController)
     this.#demands.add(payload.MTX_PATH)
     this.#logger?.info(`Received demand for ${payload.MTX_PATH}`)
     const demandTimeout = this.#demandTimeouts.get(payload.MTX_PATH)
