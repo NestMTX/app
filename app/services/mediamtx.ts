@@ -209,7 +209,7 @@ export class MediaMTXService {
         // runOnInit: [...baseRunOnCommand, 'init'].join(' '),
         // runOnInitRestart: false,
         runOnDemand: [...baseRunOnCommand, 'demand'].join(' '),
-        runOnDemandStartTimeout: '120s',
+        runOnDemandStartTimeout: '60s',
         runOnDemandRestart: false,
         runOnUnDemand: [...baseRunOnCommand, 'unDemand'].join(' '),
         runOnReady: [...baseRunOnCommand, 'ready'].join(' '),
