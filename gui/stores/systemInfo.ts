@@ -86,6 +86,7 @@ export const onIncomingLog = (log: PinoLog) => {
       .sort((a, b) => a.time - b.time)
       .slice(0, countToDelete)
       .map((t) => t.key)
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     oldestLogs.forEach((key) => delete logStore.value[key])
   }
 }

@@ -136,14 +136,14 @@
         </v-card>
       </v-dialog>
     </v-locale-provider>
-    <v-fab
+    <!-- <v-fab
       v-if="!showSystemInfo"
       app
       icon="mdi-server"
       fixed
       color="secondary"
       @click="showSystemInfo = true"
-    ></v-fab>
+    ></v-fab> -->
   </v-app>
 </template>
 
@@ -211,6 +211,7 @@ export default defineComponent({
         { icon: 'mdi-cctv', value: 'cameras' },
         { icon: 'mdi-clock', value: 'cronjobs' },
         { icon: 'mdi-account', value: 'users' },
+        { icon: 'mdi-console', value: 'logs' },
       ].map((n) => ({
         'active': rawRouteName.value === n.value,
         'prepend-icon': n.icon,
