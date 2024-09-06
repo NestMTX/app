@@ -108,6 +108,7 @@ export class MediaMTXService {
     const baseRunOnCommand = ['node', this.#app.makePath('ace.js'), 'mediamtx:on:event']
     const updated: any = {
       ...mediaMtxConfig,
+      readTimeout: '60s',
       writeQueueSize: 1024,
       metrics: false,
       metricsEncryption: false,
@@ -193,6 +194,8 @@ export class MediaMTXService {
       webrtcAdditionalHosts: ['127.0.0.1', '::1', ...nat.lanIps, nat.publicIp],
       webrtcICEServers2: ice.asMediaMtxIceServers,
       webrtcIPsFromInterfaces: true,
+      webrtcHandshakeTimeout: '60s',
+      webrtcTrackGatherTimeout: '60s',
       /**
        * Update the SRT configuration
        */
@@ -206,6 +209,7 @@ export class MediaMTXService {
         // runOnInit: [...baseRunOnCommand, 'init'].join(' '),
         // runOnInitRestart: false,
         runOnDemand: [...baseRunOnCommand, 'demand'].join(' '),
+        runOnDemandStartTimeout: '120s',
         runOnDemandRestart: false,
         runOnUnDemand: [...baseRunOnCommand, 'unDemand'].join(' '),
         runOnReady: [...baseRunOnCommand, 'ready'].join(' '),
