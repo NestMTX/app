@@ -19,16 +19,14 @@ import { RTCPeerConnection, RTCRtpCodecParameters } from 'werift'
 import { pickPort } from 'pick-port'
 import { createSocket } from 'node:dgram'
 import { EventEmitter } from 'node:events'
-import { execa } from 'execa'
-import { MissingStreamCharacteristicsException } from '#exceptions/missing_stream_characteristics_exception'
-import { dropcamPossibleHostnames, dropcamRetryHostnameFailureMessages } from '#config/dropcam'
-import { getUrlObjectForRtspUrl, getHostnameFromRtspUrl } from '#utilities/url'
+import { getRtspStreamCharacteristics } from '#utilities/rtsp'
 
 dot.keepArray = true
 
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import type { RTCTrackEvent } from 'werift'
 import type { Socket as DGramSocket } from 'node:dgram'
+import type { RtspStreamCharacteristics } from '#utilities/rtsp'
 
 interface PickPortOptions {
   type: 'tcp' | 'udp'
@@ -36,31 +34,6 @@ interface PickPortOptions {
   minPort?: number
   maxPort?: number
   reserveTimeout?: number
-}
-
-interface RtspStreamInfo {
-  streamID?: string
-  width?: number
-  height?: number
-  depth?: number
-  frameRate?: string
-  pixelAspectRatio?: string
-  interlaced?: boolean
-  bitrate?: number
-  maxBitrate?: number
-  language?: string
-  channels?: number
-  sampleRate?: number
-}
-
-interface RtspStreamCharacteristics {
-  url: string
-  video: RtspStreamInfo
-  audio: RtspStreamInfo
-  duration?: string
-  seekable?: boolean
-  live?: boolean
-  raw: string
 }
 
 const makeChecksum = (data: string) => {
@@ -790,10 +763,13 @@ export default class Camera extends BaseModel {
     ])
   }
 
-  async start() {
+  async start(signal?: AbortSignal) {
     try {
       await (this as Camera).load('credential')
     } catch {
+      if (signal && signal.aborted) {
+        return
+      }
       throw new Error(`Failed to load Google SDM API Credentials for Camera ${this.id}`)
     }
     if (
@@ -815,11 +791,17 @@ export default class Camera extends BaseModel {
       throw new Error('Unsupported video codec. Supported codec is H264.')
     }
     const service = await this.credential.getSDMClient()
+    if (signal && signal.aborted) {
+      return
+    }
     if (this.protocols.includes('WEB_RTC')) {
-      await this.#startWebRTC(service)
+      await this.#startWebRTC(service, signal)
     } else if (this.protocols.includes('RTSP')) {
-      await this.#startRTSP(service)
+      await this.#startRTSP(service, signal)
     } else {
+      if (signal && signal.aborted) {
+        return
+      }
       throw new Error('No supported protocols found')
     }
   }
@@ -927,10 +909,16 @@ export default class Camera extends BaseModel {
     return { audioPort, videoPort, opusAudioPort }
   }
 
-  async #startWebRTC(service: smartdevicemanagement_v1.Smartdevicemanagement) {
+  async #startWebRTC(
+    service: smartdevicemanagement_v1.Smartdevicemanagement,
+    signal?: AbortSignal
+  ) {
     const mainLogger = await app.container.make('logger')
     const logger = mainLogger.child({ service: `camera-${this.id}` })
     const isRunning = await this.#getIsAlreadyRunning()
+    if (signal && signal.aborted) {
+      return
+    }
     if (isRunning) {
       logger.info(`GStreamer process for WebRTC stream already running`)
       return
@@ -949,10 +937,16 @@ export default class Camera extends BaseModel {
       app.natService.publicIp,
     ]
     if (!Array.isArray(iceServers)) {
+      if (signal && signal.aborted) {
+        return
+      }
       throw new Error('Failed to get ICE servers')
     }
 
     const { audioPort, videoPort, opusAudioPort } = await this.#getWebRTCUdpPorts()
+    if (signal && signal.aborted) {
+      return
+    }
 
     const gstreamerBinary = env.get('GSTREAMER_BIN', 'gst-launch-1.0')
     const location = `rtsp://127.0.0.1:${env.get('MEDIA_MTX_RTSP_TCP_PORT', 8554)}/${this.mtxPath}`
@@ -1018,6 +1012,9 @@ export default class Camera extends BaseModel {
       })
       logger.info('Added GStreamer process for WebRTC stream')
     } catch (error) {
+      if (signal && signal.aborted) {
+        return
+      }
       if (!this.#shouldIgnoreError(error as Error)) {
         logger.error(`Error starting GStreamer for WebRTC process: ${(error as Error).message}`)
       }
@@ -1096,6 +1093,11 @@ export default class Camera extends BaseModel {
         // reject(new Error('Aborted'))
         resolve(void 0)
       )
+      if (signal) {
+        signal.addEventListener('abort', () => {
+          resolve(void 0)
+        })
+      }
     })
 
     peerConnected.then(() => {
@@ -1135,6 +1137,9 @@ export default class Camera extends BaseModel {
       })
       videoRtpBus.once('error', (error) => reject(error))
       rtpPromiseAbortController.signal.addEventListener('abort', () => resolve(void 0))
+      if (signal) {
+        signal.addEventListener('abort', () => resolve(void 0))
+      }
     })
 
     const audioRtpSending = new Promise<void>((resolve, reject) => {
@@ -1144,6 +1149,9 @@ export default class Camera extends BaseModel {
       })
       audioRtpBus.once('error', (error) => reject(error))
       rtpPromiseAbortController.signal.addEventListener('abort', () => resolve(void 0))
+      if (signal) {
+        signal.addEventListener('abort', () => resolve(void 0))
+      }
     })
 
     pc.addEventListener('track', (event: RTCTrackEvent) => {
@@ -1184,17 +1192,26 @@ export default class Camera extends BaseModel {
         }
       })
       rtpPromiseAbortController.signal.addEventListener('abort', () => unSubscribe())
+      if (signal) {
+        signal.addEventListener('abort', () => unSubscribe())
+      }
     })
 
     try {
       pc.addTransceiver('audio', { direction: 'recvonly' })
     } catch (error) {
+      if (signal && signal.aborted) {
+        return
+      }
       throw new Error(`Failed to add audio transceiver: ${error.message}`)
     }
 
     try {
       pc.addTransceiver('video', { direction: 'recvonly' })
     } catch (error) {
+      if (signal && signal.aborted) {
+        return
+      }
       throw new Error(`Failed to add video transceiver: ${error.message}`)
     }
 
@@ -1202,7 +1219,13 @@ export default class Camera extends BaseModel {
     pc.createDataChannel('dataSendChannel', { id: 1 })
 
     const offer = await pc.createOffer()
+    if (signal && signal.aborted) {
+      return
+    }
     await pc.setLocalDescription(offer)
+    if (signal && signal.aborted) {
+      return
+    }
 
     let results: smartdevicemanagement_v1.Schema$GoogleHomeEnterpriseSdmV1ExecuteDeviceCommandResponse['results']
     try {
@@ -1220,13 +1243,22 @@ export default class Camera extends BaseModel {
       results = commandResults!
     } catch (error) {
       rtpPromiseAbortController.abort()
+      if (signal && signal.aborted) {
+        return
+      }
       throw new Error(`Google API returned error: ${error.message} for Offer SDP: \n\n${offer.sdp}`)
     }
 
     if (!results!.answerSdp) {
+      if (signal && signal.aborted) {
+        return
+      }
       throw new Error('WebRTC Answer SDP not found')
     }
     if (!results!.mediaSessionId) {
+      if (signal && signal.aborted) {
+        return
+      }
       throw new Error('Media Session ID not found')
     }
     this.streamExtensionToken = results!.mediaSessionId
@@ -1243,154 +1275,40 @@ export default class Camera extends BaseModel {
       type: 'answer',
       sdp: results!.answerSdp,
     })
+    if (signal && signal.aborted) {
+      return
+    }
     await Promise.all([videoRtpSending, audioRtpSending])
     logger.info('Starting GStreamer process for WebRTC stream')
   }
 
-  #getAlternativeRtspUrl(current: string, tried: string[]): string {
-    const currentHostname = getHostnameFromRtspUrl(current)
-    const previouslyTriedHostnames = tried.map((url) => getHostnameFromRtspUrl(url))
-    const possibleHosts: Array<string> = [...dropcamPossibleHostnames].filter(
-      (h) => h !== currentHostname && !previouslyTriedHostnames.includes(h)
-    )
-    if (possibleHosts.length === 0) {
-      throw new Error(
-        'Failed to get RTSP stream characteristics after exhausting all possible hostnames'
-      )
-    }
-    const randomIndex = Math.floor(Math.random() * possibleHosts.length)
-    const possibleHost = possibleHosts[randomIndex]
-    const updatedUrl = getUrlObjectForRtspUrl(current)
-    updatedUrl.hostname = possibleHost
-    return updatedUrl.toString().replace('https://', 'rtsps://')
-  }
+  // #getAlternativeRtspUrl(current: string, tried: string[]): string {
+  //   const currentHostname = getHostnameFromRtspUrl(current)
+  //   const previouslyTriedHostnames = tried.map((url) => getHostnameFromRtspUrl(url))
+  //   const possibleHosts: Array<string> = [...dropcamPossibleHostnames].filter(
+  //     (h) => h !== currentHostname && !previouslyTriedHostnames.includes(h)
+  //   )
+  //   if (possibleHosts.length === 0) {
+  //     throw new Error(
+  //       'Failed to get RTSP stream characteristics after exhausting all possible hostnames'
+  //     )
+  //   }
+  //   const randomIndex = Math.floor(Math.random() * possibleHosts.length)
+  //   const possibleHost = possibleHosts[randomIndex]
+  //   const updatedUrl = getUrlObjectForRtspUrl(current)
+  //   updatedUrl.hostname = possibleHost
+  //   return updatedUrl.toString().replace('https://', 'rtsps://')
+  // }
 
-  async #getRtspStreamCharacteristics(
-    url: string,
-    tried: string[] = []
-  ): Promise<RtspStreamCharacteristics> {
-    const mainLogger = await app.container.make('logger')
-    const logger = mainLogger.child({ service: `getRtspStreamCharacteristics` })
-    logger.info(
-      `Getting RTSP stream characteristics camera being served by ${getHostnameFromRtspUrl(url)}`
-    )
-    try {
-      const { stdout } = await execa('gst-discoverer-1.0', [url], {
-        reject: true,
-      })
-
-      if (dropcamRetryHostnameFailureMessages.some((m) => stdout.includes(m))) {
-        if (
-          tried.length >= dropcamPossibleHostnames.length ||
-          tried.length >= DROPCAM_MAX_CASCADES
-        ) {
-          throw new Error(
-            `Failed to get RTSP stream characteristics after ${tried.length} attempts`
-          )
-        }
-        const current = url
-        url = this.#getAlternativeRtspUrl(url, tried)
-        logger.info(
-          `${getHostnameFromRtspUrl(current)} is not serving the stream. Trying ${getHostnameFromRtspUrl(url)}`
-        )
-        return await this.#getRtspStreamCharacteristics(url, [...tried, current])
-      }
-
-      const characteristics: RtspStreamCharacteristics = {
-        url,
-        audio: {},
-        video: {},
-        raw: stdout,
-      }
-
-      // Parse the output for key stream characteristics
-      const toCamelCase = (str: string) =>
-        str
-          .replace(/(?:^\w|[A-Z]|\b\w)/g, (word, index) =>
-            index === 0 ? word.toLowerCase() : word.toUpperCase()
-          )
-          .replace(/\s+/g, '')
-      const toInteger = (str: string) => Number.parseInt(str.replace(/\D/g, ''))
-      const toBoolean = (str: string) => str === 'true' || str === 'yes'
-      const lines = stdout.split('\n')
-      let reachedProperties = false
-      const goodLines: Array<{ key: string; value: string; spaces: number }> = []
-      for (const line of lines) {
-        // get the number of preceeding spaces
-        const match = line.match(/^\s*/)
-        const spaces = match ? match[0].length : 0
-        reachedProperties = reachedProperties || line.includes('Properties:')
-        if (!reachedProperties) continue
-        const parts = line.split(':')
-        const key = parts.shift()?.trim()
-        const value = parts.join(':').trim()
-        if (key) {
-          goodLines.push({ key, value, spaces })
-        }
-      }
-      goodLines.forEach((line: { key: string; value: any; spaces: number }, i) => {
-        switch (toCamelCase(line.key)) {
-          case 'channels':
-          case 'sampleRate':
-          case 'depth':
-          case 'bitrate':
-          case 'maxBitrate':
-          case 'width':
-          case 'height':
-            line.value = toInteger(line.value)
-            break
-
-          case 'interlaced':
-          case 'seekable':
-          case 'live':
-            line.value = toBoolean(line.value)
-            break
-        }
-        if (line.spaces === 2 && !line.key.includes('container')) {
-          // @ts-ignore - we've confused typescript
-          characteristics[toCamelCase(line.key) as keyof RtspStreamCharacteristics] = line.value
-        }
-        if (line.spaces > 6) {
-          // find the parent entry which will have 6 spaces
-          const parent = goodLines
-            .slice(0, i)
-            .reverse()
-            .find((l) => l.spaces === 6)
-          if (parent) {
-            if (parent.key.includes('video')) {
-              // @ts-ignore - we've confused typescript
-              characteristics.video[toCamelCase(line.key) as keyof RtspStreamInfo] = line.value
-            }
-            if (parent.key.includes('audio')) {
-              // @ts-ignore - we've confused typescript
-              characteristics.audio[toCamelCase(line.key) as keyof RtspStreamInfo] = line.value
-            }
-          }
-        }
-      })
-      // Add validation checks
-      if (
-        characteristics.video?.width === 0 ||
-        characteristics.video?.height === 0 ||
-        characteristics.video?.frameRate === '0/1' ||
-        characteristics.audio?.channels === 0 ||
-        characteristics.audio?.sampleRate === 0
-      ) {
-        throw new Error('Invalid stream characteristics detected.')
-      }
-
-      return characteristics
-    } catch (error) {
-      throw error
-    }
-  }
-
-  async #startRTSP(service: smartdevicemanagement_v1.Smartdevicemanagement) {
+  async #startRTSP(service: smartdevicemanagement_v1.Smartdevicemanagement, signal?: AbortSignal) {
     const mainLogger = await app.container.make('logger')
     const logger = mainLogger.child({ service: `camera-${this.id}` })
     const isRunning = await this.#getIsAlreadyRunning()
     if (isRunning) {
-      logger.info(`GStreamer process for RTSP stream already running`)
+      logger.info(`FFMpeg process for RTSP stream already running`)
+      return
+    }
+    if (signal && signal.aborted) {
       return
     }
     const {
@@ -1401,7 +1319,9 @@ export default class Camera extends BaseModel {
         command: 'sdm.devices.commands.CameraLiveStream.GenerateRtspStream',
       },
     })
-
+    if (signal && signal.aborted) {
+      return
+    }
     if (!results!.streamUrls || !results!.streamUrls.rtspUrl) {
       throw new Error('RTSP Stream URL not found')
     }
@@ -1424,26 +1344,15 @@ export default class Camera extends BaseModel {
     const rtspSrc = results!.streamUrls.rtspUrl
     const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
     const outputRtspUrl = `rtsp://127.0.0.1:${env.get('MEDIA_MTX_RTSP_TCP_PORT', 8554)}/${this.mtxPath}`
-
-    const characteristics = await this.#getRtspStreamCharacteristics(rtspSrc)
-    const missingCharacteristics = []
-
-    if (!characteristics.video?.width) {
-      missingCharacteristics.push('video.width')
+    let characteristics: RtspStreamCharacteristics
+    try {
+      characteristics = await getRtspStreamCharacteristics(rtspSrc)
+    } catch (error) {
+      if (signal && signal.aborted) {
+        return
+      }
+      throw error
     }
-
-    if (!characteristics.video?.height) {
-      missingCharacteristics.push('video.height')
-    }
-
-    if (!characteristics.video?.frameRate) {
-      missingCharacteristics.push('video.frameRate')
-    }
-
-    if (missingCharacteristics.length > 0) {
-      throw new MissingStreamCharacteristicsException(missingCharacteristics, characteristics)
-    }
-
     const inputVideoCodec = 'h264' // Assuming H264 is always used for video
     let inputAudioCodec
     if (this.#audioCodecs.includes('AAC')) {
@@ -1451,14 +1360,15 @@ export default class Camera extends BaseModel {
     } else if (this.#audioCodecs.includes('OPUS')) {
       inputAudioCodec = 'opus'
     } else {
+      if (signal && signal.aborted) {
+        return
+      }
       throw new Error('Unsupported audio codec')
     }
-
     const resolutionArgs = []
     if (characteristics.video.width && characteristics.video.height) {
       resolutionArgs.push('-s', `${characteristics.video.width}x${characteristics.video.height}`)
     }
-
     const args = [
       '-loglevel',
       'warning',
@@ -1513,9 +1423,6 @@ export default class Camera extends BaseModel {
       '1',
       outputRtspUrl, // Output RTSP stream
     ]
-
-    // logger.info([ffmpegBinary, ...args].join(' '))
-    // logger.info(`const characteristics = ${inspect(characteristics, { depth: 20, colors: false })}`)
     try {
       await app.pm3.add(this.#streamProcessName, {
         file: ffmpegBinary,
@@ -1524,6 +1431,9 @@ export default class Camera extends BaseModel {
       })
       logger.info('Starting FFMpeg process for RTSP stream')
     } catch (error) {
+      if (signal && signal.aborted) {
+        return
+      }
       if (!this.#shouldIgnoreError(error as Error)) {
         logger.error(`Error starting FFMpeg for RTSP process: ${(error as Error).message}`)
       }
