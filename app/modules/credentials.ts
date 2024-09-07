@@ -10,6 +10,8 @@ import Joi from 'joi'
 import I18NException from '#exceptions/i18n'
 import db from '@adonisjs/lucid/services/db'
 
+import type { ApplicationService } from '@adonisjs/core/types'
+
 interface AuthorizationData {
   state: string
   code: string
@@ -29,6 +31,11 @@ const authorizationDataSchema = Joi.object<AuthorizationData>({
 })
 
 export default class CredentialsModule implements ApiServiceModule {
+  #app: ApplicationService
+  constructor(app: ApplicationService) {
+    this.#app = app
+  }
+
   get schemas() {
     return {
       create: Joi.object({
@@ -128,6 +135,9 @@ export default class CredentialsModule implements ApiServiceModule {
     credential.tokens = tokens
     credential.tokenRedirectUrl = redirectUrl.toString()
     await credential.save()
+    this.#app.bus.publish('credentials', 'authenticated', credential.id, {
+      description: credential.description,
+    })
     return { success: true }
   }
 

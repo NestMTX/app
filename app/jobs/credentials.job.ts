@@ -48,10 +48,17 @@ export default class CredentialsJob extends CronJob {
           logger.info(`Refreshing ${credential.description}`)
           try {
             await credential.refreshAuthentication()
+            this.#app.bus.publish('credentials', 'reauthenticated', credential.id, {
+              description: credential.description,
+            })
           } catch (error) {
             logger.error(`Failed to refresh ${credential.description}: ${error.message}`)
             credential.tokens = null
             await credential.save()
+            this.#app.bus.publish('credentials', 'unauthenticated', credential.id, {
+              description: credential.description,
+              error: error.message,
+            })
           }
         }
       }

@@ -9,6 +9,7 @@ import type { ICEService } from '#services/ice'
 import type { IPCService } from '#services/ipc'
 import type { MiliCron } from '@jakguru/milicron'
 import type { PM3 } from '#services/pm3'
+import type { MqttService } from '#services/mqtt'
 
 declare module '@adonisjs/core/types' {
   interface ApplicationService {
@@ -16,6 +17,7 @@ declare module '@adonisjs/core/types' {
     socketIoService: SocketIoService
     mqttBroker?: Server
     mqttClient?: MqttClient
+    mqttService?: MqttService
     mediamtx: MediaMTXService
     gstreamer: GStreamerService
     pm3: PM3

@@ -24,7 +24,8 @@ export default class ExtendCameraStreamAuthenticationJob extends CronJob {
     const liveCameras = await Camera.query()
       .whereIn('mtx_path', livePaths)
       .where('is_enabled', true)
-    logger.info(`Found ${liveCameras.length} live cameras`)
+      .whereNotNull('stream_extension_token')
+    logger.info(`Found ${liveCameras.length} live cameras with stream extension tokens`)
     if (liveCameras.length === 0) {
       return
     }
@@ -37,10 +38,18 @@ export default class ExtendCameraStreamAuthenticationJob extends CronJob {
           try {
             await camera.extend()
             logger.info(`Extended authentication for camera "${camera.name}" (${camera.id})`)
+            this.#app.bus.publish('camera', 'extended', camera.id, {
+              name: camera.name,
+              expiresAt: camera.expiresAt.toISO(),
+            })
           } catch (error) {
             logger.error(
               `Failed to extend authentication for camera "${camera.name}" (${camera.id}) due to ${(error as Error).message}`
             )
+            this.#app.bus.publish('camera', 'failed-extension', camera.id, {
+              name: camera.name,
+              error,
+            })
           }
         } else {
           logger.info(

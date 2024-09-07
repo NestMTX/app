@@ -12,6 +12,7 @@ import { ApiServiceRequestError } from '#services/api'
 import { inspect } from 'node:util'
 import logEmitter from '#services/emitter.log'
 import { tokensUserProvider } from '@adonisjs/auth/access_tokens'
+import { DateTime } from 'luxon'
 
 type HttpServerService = typeof server
 
@@ -241,5 +242,17 @@ export class SocketIoService {
 
   broadcast(event: string, ...args: any[]) {
     this.#io.emit(event, ...args)
+  }
+
+  async publish(domain: string, event: string, entity: any | null | undefined, details: unknown) {
+    const eventsToPublish = [`${domain}:${event}`, `${domain}:*`, event]
+    const payload = {
+      domain,
+      event,
+      entity,
+      details,
+      at: DateTime.utc().toISO(),
+    }
+    eventsToPublish.forEach((e: string) => this.#io.emit(e, payload))
   }
 }

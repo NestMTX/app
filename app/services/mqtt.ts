@@ -11,6 +11,7 @@ import Aedes from 'aedes'
 import { createServer } from 'node:net'
 import { tokensUserProvider } from '@adonisjs/auth/access_tokens'
 import { Secret } from '@adonisjs/core/helpers'
+import { DateTime } from 'luxon'
 
 type UserProvider = ReturnType<typeof tokensUserProvider>
 
@@ -190,6 +191,27 @@ export class MqttService {
     } catch (err) {
       this.#logger.error(`Failed to publish failure to "${topic}": ${err.message}`)
     }
+  }
+
+  async publish(domain: string, event: string, entity: any | null | undefined, details: unknown) {
+    if ('undefined' === typeof entity || null === entity) {
+      entity = `null`
+    }
+    const entityFocused = MqttService.topic('events', domain, entity.toString(), event)
+    const eventFocused = MqttService.topic('stream', domain, event)
+    const payload = JSON.stringify({
+      domain,
+      event,
+      entity,
+      details,
+      at: DateTime.utc().toISO(),
+    })
+    await Promise.all([
+      this.#client.publishAsync(entityFocused, payload),
+      this.#client.publishAsync(eventFocused, payload),
+    ]).catch((error) => {
+      this.#logger.error(`Failed to publish event: ${error.message}`)
+    })
   }
 
   static topic(...parts: string[]): string {
