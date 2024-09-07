@@ -23,6 +23,7 @@ import { init } from '#services/cron'
 import { PM3 } from '#services/pm3'
 import { HttpsService } from '#services/https'
 import { execa } from 'execa'
+import { BusService } from '#services/bus'
 
 const base = new URL('../', import.meta.url).pathname
 
@@ -32,6 +33,7 @@ declare module '@adonisjs/core/types' {
     'socket.io/service': SocketIoService
     'mqtt/broker'?: Server
     'mqtt/client'?: MqttClient
+    'mqtt/service'?: MqttService
     'mediamtx': MediaMTXService
     'gstreamer': GStreamerService
     'pm3': PM3
@@ -40,6 +42,7 @@ declare module '@adonisjs/core/types' {
     'ipc/service': IPCService
     'cron/service': MiliCron
     'https/service': HttpsService
+    'bus': BusService
   }
 }
 
@@ -49,6 +52,7 @@ declare module '@adonisjs/core/app' {
     socketIoService: SocketIoService
     mqttBroker?: Server
     mqttClient?: MqttClient
+    mqttService?: MqttService
     mediamtx: MediaMTXService
     gstreamer: GStreamerService
     pm3: PM3
@@ -57,6 +61,7 @@ declare module '@adonisjs/core/app' {
     ipcService: IPCService
     cronService: MiliCron
     httpsService: HttpsService
+    bus: BusService
   }
 }
 
@@ -67,12 +72,14 @@ export default class AppProvider {
   #gstreamer: GStreamerService
   #mqttBroker?: Server
   #mqtt?: MqttClient
+  #mqttService?: MqttService
   #nat: NATService
   #ice: ICEService
   #ipc: IPCService
   #cron: MiliCron
   #pm3: PM3
   #https: HttpsService
+  #bus: BusService
   constructor(protected app: ApplicationService) {
     this.#api = new ApiService()
     this.#io = new SocketIoService(this.app, this.#api)
@@ -84,6 +91,7 @@ export default class AppProvider {
     this.#cron = new MiliCron()
     this.#pm3 = new PM3()
     this.#https = new HttpsService(this.app)
+    this.#bus = new BusService(this.app)
   }
 
   /**
@@ -94,6 +102,7 @@ export default class AppProvider {
     this.app.container.singleton('socket.io/service', () => this.#io)
     this.app.container.singleton('mqtt/broker', () => this.#mqttBroker)
     this.app.container.singleton('mqtt/client', () => this.#mqtt)
+    this.app.container.singleton('mqtt/service', () => this.#mqttService)
     this.app.container.singleton('mediamtx', () => this.#mediamtx)
     this.app.container.singleton('gstreamer', () => this.#gstreamer)
     this.app.container.singleton('pm3', () => this.#pm3)
@@ -102,6 +111,7 @@ export default class AppProvider {
     this.app.container.singleton('ipc/service', () => this.#ipc)
     this.app.container.singleton('cron/service', () => this.#cron)
     this.app.container.singleton('https/service', () => this.#https)
+    this.app.container.singleton('bus', () => this.#bus)
   }
 
   /**
@@ -199,6 +209,7 @@ export default class AppProvider {
     Application.getter('socketIoService', () => this.#io)
     Application.getter('mqttBroker', () => this.#mqttBroker)
     Application.getter('mqttClient', () => this.#mqtt)
+    Application.getter('mqttService', () => this.#mqttService)
     Application.getter('mediamtx', () => this.#mediamtx)
     Application.getter('gstreamer', () => this.#gstreamer)
     Application.getter('pm3', () => this.#pm3)
@@ -207,6 +218,10 @@ export default class AppProvider {
     Application.getter('ipcService', () => this.#ipc)
     Application.getter('cronService', () => this.#cron)
     Application.getter('httpsService', () => this.#https)
+    Application.getter('bus', () => this.#bus)
+    this.#bus.publish('application', 'booted', null, {
+      at: DateTime.utc().toISO(),
+    })
   }
 
   /**
@@ -231,9 +246,12 @@ export default class AppProvider {
       await this.#io.start(server)
       logger.info('Socket.IO Server Attached')
       await this.#https.boot(logger as LoggerServiceWithConfig)
+      this.#bus.publish('application', 'ready', null, {
+        at: DateTime.utc().toISO(),
+      })
     }
     if (this.#mqtt) {
-      new MqttService(this.#api, this.#mqtt, logger)
+      this.#mqttService = new MqttService(this.#api, this.#mqtt, logger)
     }
   }
 
@@ -244,6 +262,9 @@ export default class AppProvider {
     const logger = await this.app.container.make('logger')
     const env = this.app.getEnvironment()
     if ('web' === env) {
+      this.#bus.publish('application', 'shutdown', null, {
+        at: DateTime.utc().toISO(),
+      })
       await this.#https.shutdown()
       this.#cron.$off('*/5 * * * * *', this.#mediamtx.cron.bind(this.#mediamtx))
       logger.info('Shutting down child processes')

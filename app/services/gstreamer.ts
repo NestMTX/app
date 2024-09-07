@@ -15,6 +15,16 @@ interface DemandEventPayload {
   RTSP_PORT: string
 }
 
+interface ReadyEventPayload extends DemandEventPayload {
+  MTX_SOURCE_TYPE: string
+  MTX_SOURCE_ID: string
+}
+
+interface ReadEventPayload extends DemandEventPayload {
+  MTX_READER_TYPE: string
+  MTX_READER_ID: string
+}
+
 /**
  * A class for managing the MediaMTX service process
  */
@@ -90,6 +100,10 @@ export class GStreamerService {
     }
     ipc.on('demand', this.#onDemand.bind(this))
     ipc.on('unDemand', this.#onUnDemand.bind(this))
+    ipc.on('ready', this.#onReady.bind(this))
+    ipc.on('notReady', this.#onNotReady.bind(this))
+    ipc.on('read', this.#onRead.bind(this))
+    ipc.on('unread', this.#onUnread.bind(this))
     this.#logger.info(`GStreamer Service booted`)
     pm3.on('log:out', this.#logProcessToInfo)
     pm3.on('log:err', this.#logProcessToError)
@@ -172,8 +186,9 @@ export class GStreamerService {
       this.#demandTimeouts.delete(payload.MTX_PATH)
     }
     let processName: string | undefined
+    let camera: Camera | null | undefined
     try {
-      const camera = await Camera.findBy({ mtx_path: payload.MTX_PATH })
+      camera = await Camera.findBy({ mtx_path: payload.MTX_PATH })
       if (!camera) {
         processName = `ffmpeg-no-such-camera-${payload.MTX_PATH}`
         await this.#addNoSuchCameraStreamProcess(
@@ -192,11 +207,22 @@ export class GStreamerService {
         processName = `camera-${camera.id}`
         await camera.start(abortController.signal)
       }
+      this.#app.bus.publish('camera', 'demand', camera ? camera.id : null, {
+        name: camera ? camera.name : null,
+        path: payload.MTX_PATH,
+        query: payload.MTX_QUERY,
+      })
       this.#app.pm3.start(processName)
       const process = this.#app.pm3.get(processName)
       if (process) {
         this.#logger?.info(`Started process ${processName} with PID ${process.pid}`)
-        process.on('exit', () => {
+        this.#app.bus.publish('camera', 'started', camera ? camera.id : null, {
+          name: camera ? camera.name : null,
+          path: payload.MTX_PATH,
+          query: payload.MTX_QUERY,
+          pid: process.pid,
+        })
+        process.on('exit', (code, signal) => {
           this.#logger?.info(
             `Process ${processName} has exited and is being removed from the process manager.`
           )
@@ -206,7 +232,7 @@ export class GStreamerService {
             if (!this.#demandTimeouts.has(payload.MTX_PATH)) {
               this.#demandTimeouts.set(
                 payload.MTX_PATH,
-                setTimeout(() => this.#onDemand(payload, true), 30000)
+                setTimeout(() => this.#onDemand(payload, true), 5000)
               )
             }
           }
@@ -215,6 +241,14 @@ export class GStreamerService {
             camera.expiresAt = null
             camera.save()
           }
+          this.#app.bus.publish('camera', 'stopped', camera ? camera.id : null, {
+            name: camera ? camera.name : null,
+            path: payload.MTX_PATH,
+            query: payload.MTX_QUERY,
+            pid: process.pid,
+            exitCode: code,
+            exitSignal: signal,
+          })
         })
         this.#managedProcesses.add(processName)
       }
@@ -234,6 +268,13 @@ export class GStreamerService {
         this.#app.pm3.remove(processName)
         this.#managedProcesses.delete(processName)
       }
+      this.#app.bus.publish('camera', 'errored', camera ? camera.id : null, {
+        name: camera ? camera.name : null,
+        path: payload.MTX_PATH,
+        query: payload.MTX_QUERY,
+        pid: process.pid,
+        error,
+      })
     }
   }
 
@@ -245,8 +286,14 @@ export class GStreamerService {
       abortController.abort()
       this.#abortControllers.delete(payload.MTX_PATH)
     }
+    let camera: Camera | null | undefined
     try {
-      const camera = await Camera.findBy({ mtx_path: payload.MTX_PATH })
+      camera = await Camera.findBy({ mtx_path: payload.MTX_PATH })
+      this.#app.bus.publish('camera', 'unDemand', camera ? camera.id : null, {
+        name: camera ? camera.name : null,
+        path: payload.MTX_PATH,
+        query: payload.MTX_QUERY,
+      })
       let processName: string
       if (!camera) {
         processName = `ffmpeg-no-such-camera-${payload.MTX_PATH}`
@@ -275,12 +322,68 @@ export class GStreamerService {
     )
     const undemandTimeout = this.#undemandTimeouts.get(payload.MTX_PATH)
     if (undemandTimeout) {
-      return
+      clearTimeout(undemandTimeout)
     }
     this.#undemandTimeouts.set(
       payload.MTX_PATH,
       setTimeout(() => this.#onUnDemandTimeout(payload), 60000)
     )
+  }
+
+  async #onReady(payload: ReadyEventPayload) {
+    let camera: Camera | null | undefined
+    try {
+      camera = await Camera.findBy({ mtx_path: payload.MTX_PATH })
+      this.#app.bus.publish('camera', 'ready', camera ? camera.id : null, {
+        name: camera ? camera.name : null,
+        path: payload.MTX_PATH,
+        query: payload.MTX_QUERY,
+        sourceType: payload.MTX_SOURCE_TYPE,
+        sourceId: payload.MTX_SOURCE_ID,
+      })
+    } catch {}
+  }
+
+  async #onNotReady(payload: ReadyEventPayload) {
+    let camera: Camera | null | undefined
+    try {
+      camera = await Camera.findBy({ mtx_path: payload.MTX_PATH })
+      this.#app.bus.publish('camera', 'notReady', camera ? camera.id : null, {
+        name: camera ? camera.name : null,
+        path: payload.MTX_PATH,
+        query: payload.MTX_QUERY,
+        sourceType: payload.MTX_SOURCE_TYPE,
+        sourceId: payload.MTX_SOURCE_ID,
+      })
+    } catch {}
+  }
+
+  async #onRead(payload: ReadEventPayload) {
+    let camera: Camera | null | undefined
+    try {
+      camera = await Camera.findBy({ mtx_path: payload.MTX_PATH })
+      this.#app.bus.publish('camera', 'read', camera ? camera.id : null, {
+        name: camera ? camera.name : null,
+        path: payload.MTX_PATH,
+        query: payload.MTX_QUERY,
+        readerType: payload.MTX_READER_TYPE,
+        readerId: payload.MTX_READER_ID,
+      })
+    } catch {}
+  }
+
+  async #onUnread(payload: ReadEventPayload) {
+    let camera: Camera | null | undefined
+    try {
+      camera = await Camera.findBy({ mtx_path: payload.MTX_PATH })
+      this.#app.bus.publish('camera', 'unread', camera ? camera.id : null, {
+        name: camera ? camera.name : null,
+        path: payload.MTX_PATH,
+        query: payload.MTX_QUERY,
+        readerType: payload.MTX_READER_TYPE,
+        readerId: payload.MTX_READER_ID,
+      })
+    } catch {}
   }
 
   async #addNoSuchCameraStreamProcess(name: string, path: string, signal?: AbortSignal) {

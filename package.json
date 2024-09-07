@@ -104,6 +104,7 @@
   },
   "prettier": "@adonisjs/prettier-config",
   "resolutions": {
-    "ws": "^8.17.1"
+    "ws": "^8.17.1",
+    "axios": "^1.7.4"
   }
 }
