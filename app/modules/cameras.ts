@@ -92,9 +92,9 @@ export default class CamerasModule implements ApiServiceModule {
       camera.isPersistent = isPersistent
     }
     await camera.save()
-    if (isEnabled) {
+    if (isEnabled && !camera.isEnabled) {
       await camera.enable()
-    } else {
+    } else if (!isEnabled && camera.isEnabled) {
       await camera.disable()
     }
   }

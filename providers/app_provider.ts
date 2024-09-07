@@ -14,7 +14,7 @@ import { connect as MqttConnect } from 'mqtt'
 import Joi from 'joi'
 import { MqttService } from '#services/mqtt'
 import { MediaMTXService } from '#services/mediamtx'
-import { GStreamerService } from '#services/gstreamer'
+import { StreamerService } from '#services/streamer'
 import { NATService } from '#services/nat'
 import { ICEService } from '#services/ice'
 import { IPCService } from '#services/ipc'
@@ -35,7 +35,7 @@ declare module '@adonisjs/core/types' {
     'mqtt/client'?: MqttClient
     'mqtt/service'?: MqttService
     'mediamtx': MediaMTXService
-    'gstreamer': GStreamerService
+    'streamer': StreamerService
     'pm3': PM3
     'nat/service': NATService
     'ice/service': ICEService
@@ -54,7 +54,7 @@ declare module '@adonisjs/core/app' {
     mqttClient?: MqttClient
     mqttService?: MqttService
     mediamtx: MediaMTXService
-    gstreamer: GStreamerService
+    streamer: StreamerService
     pm3: PM3
     natService: NATService
     iceService: ICEService
@@ -69,7 +69,7 @@ export default class AppProvider {
   #api: ApiService
   #io: SocketIoService
   #mediamtx: MediaMTXService
-  #gstreamer: GStreamerService
+  #streamer: StreamerService
   #mqttBroker?: Server
   #mqtt?: MqttClient
   #mqttService?: MqttService
@@ -84,7 +84,7 @@ export default class AppProvider {
     this.#api = new ApiService()
     this.#io = new SocketIoService(this.app, this.#api)
     this.#mediamtx = new MediaMTXService(this.app)
-    this.#gstreamer = new GStreamerService(this.app)
+    this.#streamer = new StreamerService(this.app)
     this.#nat = new NATService()
     this.#ice = new ICEService()
     this.#ipc = new IPCService(this.app)
@@ -104,7 +104,7 @@ export default class AppProvider {
     this.app.container.singleton('mqtt/client', () => this.#mqtt)
     this.app.container.singleton('mqtt/service', () => this.#mqttService)
     this.app.container.singleton('mediamtx', () => this.#mediamtx)
-    this.app.container.singleton('gstreamer', () => this.#gstreamer)
+    this.app.container.singleton('streamer', () => this.#streamer)
     this.app.container.singleton('pm3', () => this.#pm3)
     this.app.container.singleton('nat/service', () => this.#nat)
     this.app.container.singleton('ice/service', () => this.#ice)
@@ -201,7 +201,7 @@ export default class AppProvider {
         logger.error('Invalid MQTT Configuration. Not connecting to MQTT Server.')
       }
       await this.#mediamtx.boot(logger, this.#nat, this.#ice, this.#pm3)
-      await this.#gstreamer.boot(logger, this.#nat, this.#ice, this.#pm3, this.#ipc)
+      await this.#streamer.boot(logger, this.#nat, this.#ice, this.#pm3, this.#ipc)
       this.#cron.$on('*/5 * * * * *', this.#mediamtx.cron.bind(this.#mediamtx))
       await init(this.app, this.#cron, logger as LoggerServiceWithConfig)
     }
@@ -211,7 +211,7 @@ export default class AppProvider {
     Application.getter('mqttClient', () => this.#mqtt)
     Application.getter('mqttService', () => this.#mqttService)
     Application.getter('mediamtx', () => this.#mediamtx)
-    Application.getter('gstreamer', () => this.#gstreamer)
+    Application.getter('streamer', () => this.#streamer)
     Application.getter('pm3', () => this.#pm3)
     Application.getter('natService', () => this.#nat)
     Application.getter('iceService', () => this.#ice)

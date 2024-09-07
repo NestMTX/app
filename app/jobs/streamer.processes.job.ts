@@ -15,6 +15,6 @@ export default class ConfirmStreamerProcessesJob extends CronJob {
     if (!this.#app) {
       return
     }
-    return await this.#app.gstreamer.cronjob()
+    return await this.#app.streamer.cronjob()
   }
 }

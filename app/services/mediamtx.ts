@@ -194,7 +194,7 @@ export class MediaMTXService {
       webrtcAdditionalHosts: ['127.0.0.1', '::1', ...nat.lanIps, nat.publicIp],
       webrtcICEServers2: ice.asMediaMtxIceServers,
       webrtcIPsFromInterfaces: true,
-      webrtcHandshakeTimeout: '60s',
+      webrtcHandshakeTimeout: '10s',
       webrtcTrackGatherTimeout: '60s',
       /**
        * Update the SRT configuration
