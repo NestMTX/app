@@ -229,12 +229,10 @@ export class GStreamerService {
           this.#app.pm3.remove(processName!)
           this.#managedProcesses.delete(processName!)
           if (this.#demands.has(payload.MTX_PATH)) {
-            if (!this.#demandTimeouts.has(payload.MTX_PATH)) {
-              this.#demandTimeouts.set(
-                payload.MTX_PATH,
-                setTimeout(() => this.#onDemand(payload, true), 5000)
-              )
-            }
+            this.#onDemand(payload, true)
+            // if (!this.#demandTimeouts.has(payload.MTX_PATH)) {
+            //   this.#onDemand(payload, true)
+            // }
           }
           if (camera) {
             camera.streamExtensionToken = null
@@ -251,18 +249,21 @@ export class GStreamerService {
           })
         })
         this.#managedProcesses.add(processName)
+      } else {
+        this.#onDemand(payload, true)
       }
     } catch (error) {
       if (this.#logger) {
         this.#logger.error(error)
       }
       if (this.#demands.has(payload.MTX_PATH)) {
-        if (!this.#demandTimeouts.has(payload.MTX_PATH)) {
-          this.#demandTimeouts.set(
-            payload.MTX_PATH,
-            setTimeout(() => this.#onDemand(payload, true), 30000)
-          )
-        }
+        this.#onDemand(payload, true)
+        // if (!this.#demandTimeouts.has(payload.MTX_PATH)) {
+        //   this.#demandTimeouts.set(
+        //     payload.MTX_PATH,
+        //     setTimeout(() => this.#onDemand(payload, true), 30000)
+        //   )
+        // }
       }
       if (processName) {
         this.#app.pm3.remove(processName)
