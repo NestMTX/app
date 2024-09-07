@@ -503,7 +503,7 @@ export default class Camera extends BaseModel {
     return `camera-${this.id}`
   }
 
-  get #gstreamerProcess() {
+  get #streamerProcess() {
     return app.pm3.processes.find((p) => p.name === this.#streamProcessName)
   }
 
@@ -513,9 +513,9 @@ export default class Camera extends BaseModel {
       return 'unconfigured'
     } else if (!this.isEnabled) {
       return 'disabled'
-    } else if (!this.#gstreamerProcess) {
+    } else if (!this.#streamerProcess) {
       return 'dead'
-    } else if (!this.#gstreamerProcess.pid) {
+    } else if (!this.#streamerProcess.pid) {
       return 'stopped'
     } else if (!this.#mediamtx_path) {
       return 'unavailable'
@@ -528,7 +528,7 @@ export default class Camera extends BaseModel {
 
   @computed({ serializeAs: 'process_id' })
   get process_id() {
-    return this.#gstreamerProcess ? this.#gstreamerProcess.pid : null
+    return this.#streamerProcess ? this.#streamerProcess.pid : null
   }
 
   get #mediamtx_path() {
@@ -745,22 +745,24 @@ export default class Camera extends BaseModel {
 
   async disable() {
     this.isEnabled = false
+    this.isPersistent = false
     await this.save()
     await this.#killExistingProcesses()
   }
 
   async #killExistingProcesses() {
-    if (!app.pm3) {
-      return
-    }
-    const ffmpegNoSuchCameraFeedProcess = `ffmpeg-no-such-camera-${this.mtxPath}`
-    const ffmpegCameraDisabledFeedProcess = `ffmpeg-camera-disabled-${this.mtxPath}`
-    const gstreamerCameraFeedProcess = `camera-${this.id}`
-    await Promise.all([
-      app.pm3.stop(ffmpegNoSuchCameraFeedProcess).catch(() => {}),
-      app.pm3.stop(ffmpegCameraDisabledFeedProcess).catch(() => {}),
-      app.pm3.stop(gstreamerCameraFeedProcess).catch(() => {}),
-    ])
+    // @todo: Implement this via the streamer service instead of pm3 directly
+    // if (!app.pm3) {
+    //   return
+    // }
+    // const ffmpegNoSuchCameraFeedProcess = `ffmpeg-no-such-camera-${this.mtxPath}`
+    // const ffmpegCameraDisabledFeedProcess = `ffmpeg-camera-disabled-${this.mtxPath}`
+    // const streamerCameraFeedProcess = `camera-${this.id}`
+    // await Promise.all([
+    //   app.pm3.stop(ffmpegNoSuchCameraFeedProcess).catch(() => {}),
+    //   app.pm3.stop(ffmpegCameraDisabledFeedProcess).catch(() => {}),
+    //   app.pm3.stop(streamerCameraFeedProcess).catch(() => {}),
+    // ])
   }
 
   async start(signal?: AbortSignal) {
@@ -1374,10 +1376,6 @@ export default class Camera extends BaseModel {
       'warning',
       '-fflags',
       'nobuffer', // Disable input buffering
-      '-listen_timeout',
-      '-1',
-      '-timeout',
-      '-1',
       '-c:v',
       inputVideoCodec, // Specify known input video codec (if you want to decode the input stream)
       '-c:a',
