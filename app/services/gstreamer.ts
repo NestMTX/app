@@ -248,7 +248,34 @@ export class GStreamerService {
             exitSignal: signal,
           })
         })
-        this.#managedProcesses.add(processName)
+        if (process.exitCode !== null) {
+          this.#logger?.info(
+            `Process ${processName} has exited and is being removed from the process manager.`
+          )
+          this.#app.pm3.remove(processName!)
+          this.#managedProcesses.delete(processName!)
+          if (this.#demands.has(payload.MTX_PATH)) {
+            this.#onDemand(payload, true)
+            // if (!this.#demandTimeouts.has(payload.MTX_PATH)) {
+            //   this.#onDemand(payload, true)
+            // }
+          }
+          if (camera) {
+            camera.streamExtensionToken = null
+            camera.expiresAt = null
+            camera.save()
+          }
+          this.#app.bus.publish('camera', 'stopped', camera ? camera.id : null, {
+            name: camera ? camera.name : null,
+            path: payload.MTX_PATH,
+            query: payload.MTX_QUERY,
+            pid: process.pid,
+            exitCode: process.exitCode,
+            exitSignal: process.signalCode,
+          })
+        } else {
+          this.#managedProcesses.add(processName)
+        }
       } else {
         this.#onDemand(payload, true)
       }
