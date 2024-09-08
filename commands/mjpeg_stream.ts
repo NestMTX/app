@@ -5,13 +5,13 @@ import { readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import type { CommandOptions } from '@adonisjs/core/types/ace'
 
-export default class MpjegStream extends BaseCommand {
+export default class MjpegStream extends BaseCommand {
   static commandName = 'mjpeg:stream'
   static description =
     'Start an MJPEG Stream which will be used by NestMTX for the static image feeds'
 
   static options: CommandOptions = {
-    staysAlive: true,
+    staysAlive: false,
   }
 
   @args.string({ description: 'The port to serve on' })
@@ -32,19 +32,24 @@ export default class MpjegStream extends BaseCommand {
       process.exit(1)
     }
     const image = await readFile(this.path)
+
+    // Create the server
     http
       .createServer(async (req, res) => {
+        // Create MJPEG response handler
         const mjpegServer = createReqHandler(req, res)
+
         let finished = false
         res.on('finish', () => {
-          if (!finished) {
-            finished = true
-            mjpegServer.close()
-          }
+          finished = true
+          mjpegServer.close()
         })
+
+        // Send headers once
         while (!finished) {
           mjpegServer.write(image)
-          await new Promise((resolve) => setTimeout(resolve, 100))
+          // Wait before sending the next frame
+          await new Promise((resolve) => setTimeout(resolve, 100)) // 10 FPS
         }
       })
       .listen(port, () => {

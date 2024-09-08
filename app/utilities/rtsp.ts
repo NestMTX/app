@@ -121,8 +121,8 @@ const getRtspStreamCharacteristicsFromGstDiscoverer = async (
   url: string,
   signal: AbortSignal
 ): Promise<RtspStreamCharacteristics | undefined> => {
-  const mainLogger = await app.container.make('logger')
-  const logger = mainLogger.child({ service: `rtsp-utils` })
+  // const mainLogger = await app.container.make('logger')
+  // const logger = mainLogger.child({ service: `rtsp-utils` })
   const characteristics: RtspStreamCharacteristics = {
     url,
     audio: {},
@@ -138,9 +138,9 @@ const getRtspStreamCharacteristicsFromGstDiscoverer = async (
     if (signal.aborted) {
       return undefined
     }
-    logger.error(
-      `Error getting stream characteristics for camera being served by ${getHostnameFromRtspUrl(url)} from gst-discoverer: ${error.message}`
-    )
+    // logger.error(
+    //   `Error getting stream characteristics for camera being served by ${getHostnameFromRtspUrl(url)} from gst-discoverer: ${error.message}`
+    // )
     return undefined
   }
   if (signal.aborted) {
@@ -210,9 +210,9 @@ const getRtspStreamCharacteristicsFromGstDiscoverer = async (
     characteristics.audio?.channels === 0 ||
     characteristics.audio?.sampleRate === 0
   ) {
-    logger.error(
-      `Error getting stream characteristics for camera being served by ${getHostnameFromRtspUrl(url)} from gst-discoverer: Invalid stream characteristics detected.`
-    )
+    // logger.error(
+    //   `Error getting stream characteristics for camera being served by ${getHostnameFromRtspUrl(url)} from gst-discoverer: Invalid stream characteristics detected.`
+    // )
   }
   const missingCharacteristics = []
   if (!characteristics.video?.width) {
@@ -234,8 +234,8 @@ const getRtspStreamCharacteristicsFromFfprobe = async (
   url: string,
   signal: AbortSignal
 ): Promise<RtspStreamCharacteristics | undefined> => {
-  const mainLogger = await app.container.make('logger')
-  const logger = mainLogger.child({ service: `rtsp-utils` })
+  // const mainLogger = await app.container.make('logger')
+  // const logger = mainLogger.child({ service: `rtsp-utils` })
   const characteristics: RtspStreamCharacteristics = {
     url,
     audio: {},
@@ -266,18 +266,18 @@ const getRtspStreamCharacteristicsFromFfprobe = async (
     if (signal.aborted) {
       return undefined
     }
-    logger.error(
-      `Error getting stream characteristics for camera being served by ${getHostnameFromRtspUrl(url)} from ffprobe: ${error.message}`
-    )
+    // logger.error(
+    //   `Error getting stream characteristics for camera being served by ${getHostnameFromRtspUrl(url)} from ffprobe: ${error.message}`
+    // )
     return undefined
   }
   let parsed: FFprobeResult
   try {
     parsed = JSON.parse(characteristics.raw)
   } catch {
-    logger.error(
-      `Error getting stream characteristics for camera being served by ${getHostnameFromRtspUrl(url)} from ffprobe: Invalid JSON response`
-    )
+    // logger.error(
+    //   `Error getting stream characteristics for camera being served by ${getHostnameFromRtspUrl(url)} from ffprobe: Invalid JSON response`
+    // )
     return undefined
   }
   // Populate the characteristics object with video and audio stream details
