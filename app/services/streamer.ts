@@ -2,7 +2,8 @@ import env from '#start/env'
 import { execa } from 'execa'
 import Camera from '#models/camera'
 import string from '@adonisjs/core/helpers/string'
-// import { Server as StreamPrivateApiServer } from 'socket.io'
+import { Server as StreamPrivateApiServer } from 'socket.io'
+import { pickPort } from '#utilities/ports'
 import type { PM3 } from '#services/pm3'
 import type { ApplicationService } from '@adonisjs/core/types'
 import type { LoggerService } from '@adonisjs/core/types'
@@ -34,14 +35,16 @@ export class StreamerService {
   readonly #app: ApplicationService
   readonly #managedProcesses: Set<string>
   readonly #shuttingDownProcesses: Set<string>
-  // readonly #noSuchCameraPort: number
-  // readonly #cameraDisabledPort: number
-  // readonly #connectingPort: number
-  // readonly #internalApiPort: number
+  readonly #internalApiPort: number
+
   #logger?: Logger
   #ffmpegHwAccelerator?: string
   #ffmpegHwAcceleratorDevice?: string
-  // #internalApiServer?: StreamPrivateApiServer
+
+  #noSuchCameraPort?: number
+  #cameraDisabledPort?: number
+  #connectingPort?: number
+  #internalApiServer?: StreamPrivateApiServer
 
   constructor(app: ApplicationService) {
     this.#app = app
@@ -50,7 +53,7 @@ export class StreamerService {
     // this.#noSuchCameraPort = env.get('NO_SUCH_CAMERA_PORT', 62001)
     // this.#cameraDisabledPort = env.get('CAMERA_DISABLED_PORT', 62002)
     // this.#connectingPort = env.get('CONNECTING_PORT', 62003)
-    // this.#internalApiPort = env.get('INTERNAL_API_PORT', 62004)
+    this.#internalApiPort = env.get('INTERNAL_API_PORT', 62005)
   }
 
   get managedProcesses() {
@@ -111,57 +114,69 @@ export class StreamerService {
     pm3.on('log:out', this.#logProcessToInfo)
     pm3.on('log:err', this.#logProcessToWarn)
 
-    // const noSuchCameraFilePath = this.#app.makePath('resources/mediamtx/no-such-camera.jpg')
-    // const cameraDisabledFilePath = this.#app.makePath('resources/mediamtx/camera-disabled.jpg')
-    // const connectingFilePath = this.#app.makePath('resources/mediamtx/connecting.jpg')
-    // pm3.on('stdout:nestmtx-static-no-such-camera', this.#logToInfo)
-    // pm3.on('stderr:nestmtx-static-no-such-camera', this.#logToError)
-    // pm3.on('stdout:nestmtx-static-camera-disabled', this.#logToInfo)
-    // pm3.on('stderr:nestmtx-static-camera-disabled', this.#logToError)
-    // pm3.on('stdout:nestmtx-static-connecting', this.#logToInfo)
-    // pm3.on('stderr:nestmtx-static-connecting', this.#logToError)
-    // pm3.add(
-    //   'nestmtx-static-no-such-camera',
-    //   {
-    //     file: 'node',
-    //     arguments: ['ace', 'mjpeg:stream', this.#noSuchCameraPort.toString(), noSuchCameraFilePath],
-    //     restart: true,
-    //   },
-    //   true
-    // )
-    // pm3.add(
-    //   'nestmtx-static-camera-disabled',
-    //   {
-    //     file: 'node',
-    //     arguments: [
-    //       'ace',
-    //       'mjpeg:stream',
-    //       this.#cameraDisabledPort.toString(),
-    //       cameraDisabledFilePath,
-    //     ],
-    //     restart: true,
-    //   },
-    //   true
-    // )
-    // pm3.add(
-    //   'nestmtx-static-connecting',
-    //   {
-    //     file: 'node',
-    //     arguments: ['ace', 'mjpeg:stream', this.#connectingPort.toString(), connectingFilePath],
-    //     restart: true,
-    //   },
-    //   true
-    // )
-    // this.#internalApiServer = new StreamPrivateApiServer({
-    //   serveClient: false,
-    //   allowEIO3: true,
-    //   transports: ['websocket', 'polling'],
-    // })
-    // this.#internalApiServer.on('connection', (socket) => {
-    //   this.#logger?.info(`Got connection from socket ${socket.id}`)
-    // })
-    // this.#internalApiServer.listen(this.#internalApiPort)
-    // this.#logger.info(`Streamer Service API listening on port ${this.#internalApiPort}`)
+    const noSuchCameraFilePath = this.#app.makePath('resources/mediamtx/no-such-camera.jpg')
+    const cameraDisabledFilePath = this.#app.makePath('resources/mediamtx/camera-disabled.jpg')
+    const connectingFilePath = this.#app.makePath('resources/mediamtx/connecting.jpg')
+    this.#noSuchCameraPort = await pickPort({ type: 'tcp', ip: '127.0.0.1' })
+    this.#cameraDisabledPort = await pickPort({ type: 'tcp', ip: '127.0.0.1' })
+    this.#connectingPort = await pickPort({ type: 'tcp', ip: '127.0.0.1' })
+
+    pm3.on('stdout:nestmtx-static-no-such-camera', this.#logToInfo)
+    pm3.on('stderr:nestmtx-static-no-such-camera', this.#logToError)
+    pm3.on('stdout:nestmtx-static-camera-disabled', this.#logToInfo)
+    pm3.on('stderr:nestmtx-static-camera-disabled', this.#logToError)
+    pm3.on('stdout:nestmtx-static-connecting', this.#logToInfo)
+    pm3.on('stderr:nestmtx-static-connecting', this.#logToError)
+    pm3.add(
+      'nestmtx-static-no-such-camera',
+      {
+        file: 'node',
+        arguments: ['ace', 'mjpeg:stream', this.#noSuchCameraPort.toString(), noSuchCameraFilePath],
+        restart: true,
+      },
+      true
+    )
+    pm3.add(
+      'nestmtx-static-camera-disabled',
+      {
+        file: 'node',
+        arguments: [
+          'ace',
+          'mjpeg:stream',
+          this.#cameraDisabledPort.toString(),
+          cameraDisabledFilePath,
+        ],
+        restart: true,
+      },
+      true
+    )
+    pm3.add(
+      'nestmtx-static-connecting',
+      {
+        file: 'node',
+        arguments: ['ace', 'mjpeg:stream', this.#connectingPort.toString(), connectingFilePath],
+        restart: true,
+      },
+      true
+    )
+    // this.#internalApiPort = await pickPort({ type: 'tcp', ip: '127.0.0.1' })
+    this.#internalApiServer = new StreamPrivateApiServer({
+      serveClient: false,
+      allowEIO3: true,
+      transports: ['websocket', 'polling'],
+    })
+    this.#internalApiServer.on('connection', (socket) => {
+      this.#logger?.info(`Got connection from socket ${socket.id}`)
+      if (this.#noSuchCameraPort && this.#cameraDisabledPort && this.#connectingPort) {
+        socket.emit('ports', {
+          cameraMissing: this.#noSuchCameraPort,
+          cameraDisabled: this.#cameraDisabledPort,
+          cameraConnecting: this.#connectingPort,
+        })
+      }
+    })
+    this.#internalApiServer.listen(this.#internalApiPort)
+    this.#logger.info(`Streamer Service API listening on port ${this.#internalApiPort}`)
   }
 
   async cronjob() {}
@@ -176,17 +191,17 @@ export class StreamerService {
       .filter((l) => l !== 'Hardware acceleration methods:')
   }
 
-  // #logToInfo = (data: string) => {
-  //   if (this.#logger) {
-  //     this.#logger.info(data)
-  //   }
-  // }
+  #logToInfo = (data: string) => {
+    if (this.#logger) {
+      this.#logger.info(data)
+    }
+  }
 
-  // #logToError = (data: string) => {
-  //   if (this.#logger) {
-  //     this.#logger.error(data)
-  //   }
-  // }
+  #logToError = (data: string) => {
+    if (this.#logger) {
+      this.#logger.error(data)
+    }
+  }
 
   #logProcessToInfo = (name: string, data: string) => {
     if (['camera-', 'ffmpeg-', 'gstreamer-', 'mtx-'].some((prefix) => name.startsWith(prefix))) {
@@ -252,7 +267,7 @@ export class StreamerService {
         processName,
         {
           file: 'node',
-          arguments: ['ace', 'nestmtx:stream', payload.MTX_PATH],
+          arguments: ['ace', 'nestmtx:stream', payload.MTX_PATH, this.#internalApiPort!.toString()],
           restart: true,
         },
         true
