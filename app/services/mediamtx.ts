@@ -157,7 +157,8 @@ export class MediaMTXService {
       /**
        * Update the RTSP configuration
        */
-      rtsp: true,
+      rtsp: true === env.get('MEDIA_MTX_RTSP_ENABLED', false) ? true : false,
+      // rtsp: true,
       encryption: 'no',
       protocols: ['tcp', 'udp'],
       rtspAddress: `${env.get('HOST')}:${env.get('MEDIA_MTX_RTSP_TCP_PORT', 8554)}`,
@@ -199,8 +200,8 @@ export class MediaMTXService {
       /**
        * Update the SRT configuration
        */
-      srt: true === env.get('MEDIA_MTX_SRT_ENABLED', false) ? true : false,
-      // srt: true,
+      // srt: true === env.get('MEDIA_MTX_SRT_ENABLED', false) ? true : false,
+      srt: true,
       srtAddress: `${env.get('HOST')}:${env.get('MEDIA_MTX_SRT_PORT', 8890)}`,
       /**
        * Update the path defaults configuration

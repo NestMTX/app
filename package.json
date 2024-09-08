@@ -96,6 +96,7 @@
     "pino-abstract-transport": "^1.2.0",
     "reflect-metadata": "^0.2.1",
     "socket.io": "^4.7.5",
+    "socket.io-client": "^4.7.5",
     "twilio": "^5.0.4",
     "werift": "^0.19.8",
     "yaml": "^2.4.1"

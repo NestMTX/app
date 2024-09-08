@@ -44,7 +44,7 @@ export default class MjpegStream extends BaseCommand {
           finished = true
           mjpegServer.close()
         })
-
+        mjpegServer.write(image)
         // Send headers once
         while (!finished) {
           mjpegServer.write(image)
