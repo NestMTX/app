@@ -20,6 +20,7 @@ import { pickPort } from 'pick-port'
 import { createSocket } from 'node:dgram'
 import { EventEmitter } from 'node:events'
 import { getRtspStreamCharacteristics } from '#utilities/rtsp'
+import string from '@adonisjs/core/helpers/string'
 
 dot.keepArray = true
 
@@ -752,9 +753,19 @@ export default class Camera extends BaseModel {
 
   async #killExistingProcesses() {
     // @todo: Implement this via the streamer service instead of pm3 directly
-    // if (!app.pm3) {
-    //   return
-    // }
+    if (!app.pm3 || !this.mtxPath) {
+      return
+    }
+    const slugifiedName = string.slug(this.mtxPath, {
+      replacement: '-',
+      lower: true,
+      strict: true,
+      locale: 'en',
+      trim: true,
+    })
+    try {
+      await app.pm3.stop(`mtx-${slugifiedName}`)
+    } catch {}
     // const ffmpegNoSuchCameraFeedProcess = `ffmpeg-no-such-camera-${this.mtxPath}`
     // const ffmpegCameraDisabledFeedProcess = `ffmpeg-camera-disabled-${this.mtxPath}`
     // const streamerCameraFeedProcess = `camera-${this.id}`

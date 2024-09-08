@@ -285,7 +285,6 @@ export default class NestmtxStream extends BaseCommand {
     this.logger.info(`Getting RTSP stream characteristics for "${getHostnameFromRtspUrl(rtspSrc)}"`)
     const characteristics: RtspStreamCharacteristics = await getRtspStreamCharacteristics(rtspSrc)
     const videoBitrate = characteristics.video.bitrate || 1000
-    const frameRate = characteristics.video.frameRate || '30/1'
 
     const ffmpegArgs: string[] = [
       '-loglevel',
@@ -308,7 +307,7 @@ export default class NestmtxStream extends BaseCommand {
       `-b:v`,
       `${videoBitrate}k`, // Set video bitrate dynamically
       '-r',
-      `${frameRate.split('/')[0]}`, // Set frame rate dynamically
+      `10`, // Set frame rate dynamically
 
       // Set pixel format to avoid deprecated warning
       '-pix_fmt',
