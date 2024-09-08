@@ -197,7 +197,7 @@ export class PM3 extends EventEmitter<PM3ProcessEventMap> {
         signal: abortController.signal,
       }
       process = execa(desired.file, desired.arguments, desired.options)
-      process.on('exit', (code, signal) => {
+      process.on('exit', async (code, signal) => {
         this.#debug(
           `Process exited: ${name} with code: ${code} and signal: ${signal}. Abort signal ${abortController.signal.aborted ? 'was' : 'was not'} sent`
         )
@@ -210,6 +210,7 @@ export class PM3 extends EventEmitter<PM3ProcessEventMap> {
             ? options.maxRestarts
             : Number.POSITIVE_INFINITY
         if (restartable && attempt < maxRestarts) {
+          await new Promise((resolve) => setTimeout(resolve, 1000))
           this.#processes.delete(name)
           this.#start(name, attempt + 1)
         } else {

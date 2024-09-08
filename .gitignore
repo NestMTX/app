@@ -45,3 +45,5 @@ streamer/Cargo.lock
 
 # If you're using rustfmt
 **/*.rs.bk
+
+*.fifo
