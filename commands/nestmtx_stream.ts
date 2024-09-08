@@ -287,8 +287,12 @@ export default class NestmtxStream extends BaseCommand {
     const videoBitrate = characteristics.video.bitrate || 1000
 
     const ffmpegArgs: string[] = [
+      '-use_wallclock_as_timestamps',
+      '1', // Force FFMpeg to use the wall-clock time for packet timestamps
       '-loglevel',
       'warning', // Suppress most log messages, only show warnings
+      '-fflags',
+      '+genpts', // Generate presentation timestamps
       '-fflags',
       '+discardcorrupt', // Ignore corrupted frames
       '-re', // Read input at native frame rate
