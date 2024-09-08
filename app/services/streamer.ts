@@ -173,6 +173,13 @@ export class StreamerService {
           cameraDisabled: this.#cameraDisabledPort,
           cameraConnecting: this.#connectingPort,
         })
+        socket.emit('ice', this.#app.iceService.asRTCIceServers)
+        socket.emit('hosts', [
+          '127.0.0.1',
+          '::1',
+          ...this.#app.natService.lanIps,
+          this.#app.natService.publicIp,
+        ])
       }
     })
     this.#internalApiServer.listen(this.#internalApiPort)

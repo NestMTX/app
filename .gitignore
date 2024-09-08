@@ -47,3 +47,4 @@ streamer/Cargo.lock
 **/*.rs.bk
 
 *.fifo
+*.sdp

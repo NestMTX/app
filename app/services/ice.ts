@@ -13,6 +13,25 @@ interface IceServer {
   password?: string
 }
 
+export class IceCandidateError extends Error {
+  readonly address: string
+  readonly errorCode: number
+  readonly errorText: string
+  readonly port: number
+  readonly url: string
+
+  constructor(address: string, errorCode: number, errorText: string, port: number, url: string) {
+    super(`ICE Candidate Error: ${errorText}`)
+    this.name = this.constructor.name
+    Error.captureStackTrace(this, this.constructor)
+    this.address = address
+    this.errorCode = errorCode
+    this.errorText = errorText
+    this.port = port
+    this.url = url
+  }
+}
+
 export class ICEService {
   readonly #known: Set<IceServer> = new Set<any>()
   #logger?: Logger
