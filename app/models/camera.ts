@@ -501,7 +501,18 @@ export default class Camera extends BaseModel {
   }
 
   get #streamProcessName() {
-    return `camera-${this.id}`
+    // return `camera-${this.id}`
+    if (!this.mtxPath) {
+      return null
+    }
+    const slugifiedName = string.slug(this.mtxPath, {
+      replacement: '-',
+      lower: true,
+      strict: true,
+      locale: 'en',
+      trim: true,
+    })
+    return `mtx-${slugifiedName}`
   }
 
   get #streamerProcess() {
@@ -752,7 +763,6 @@ export default class Camera extends BaseModel {
   }
 
   async #killExistingProcesses() {
-    // @todo: Implement this via the streamer service instead of pm3 directly
     if (!app.pm3 || !this.mtxPath) {
       return
     }
@@ -901,6 +911,9 @@ export default class Camera extends BaseModel {
   }
 
   async #getIsAlreadyRunning() {
+    if (!this.#streamProcessName) {
+      return false
+    }
     const process = app.pm3.get(this.#streamProcessName)
     if (process && process.pid) {
       return true
@@ -932,7 +945,7 @@ export default class Camera extends BaseModel {
     if (signal && signal.aborted) {
       return
     }
-    if (isRunning) {
+    if (isRunning || !this.#streamProcessName) {
       logger.info(`GStreamer process for WebRTC stream already running`)
       return
     }
@@ -1317,7 +1330,7 @@ export default class Camera extends BaseModel {
     const mainLogger = await app.container.make('logger')
     const logger = mainLogger.child({ service: `camera-${this.id}` })
     const isRunning = await this.#getIsAlreadyRunning()
-    if (isRunning) {
+    if (isRunning || !this.#streamProcessName) {
       logger.info(`FFMpeg process for RTSP stream already running`)
       return
     }
