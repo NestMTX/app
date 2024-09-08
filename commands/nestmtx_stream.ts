@@ -59,7 +59,7 @@ export default class NestmtxStream extends BaseCommand {
 
   #cameraMissingPort?: number
   #cameraDisabledPort?: number
-  #cameraConnectingPort?: number
+  // #cameraConnectingPort?: number
 
   #iceServers: RTCIceServer[] = []
   #additionalHostAddresses: string[] = []
@@ -72,9 +72,9 @@ export default class NestmtxStream extends BaseCommand {
     return `http://127.0.0.1:${this.#cameraDisabledPort}`
   }
 
-  get #cameraConnectingMjpegStream() {
-    return `http://127.0.0.1:${this.#cameraConnectingPort}`
-  }
+  // get #cameraConnectingMjpegStream() {
+  //   return `http://127.0.0.1:${this.#cameraConnectingPort}`
+  // }
 
   get #destination() {
     return `srt://127.0.0.1:${env.get('MEDIA_MTX_SRT_PORT', 8890)}/?streamid=publish:${this.path}&pkt_size=1316`
@@ -117,7 +117,7 @@ export default class NestmtxStream extends BaseCommand {
             }) => {
               this.#cameraMissingPort = ports.cameraMissing
               this.#cameraDisabledPort = ports.cameraDisabled
-              this.#cameraConnectingPort = ports.cameraConnecting
+              // this.#cameraConnectingPort = ports.cameraConnecting
               this.logger.info(`Ports configured`)
               r(void 0)
             }
