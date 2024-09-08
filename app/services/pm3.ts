@@ -248,9 +248,10 @@ export class PM3 extends EventEmitter<PM3ProcessEventMap> {
       this.#debug(`Process for ${name} is not running`)
       return
     }
-    abortController.abort()
     this.#debug(`Killing process: ${name}`)
+    process.kill('SIGINT')
     await process
+    abortController.abort()
     this.#debug(`Cleaning up process: ${name}`)
     this.#processes.delete(name)
     this.#abortControllers.delete(name)

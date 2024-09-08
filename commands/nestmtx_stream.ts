@@ -17,14 +17,11 @@
 import { io } from 'socket.io-client'
 import { execa } from 'execa'
 import { BaseCommand, args } from '@adonisjs/core/ace'
-import { readFile } from 'node:fs/promises'
-import { existsSync, unlinkSync, createReadStream } from 'node:fs'
 import { DateTime } from 'luxon'
 import { getRtspStreamCharacteristics } from '#utilities/rtsp'
 import { getHostnameFromRtspUrl } from '#utilities/url'
 import env from '#start/env'
 import Camera from '#models/camera'
-import string from '@adonisjs/core/helpers/string'
 
 import type { CommandOptions } from '@adonisjs/core/types/ace'
 import type { ExecaChildProcess } from 'execa'
@@ -73,6 +70,7 @@ export default class NestmtxStream extends BaseCommand {
   }
 
   async run() {
+    process.once('SIGINT', this.#gracefulExit.bind(this))
     this.logger.info(`NestMTX Streamer for "${this.path}"`)
     const privateApiServerUrl = `http://127.0.0.1:${this.port}`
     this.logger.info(`Searching for Private API Server`)
@@ -329,5 +327,12 @@ export default class NestmtxStream extends BaseCommand {
       }
       process.exit(code ? code : 0)
     })
+  }
+
+  #gracefulExit() {
+    if (this.#streamer) {
+      this.#streamer.kill('SIGKILL')
+    }
+    process.exit(0)
   }
 }
