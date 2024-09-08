@@ -175,7 +175,7 @@ export default class NestmtxStream extends BaseCommand {
     const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
     const ffmpegArgs = [
       '-loglevel',
-      'warning',
+      env.get('FFMPEG_DEBUG_LEVEL', 'warning'),
       '-fflags',
       '+discardcorrupt', // Ignore corrupted frames
       '-re', // Read input at native frame rate
@@ -288,7 +288,7 @@ export default class NestmtxStream extends BaseCommand {
 
     const ffmpegArgs: string[] = [
       '-loglevel',
-      'warning', // Suppress most log messages, only show warnings
+      env.get('FFMPEG_DEBUG_LEVEL', 'warning'), // Suppress most log messages, only show warnings
       '-fflags',
       '+discardcorrupt', // Ignore corrupted frames
       '-re', // Read input at native frame rate
@@ -592,7 +592,7 @@ export default class NestmtxStream extends BaseCommand {
 
     const gstreamerArgs: string[] = [
       '-q', // Quiet mode
-      '--gst-debug-level=2', // Log level set to WARNING
+      `--gst-debug-level=${env.get('GSTREAMER_DEBUG_LEVEL', '2')}`, // Log level set to WARNING
       // Audio pipeline
       'udpsrc',
       `port=${audioPort}`,
