@@ -12,7 +12,7 @@
             <v-divider />
             <v-container fluid>
               <v-row>
-                <v-col v-for="(c, i) in cpu" :key="`cpi-${i}`" cols="6" :sm="cpuCols">
+                <v-col v-for="(c, i) in cpu" :key="`cpi-${i}`" cols="4" :sm="cpuCols">
                   <v-card color="transparent" class="glass-surface" style="position: relative">
                     <v-progress-linear v-bind="c">
                       <template #default="{ value }">
@@ -52,17 +52,17 @@
             <v-table class="bg-transparent">
               <thead>
                 <tr>
-                  <th width="50px;">&nbsp;</th>
-                  <th>{{ $t('index.htop.processes.pid') }}</th>
-                  <th>{{ $t('index.htop.processes.name') }}</th>
-                  <th>{{ $t('index.htop.processes.cpu') }}</th>
-                  <th>{{ $t('index.htop.processes.memory') }}</th>
-                  <th>{{ $t('index.htop.processes.uptime') }}</th>
+                  <th class="text-no-wrap" width="50px;">&nbsp;</th>
+                  <th class="text-no-wrap">{{ $t('index.htop.processes.pid') }}</th>
+                  <th class="text-no-wrap">{{ $t('index.htop.processes.name') }}</th>
+                  <th class="text-no-wrap">{{ $t('index.htop.processes.cpu') }}</th>
+                  <th class="text-no-wrap">{{ $t('index.htop.processes.memory') }}</th>
+                  <th class="text-no-wrap">{{ $t('index.htop.processes.uptime') }}</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="(p, i) in processes" :key="`process-${i}`">
-                  <td class="px-0">
+                  <td class="px-0 text-no-wrap">
                     <v-toolbar-items v-if="'nestmtx' !== p.name" class="h-100">
                       <v-btn
                         v-if="!p.pid"
@@ -96,15 +96,19 @@
                       </v-btn>
                     </v-toolbar-items>
                   </td>
-                  <td>
+                  <td class="text-no-wrap">
                     <code>{{ p.pid }}</code>
                   </td>
-                  <td>
+                  <td class="text-no-wrap">
                     <code>{{ p.name }}</code>
                   </td>
-                  <td>{{ 'number' === typeof p.cpu ? `${Math.ceil(p.cpu)}%` : '' }}</td>
-                  <td>{{ 'number' === typeof p.memory ? filesize(p.memory, { base: 2 }) : '' }}</td>
-                  <td>
+                  <td class="text-no-wrap">
+                    {{ 'number' === typeof p.cpu ? `${Math.ceil(p.cpu)}%` : '' }}
+                  </td>
+                  <td class="text-no-wrap">
+                    {{ 'number' === typeof p.memory ? filesize(p.memory, { base: 2 }) : '' }}
+                  </td>
+                  <td class="text-no-wrap">
                     {{
                       'number' === typeof p.uptime
                         ? Duration.fromObject({ milliseconds: p.uptime }).rescale().toHuman({
@@ -137,42 +141,42 @@
             <v-table class="bg-transparent">
               <thead>
                 <tr>
-                  <th>{{ $t('index.htop.paths.path') }}</th>
-                  <th style="width: 50px" class="text-center">
+                  <th class="text-no-wrap">{{ $t('index.htop.paths.path') }}</th>
+                  <th class="text-no-wrap text-center" style="width: 50px">
                     {{ $t('index.htop.paths.ready') }}
                   </th>
-                  <th>{{ $t('index.htop.paths.uptime') }}</th>
-                  <th>{{ $t('index.htop.paths.tracks') }}</th>
-                  <th>{{ $t('index.htop.paths.dataRx') }}</th>
-                  <th>{{ $t('index.htop.paths.dataTx') }}</th>
+                  <th class="text-no-wrap">{{ $t('index.htop.paths.uptime') }}</th>
+                  <th class="text-no-wrap">{{ $t('index.htop.paths.tracks') }}</th>
+                  <th class="text-no-wrap">{{ $t('index.htop.paths.dataRx') }}</th>
+                  <th class="text-no-wrap">{{ $t('index.htop.paths.dataTx') }}</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="(p, i) in paths" :key="`path-${i}`">
-                  <td>
+                  <td class="text-no-wrap">
                     <code>{{ p.path }}</code>
                   </td>
-                  <td class="text-center">
+                  <td class="text-no-wrap text-center">
                     <v-chip v-if="p.ready" variant="elevated" color="success">{{
                       $t('general.yes')
                     }}</v-chip>
                     <v-chip v-else variant="elevated" color="error">{{ $t('general.no') }}</v-chip>
                   </td>
-                  <td>
+                  <td class="text-no-wrap">
                     {{ timestampToTimeSinceDuration(p.uptime) }}
                   </td>
-                  <td>
+                  <td class="text-no-wrap">
                     {{ numberAsFormattedInteger(p.tracks) }}
                   </td>
-                  <td>
+                  <td class="text-no-wrap">
                     {{ filesize(p.dataRx) }}
                   </td>
-                  <td>
+                  <td class="text-no-wrap">
                     {{ filesize(p.dataTx) }}
                   </td>
                 </tr>
                 <tr v-if="paths.length === 0">
-                  <td colspan="7" class="pa-0">
+                  <td colspan="7" class="pa-0 text-no-wrap">
                     <v-alert color="info" type="info" dense rounded="0">{{
                       $t('index.htop.paths.empty')
                     }}</v-alert>
