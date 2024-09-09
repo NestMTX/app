@@ -251,6 +251,15 @@ export default class NestmtxStream extends BaseCommand {
       } else {
         this.logger.info(`FFMpeg exited with code ${code}`)
       }
+      if (code === 0) {
+        this.logger.info(`FFMpeg exited with code ${code}. Restarting.`)
+        this.#streamer = execa(ffmpegBinary, ffmpegArgs, {
+          stdio: 'pipe',
+          reject: false,
+          shell: true,
+        })
+        return
+      }
       process.exit(code ? code : 0)
     })
   }
@@ -372,6 +381,15 @@ export default class NestmtxStream extends BaseCommand {
         this.logger.error(`${result!.escapedCommand} failed with code ${result!.exitCode}`)
       } else {
         this.logger.info(`FFMpeg exited with code ${code}`)
+      }
+      if (code === 0) {
+        this.logger.info(`FFMpeg exited with code ${code}. Restarting.`)
+        this.#streamer = execa(ffmpegBinary, ffmpegArgs, {
+          stdio: 'pipe',
+          reject: false,
+          shell: true,
+        })
+        return
       }
       process.exit(code ? code : 0)
     })
