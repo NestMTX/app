@@ -56,6 +56,7 @@ export default class NestmtxStream extends BaseCommand {
 
   #api?: StreamPrivateApiClient
   #streamer?: ExecaChildProcess
+  #abortController: AbortController = new AbortController()
 
   #cameraMissingPort?: number
   #cameraDisabledPort?: number
@@ -234,6 +235,7 @@ export default class NestmtxStream extends BaseCommand {
       stdio: 'pipe',
       reject: false,
       shell: true,
+      signal: this.#abortController.signal,
     })
     this.#streamer.stdout!.on('data', (data) => {
       this.logger.info(data.toString())
@@ -257,6 +259,7 @@ export default class NestmtxStream extends BaseCommand {
           stdio: 'pipe',
           reject: false,
           shell: true,
+          signal: this.#abortController.signal,
         })
         return
       }
@@ -292,7 +295,14 @@ export default class NestmtxStream extends BaseCommand {
     await camera.save()
     const rtspSrc = results!.streamUrls.rtspUrl
     this.logger.info(`Getting RTSP stream characteristics for "${getHostnameFromRtspUrl(rtspSrc)}"`)
-    const characteristics: RtspStreamCharacteristics = await getRtspStreamCharacteristics(rtspSrc)
+    const getCharacteristicsAbortController = new AbortController()
+    setTimeout(() => {
+      getCharacteristicsAbortController.abort()
+    }, 30000)
+    const characteristics: RtspStreamCharacteristics = await getRtspStreamCharacteristics(
+      rtspSrc,
+      getCharacteristicsAbortController.signal
+    )
     const videoBitrate = characteristics.video.bitrate || 1000
 
     const ffmpegArgs: string[] = [
@@ -310,7 +320,9 @@ export default class NestmtxStream extends BaseCommand {
 
       // Add timeouts to avoid premature exits
       '-timeout',
-      '3000000', // Wait up to 5 seconds for connection timeout (in microseconds)
+      '6000000', // Wait up to 1 minute for the RTSP stream to start
+      '-rw_timeout',
+      '6000000',
 
       // Single H.264 Video Stream (without B-frames)
       '-c:v',
@@ -362,6 +374,7 @@ export default class NestmtxStream extends BaseCommand {
       stdio: 'pipe',
       reject: false,
       shell: true,
+      signal: this.#abortController.signal,
     })
 
     this.#streamer.stdout!.on('data', (data) => {
@@ -388,6 +401,7 @@ export default class NestmtxStream extends BaseCommand {
           stdio: 'pipe',
           reject: false,
           shell: true,
+          signal: this.#abortController.signal,
         })
         return
       }
@@ -673,6 +687,7 @@ export default class NestmtxStream extends BaseCommand {
       stdio: 'pipe',
       reject: false,
       shell: true,
+      signal: this.#abortController.signal,
     })
 
     this.#streamer.stdout!.on('data', (data) => {
@@ -698,6 +713,7 @@ export default class NestmtxStream extends BaseCommand {
     if (this.#streamer) {
       this.#streamer.kill('SIGKILL')
     }
+    this.#abortController.abort()
     process.exit(0)
   }
 }
