@@ -295,6 +295,14 @@ export default class NestmtxStream extends BaseCommand {
       '-i',
       `"${rtspSrc}"`, // Input RTSP stream with quotes
 
+      // Retry options for network issues
+      '-rtsp_transport',
+      'udp', // Use TCP for RTSP transport
+
+      // Add timeouts to avoid premature exits
+      '-timeout',
+      '3000000', // Wait up to 5 seconds for connection timeout (in microseconds)
+
       // Single H.264 Video Stream (without B-frames)
       '-c:v',
       'libx264',
