@@ -94,12 +94,34 @@ export default await Env.create(new URL('../', import.meta.url), {
    * GStreamer Configuration
    */
   GSTREAMER_BIN: Env.schema.string.optional(),
+  GSTREAMER_DEBUG_LEVEL: Env.schema.enum.optional([
+    '0',
+    '1',
+    '2',
+    '3',
+    '4',
+    '5',
+    '6',
+    '7',
+    '9',
+  ] as const),
   /**
    * FFmpeg Configuration
    */
   FFMPEG_BIN: Env.schema.string.optional(),
   FFMPEG_HW_ACCELERATOR: Env.schema.string.optional(),
   FFMPEG_HW_ACCELERATOR_DEVICE: Env.schema.string.optional(),
+  FFMPEG_DEBUG_LEVEL: Env.schema.enum.optional([
+    'quiet',
+    'panic',
+    'fatal',
+    'error',
+    'warning',
+    'info',
+    'verbose',
+    'debug',
+    'trace',
+  ] as const),
   /**
    * WebRTC Configuration
    */

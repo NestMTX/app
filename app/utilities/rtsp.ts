@@ -1,9 +1,6 @@
 import { execa } from 'execa'
 import app from '@adonisjs/core/services/app'
-import {
-  // getUrlObjectForRtspUrl,
-  getHostnameFromRtspUrl,
-} from '#utilities/url'
+import { getHostnameFromRtspUrl } from '#utilities/url'
 
 import {
   MissingStreamCharacteristicsException,
@@ -254,11 +251,14 @@ const getRtspStreamCharacteristicsFromFfprobe = async (
         '-show_streams',
         '-i',
         url,
+        '-rtsp_transport',
+        'udp', // Use TCP for RTSP transport
         '-rw_timeout',
         '6000000',
       ],
       {
         reject: true,
+        signal,
       }
     )
     characteristics.raw = stdout
