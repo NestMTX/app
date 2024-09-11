@@ -45,30 +45,17 @@ export default class NestmtxStream extends BaseCommand {
   #socket?: UnixSocketServer
   #streamer?: ExecaChildProcess
   #staticStreamer?: ExecaChildProcess
+  #cameraStreamer?: ExecaChildProcess
   #abortController: AbortController = new AbortController()
-
-  #cameraMissingPort?: number
-  #cameraDisabledPort?: number
-  #cameraConnectingPort?: number
+  #connectingStreamAbortController: AbortController = new AbortController()
 
   #iceServers: RTCIceServer[] = []
   #additionalHostAddresses: string[] = []
+  #rtspCameraStreamUrl?: string
 
   get #streamerPassthroughSock() {
     return this.app.makePath('resources', `streamer.${process.pid}.sock`)
   }
-
-  // get #cameraMissingMjpegStream() {
-  //   return `http://127.0.0.1:${this.#cameraMissingPort}`
-  // }
-
-  // get #cameraDisabledMjpegStream() {
-  //   return `http://127.0.0.1:${this.#cameraDisabledPort}`
-  // }
-
-  // get #cameraConnectingMjpegStream() {
-  //   return `http://127.0.0.1:${this.#cameraConnectingPort}`
-  // }
 
   get #noSuchCameraFilePath() {
     return this.app.makePath('resources/mediamtx/no-such-camera.jpg')
@@ -135,34 +122,39 @@ export default class NestmtxStream extends BaseCommand {
       })
       this.#api.connect()
     })
-    this.#streamJpegToOutputStream(this.#connectingFilePath)
+    this.#streamJpegToOutputStream(
+      this.#connectingFilePath,
+      this.#connectingStreamAbortController.signal
+    )
     this.logger.info(`Searching for Camera`)
     const camera = await Camera.findBy({ mtx_path: this.path })
-    // if (!camera) {
-    //   this.logger.info(`Camera not found`)
-    //   this.#streamJpegToOutputStream(this.#cameraMissingMjpegStream)
-    // } else if (
-    //   !camera.isEnabled ||
-    //   !camera.protocols ||
-    //   (!camera.protocols.includes('WEB_RTC') && !camera.protocols.includes('RTSP'))
-    // ) {
-    //   this.logger.info(`Camera disabled`)
-    //   this.#streamJpegToOutputStream(this.#cameraDisabledMjpegStream)
-    // } else {
-    // await camera.load('credential')
-    // const service: smartdevicemanagement_v1.Smartdevicemanagement =
-    //   await camera.credential.getSDMClient()
-    // try {
-    //   if (camera.protocols.includes('WEB_RTC')) {
-    //     await this.#webrtcStart(service, camera)
-    //   } else if (camera.protocols.includes('RTSP')) {
-    //     await this.#rtspStart(service, camera)
-    //   }
-    // } catch (err) {
-    //   this.logger.error(err.message)
-    //   process.exit(1)
-    // }
-    // }
+    if (!camera) {
+      this.logger.info(`Camera not found`)
+      this.#connectingStreamAbortController.abort()
+      this.#streamJpegToOutputStream(this.#noSuchCameraFilePath)
+    } else if (
+      !camera.isEnabled ||
+      !camera.protocols ||
+      (!camera.protocols.includes('WEB_RTC') && !camera.protocols.includes('RTSP'))
+    ) {
+      this.logger.info(`Camera disabled`)
+      this.#connectingStreamAbortController.abort()
+      this.#streamJpegToOutputStream(this.#cameraDisabledFilePath)
+    } else {
+      await camera.load('credential')
+      const service: smartdevicemanagement_v1.Smartdevicemanagement =
+        await camera.credential.getSDMClient()
+      try {
+        if (camera.protocols.includes('WEB_RTC')) {
+          // await this.#webrtcStart(service, camera)
+        } else if (camera.protocols.includes('RTSP')) {
+          await this.#rtspStart(service, camera)
+        }
+      } catch (err) {
+        this.logger.error(err.message)
+        process.exit(1)
+      }
+    }
   }
 
   #onUnixSocketConnection(socket: UnixSocket) {
@@ -176,87 +168,64 @@ export default class NestmtxStream extends BaseCommand {
   }
 
   #startOutputStreamer() {
-    const gstreamerBinary = env.get('GSTREAMER_BIN', 'gst-launch-1.0')
-    this.#streamer = execa(
-      gstreamerBinary,
-      [
-        '-q', // Quiet mode
-        `--gst-debug-level=${env.get('GSTREAMER_DEBUG_LEVEL', '2')}`, // Set log level
+    const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
+    const ffmpegArgs = [
+      '-loglevel',
+      env.get('FFMPEG_DEBUG_LEVEL', 'warning'),
+      '-fflags',
+      '+discardcorrupt', // Ignore corrupted frames
+      '-i',
+      `pipe:`,
+      // Single H.264 Video Stream (without B-frames)
+      '-c:v',
+      'libx264',
+      '-tune',
+      'zerolatency', // Tune for low latency
+      '-x264opts',
+      'bframes=0', // No B-frames
+      '-preset',
+      'ultrafast', // Ultrafast preset
+      `-b:v`,
+      `100k`, // Set video bitrate dynamically
+      '-r',
+      `10`, // Set frame rate dynamically
 
-        // Input stream
-        'fdsrc',
-        'fd=0',
-        'timeout=0',
-        '!',
-        'decodebin',
-        '!',
-        'tsdemux',
-        'name=demux',
+      // Set pixel format to avoid deprecated warning
+      '-pix_fmt',
+      'yuv420p',
 
-        // Video track handling
-        'demux.video_0',
-        '!',
-        'queue',
-        '!',
-        'h264parse',
-        '!',
-        'mux.',
+      // AAC Audio Stream
+      '-c:a:0',
+      'aac',
+      '-b:a:0',
+      '128k', // Audio bitrate for AAC
 
-        // Audio track handling - first (AAC)
-        'demux.audio_0',
-        '!',
-        'queue',
-        '!',
-        'decodebin',
-        '!',
-        'tee',
-        'name=audio_tee',
-        'audio_tee.',
-        '!',
-        'queue',
-        '!',
-        'audioconvert',
-        '!',
-        'avenc_aac',
-        'bitrate=128000',
-        '!',
-        'aacparse',
-        '!',
-        'mux.',
+      // Opus Audio Stream
+      '-c:a:1',
+      'libopus',
+      '-b:a:1',
+      '128k', // Audio bitrate for Opus
 
-        // Audio track handling - second (Opus)
-        'audio_tee.',
-        '!',
-        'queue',
-        '!',
-        'audioconvert',
-        '!',
-        'opusenc',
-        'bitrate=128000',
-        '!',
-        'opusparse',
-        '!',
-        'mux.',
+      // Mapping inputs and outputs
+      '-map',
+      '0:v', // Map the video input to the H.264 video stream
+      '-map',
+      '0:a', // Map the original AAC audio to the first audio track
+      '-map',
+      '0:a', // Map the original audio again for Opus encoding
 
-        // Muxing
-        'matroskamux', // Matroska container format
-        'name=mux',
-        'streamable=true', // Streamable output
-
-        // SRT Output
-        'srtsink',
-        'latency=100',
-        'localaddress="127.0.0.1"',
-        'mode="caller"',
-        `uri="${this.#destination}"`, // SRT URL, wrapped in quotes
-      ],
-      {
-        stdio: 'pipe',
-        reject: false,
-        shell: true,
-        signal: this.#abortController.signal,
-      }
-    )
+      '-f',
+      'mpegts', // Set the format to MPEG-TS
+      '-use_wallclock_as_timestamps',
+      '1',
+      `"${this.#destination}"`, // SRT destination with quotes
+    ]
+    this.#streamer = execa(ffmpegBinary, ffmpegArgs, {
+      stdio: 'pipe',
+      reject: false,
+      shell: true,
+      signal: this.#abortController.signal,
+    })
     this.#streamer.stdout!.on('data', (data) => {
       data
         .toString()
@@ -295,7 +264,7 @@ export default class NestmtxStream extends BaseCommand {
     })
   }
 
-  #streamJpegToOutputStream(src: string) {
+  #streamJpegToOutputStream(src: string, signal?: AbortSignal) {
     const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
     const ffmpegArgs = [
       '-loglevel',
@@ -310,12 +279,16 @@ export default class NestmtxStream extends BaseCommand {
       'anullsrc=r=48000:cl=stereo',
       '-c:v',
       'libx264',
+      '-profile:v',
+      'main',
       '-tune',
       'zerolatency',
-      '-b:v',
-      '100k',
       '-r',
-      '1',
+      '25',
+      '-s',
+      '640x480',
+      '-pix_fmt',
+      'yuv420p',
       '-c:a',
       'aac',
       '-b:a',
@@ -332,6 +305,10 @@ export default class NestmtxStream extends BaseCommand {
       stdio: 'pipe',
       reject: false,
       shell: true,
+      signal,
+    })
+    this.#staticStreamer.catch((err) => {
+      this.logger.error(err.message)
     })
     this.#staticStreamer.stdout!.on('data', (data) => {
       data
@@ -355,159 +332,213 @@ export default class NestmtxStream extends BaseCommand {
     })
     this.#staticStreamer.on('exit', async (code) => {
       this.logger.info(`Static Input FFMpeg exited with code ${code}`)
+      if (signal && signal.aborted) {
+        return
+      }
       if (code !== 0) {
         const res = await this.#streamer
         if (res) {
           this.logger.info(res.escapedCommand)
         }
+        this.#gracefulExit(code || 0)
       } else {
         this.#streamJpegToOutputStream(src)
       }
-      this.#gracefulExit(code || 0)
     })
   }
 
-  // async #rtspStart(service: smartdevicemanagement_v1.Smartdevicemanagement, camera: Camera) {
-  //   const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
-  //   const {
-  //     data: { results },
-  //   } = await service.enterprises.devices.executeCommand({
-  //     name: camera.uid,
-  //     requestBody: {
-  //       command: 'sdm.devices.commands.CameraLiveStream.GenerateRtspStream',
-  //     },
-  //   })
-  //   if (!results!.streamUrls || !results!.streamUrls.rtspUrl) {
-  //     throw new Error('RTSP Stream URL not found')
-  //   }
-  //   if (!results!.streamExtensionToken) {
-  //     throw new Error('No stream extension token found')
-  //   }
+  async #getRtspUrl(service: smartdevicemanagement_v1.Smartdevicemanagement, camera: Camera) {
+    while ('string' !== typeof this.#rtspCameraStreamUrl) {
+      let rtspUrl: any | undefined
+      let streamExtensionToken: string | undefined
+      let expiresAt: string | undefined
+      try {
+        const {
+          data: { results },
+        } = await service.enterprises.devices.executeCommand({
+          name: camera.uid,
+          requestBody: {
+            command: 'sdm.devices.commands.CameraLiveStream.GenerateRtspStream',
+          },
+        })
+        if (!results!.streamUrls || !results!.streamUrls.rtspUrl) {
+          throw new Error('RTSP Stream URL not found')
+        }
+        if (!results!.streamExtensionToken) {
+          throw new Error('No stream extension token found')
+        }
+        rtspUrl = results!.streamUrls.rtspUrl
+        streamExtensionToken = results!.streamExtensionToken
+        expiresAt = results!.expiresAt
+      } catch (error) {
+        if ((error as Error).message.includes('Rate limited')) {
+          this.logger.warning('Rate limited. Waiting 30 seconds before retrying')
+          await new Promise((r) => setTimeout(r, 30000))
+        } else {
+          this.#gracefulExit(1)
+        }
+      }
+      camera.streamExtensionToken = streamExtensionToken || null
+      camera.expiresAt = DateTime.utc().plus({ minutes: 5 })
+      if (expiresAt) {
+        const expiresAtDateTime = DateTime.fromISO(expiresAt)
+        if (expiresAtDateTime.isValid) {
+          camera.expiresAt = expiresAtDateTime
+        }
+      }
+      await camera.save()
+      this.#rtspCameraStreamUrl = rtspUrl
+    }
+    return this.#rtspCameraStreamUrl
+  }
 
-  //   camera.streamExtensionToken = results!.streamExtensionToken
-  //   camera.expiresAt = DateTime.utc().plus({ minutes: 5 })
-  //   if (results!.expiresAt) {
-  //     const expiresAt = DateTime.fromISO(results!.expiresAt)
-  //     if (expiresAt.isValid) {
-  //       camera.expiresAt = expiresAt
-  //     }
-  //   }
-  //   await camera.save()
-  //   const rtspSrc = results!.streamUrls.rtspUrl
-  //   this.logger.info(`Getting RTSP stream characteristics for "${getHostnameFromRtspUrl(rtspSrc)}"`)
-  //   const getCharacteristicsAbortController = new AbortController()
-  //   setTimeout(() => {
-  //     getCharacteristicsAbortController.abort()
-  //   }, 30000)
-  //   const characteristics: RtspStreamCharacteristics = await getRtspStreamCharacteristics(
-  //     rtspSrc,
-  //     getCharacteristicsAbortController.signal
-  //   )
-  //   const videoBitrate = characteristics.video.bitrate || 1000
+  async #rtspStart(
+    service: smartdevicemanagement_v1.Smartdevicemanagement,
+    camera: Camera,
+    depth: number = 0
+  ) {
+    const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
+    const rtspSrc = await this.#getRtspUrl(service, camera)
+    this.logger.info(`Getting RTSP stream characteristics for "${getHostnameFromRtspUrl(rtspSrc)}"`)
+    const getCharacteristicsAbortController = new AbortController()
+    setTimeout(() => {
+      getCharacteristicsAbortController.abort()
+    }, 30000)
+    let characteristics: RtspStreamCharacteristics
+    try {
+      characteristics = await getRtspStreamCharacteristics(
+        rtspSrc,
+        getCharacteristicsAbortController.signal
+      )
+    } catch (error) {
+      this.logger.error(error.message)
+      this.#rtspCameraStreamUrl = undefined
+      if (depth > 5) {
+        return this.#gracefulExit(1)
+      } else {
+        this.#connectingStreamAbortController = new AbortController()
+        this.#streamJpegToOutputStream(
+          this.#connectingFilePath,
+          this.#connectingStreamAbortController.signal
+        )
+        this.#rtspStart(service, camera, depth + 1)
+        return
+      }
+    }
+    const videoBitrate = characteristics.video.bitrate || 1000
 
-  //   const ffmpegArgs: string[] = [
-  //     '-loglevel',
-  //     env.get('FFMPEG_DEBUG_LEVEL', 'warning'), // Suppress most log messages, only show warnings
-  //     '-fflags',
-  //     '+discardcorrupt', // Ignore corrupted frames
-  //     '-re', // Read input at native frame rate
-  //     '-i',
-  //     `"${rtspSrc}"`, // Input RTSP stream with quotes
+    const ffmpegArgs: string[] = [
+      '-loglevel',
+      env.get('FFMPEG_DEBUG_LEVEL', 'warning'), // Suppress most log messages, only show warnings
+      '-fflags',
+      '+discardcorrupt', // Ignore corrupted frames
+      '-re', // Read input at native frame rate
+      '-i',
+      `"${rtspSrc}"`, // Input RTSP stream with quotes
 
-  //     // Retry options for network issues
-  //     '-rtsp_transport',
-  //     'udp', // Use TCP for RTSP transport
+      // Retry options for network issues
+      '-rtsp_transport',
+      'udp', // Use TCP for RTSP transport
 
-  //     // Add timeouts to avoid premature exits
-  //     '-timeout',
-  //     '6000000', // Wait up to 1 minute for the RTSP stream to start
-  //     '-rw_timeout',
-  //     '6000000',
+      // Add timeouts to avoid premature exits
+      '-timeout',
+      '6000000', // Wait up to 1 minute for the RTSP stream to start
+      '-rw_timeout',
+      '6000000',
 
-  //     // Single H.264 Video Stream (without B-frames)
-  //     '-c:v',
-  //     'libx264',
-  //     '-tune',
-  //     'zerolatency', // Tune for low latency
-  //     '-x264opts',
-  //     'bframes=0', // No B-frames
-  //     '-preset',
-  //     'ultrafast', // Ultrafast preset
-  //     `-b:v`,
-  //     `${videoBitrate}k`, // Set video bitrate dynamically
-  //     '-r',
-  //     `10`, // Set frame rate dynamically
+      // Single H.264 Video Stream (without B-frames)
+      '-c:v',
+      'libx264',
+      '-tune',
+      'zerolatency', // Tune for low latency
+      '-x264opts',
+      'bframes=0', // No B-frames
+      '-preset',
+      'ultrafast', // Ultrafast preset
+      `-b:v`,
+      `${videoBitrate}k`, // Set video bitrate dynamically
+      '-r',
+      `10`, // Set frame rate dynamically
 
-  //     // Set pixel format to avoid deprecated warning
-  //     '-pix_fmt',
-  //     'yuv420p',
+      // Set pixel format to avoid deprecated warning
+      '-pix_fmt',
+      'yuv420p',
 
-  //     // AAC Audio Stream
-  //     '-c:a:0',
-  //     'aac',
-  //     '-b:a:0',
-  //     '128k', // Audio bitrate for AAC
+      // AAC Audio Stream
+      '-c:a:0',
+      'aac',
+      '-b:a:0',
+      '128k', // Audio bitrate for AAC
 
-  //     // Opus Audio Stream
-  //     '-c:a:1',
-  //     'libopus',
-  //     '-b:a:1',
-  //     '128k', // Audio bitrate for Opus
+      // Opus Audio Stream
+      '-c:a:1',
+      'libopus',
+      '-b:a:1',
+      '128k', // Audio bitrate for Opus
 
-  //     // Mapping inputs and outputs
-  //     '-map',
-  //     '0:v', // Map the video input to the H.264 video stream
-  //     '-map',
-  //     '0:a', // Map the original AAC audio to the first audio track
-  //     '-map',
-  //     '0:a', // Map the original audio again for Opus encoding
+      // Mapping inputs and outputs
+      '-map',
+      '0:v', // Map the video input to the H.264 video stream
+      '-map',
+      '0:a', // Map the original AAC audio to the first audio track
+      '-map',
+      '0:a', // Map the original audio again for Opus encoding
 
-  //     '-f',
-  //     'mpegts', // Set the format to MPEG-TS
-  //     '-use_wallclock_as_timestamps',
-  //     '1',
-  //     `"${this.#destination}"`, // SRT destination with quotes
-  //   ]
-
-  //   this.logger.info(`Starting FFMpeg with RTSP stream`)
-  //   this.#streamer = execa(ffmpegBinary, ffmpegArgs, {
-  //     stdio: 'pipe',
-  //     reject: false,
-  //     shell: true,
-  //     signal: this.#abortController.signal,
-  //   })
-
-  //   this.#streamer.stdout!.on('data', (data) => {
-  //     this.logger.info(data.toString())
-  //   })
-
-  //   this.#streamer.stderr!.on('data', (data) => {
-  //     this.logger.warning(data.toString())
-  //   })
-
-  //   this.#streamer.on('exit', async (code) => {
-  //     if (code === 255) {
-  //       return
-  //     }
-  //     if (code === 8) {
-  //       const result = await this.#streamer
-  //       this.logger.error(`${result!.escapedCommand} failed with code ${result!.exitCode}`)
-  //     } else {
-  //       this.logger.info(`FFMpeg exited with code ${code}`)
-  //     }
-  //     if (code === 0) {
-  //       this.logger.info(`FFMpeg exited with code ${code}. Restarting.`)
-  //       this.#streamer = execa(ffmpegBinary, ffmpegArgs, {
-  //         stdio: 'pipe',
-  //         reject: false,
-  //         shell: true,
-  //         signal: this.#abortController.signal,
-  //       })
-  //       return
-  //     }
-  //     process.exit(code ? code : 0)
-  //   })
-  // }
+      '-f',
+      'mpegts',
+      '-listen',
+      '0',
+      `unix:${this.#streamerPassthroughSock}`, // Send output to Unix socket
+    ]
+    this.#connectingStreamAbortController.abort()
+    this.logger.info(`Starting FFMpeg with RTSP stream`)
+    this.#cameraStreamer = execa(ffmpegBinary, ffmpegArgs, {
+      stdio: 'pipe',
+      reject: false,
+      shell: true,
+      signal: this.#abortController.signal,
+    })
+    this.#cameraStreamer.catch((err) => {
+      this.logger.error(err.message)
+    })
+    this.#cameraStreamer.stdout!.on('data', (data) => {
+      data
+        .toString()
+        .split('\n')
+        .map((line: string) => line.trim())
+        .filter((line: string) => line.length > 0)
+        .forEach((line: string) => {
+          this.logger.info(`[static] ${line}`)
+        })
+    })
+    this.#cameraStreamer.stderr!.on('data', (data) => {
+      data
+        .toString()
+        .split('\n')
+        .map((line: string) => line.trim())
+        .filter((line: string) => line.length > 0)
+        .forEach((line: string) => {
+          this.logger.warning(`[static] ${line}`)
+        })
+    })
+    this.#cameraStreamer.on('exit', async (code) => {
+      this.logger.info(`Static Input FFMpeg exited with code ${code}`)
+      if (code !== 0) {
+        const res = await this.#streamer
+        if (res) {
+          this.logger.info(res.escapedCommand)
+        }
+        this.#gracefulExit(code || 0)
+      } else {
+        this.#connectingStreamAbortController = new AbortController()
+        this.#streamJpegToOutputStream(
+          this.#connectingFilePath,
+          this.#connectingStreamAbortController.signal
+        )
+        this.#rtspStart(service, camera, 0)
+      }
+    })
+  }
 
   // async #webrtcStart(service: smartdevicemanagement_v1.Smartdevicemanagement, camera: Camera) {
   //   if (!Array.isArray(this.#iceServers)) {
@@ -812,6 +843,9 @@ export default class NestmtxStream extends BaseCommand {
   #gracefulExit(code: number = 0) {
     if (this.#streamer) {
       this.#streamer.kill('SIGKILL')
+    }
+    if (this.#staticStreamer) {
+      this.#staticStreamer.kill('SIGKILL')
     }
     if (this.#socket) {
       this.#socket.close()
