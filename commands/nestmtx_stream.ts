@@ -12,7 +12,6 @@ import { EventEmitter } from 'node:events'
 import env from '#start/env'
 import Camera from '#models/camera'
 import { createServer } from 'node:net'
-import { writeFileSync } from 'node:fs'
 
 import type { CommandOptions } from '@adonisjs/core/types/ace'
 import type { ExecaChildProcess } from 'execa'
@@ -71,10 +70,6 @@ export default class NestmtxStream extends BaseCommand {
 
   get #destination() {
     return `srt://127.0.0.1:${env.get('MEDIA_MTX_SRT_PORT', 8890)}/?streamid=publish:${this.path}&pkt_size=1316`
-  }
-
-  get #location() {
-    return `rtsp://127.0.0.1:${env.get('MEDIA_MTX_RTSP_TCP_PORT', 8554)}/${this.path}`
   }
 
   async run() {
@@ -146,7 +141,7 @@ export default class NestmtxStream extends BaseCommand {
         await camera.credential.getSDMClient()
       try {
         if (camera.protocols.includes('WEB_RTC')) {
-          // await this.#webrtcStart(service, camera)
+          await this.#webrtcStart(service, camera)
         } else if (camera.protocols.includes('RTSP')) {
           await this.#rtspStart(service, camera)
         }
@@ -508,7 +503,7 @@ export default class NestmtxStream extends BaseCommand {
         .map((line: string) => line.trim())
         .filter((line: string) => line.length > 0)
         .forEach((line: string) => {
-          this.logger.info(`[static] ${line}`)
+          this.logger.info(`[camera] ${line}`)
         })
     })
     this.#cameraStreamer.stderr!.on('data', (data) => {
@@ -518,11 +513,11 @@ export default class NestmtxStream extends BaseCommand {
         .map((line: string) => line.trim())
         .filter((line: string) => line.length > 0)
         .forEach((line: string) => {
-          this.logger.warning(`[static] ${line}`)
+          this.logger.warning(`[camera] ${line}`)
         })
     })
     this.#cameraStreamer.on('exit', async (code) => {
-      this.logger.info(`Static Input FFMpeg exited with code ${code}`)
+      this.logger.info(`RTSP Camera FFMpeg exited with code ${code}`)
       if (code !== 0) {
         const res = await this.#streamer
         if (res) {
@@ -540,305 +535,397 @@ export default class NestmtxStream extends BaseCommand {
     })
   }
 
-  // async #webrtcStart(service: smartdevicemanagement_v1.Smartdevicemanagement, camera: Camera) {
-  //   if (!Array.isArray(this.#iceServers)) {
-  //     throw new Error('Failed to get ICE servers')
-  //   }
-  //   const getPortOptions: PickPortOptions = {
-  //     type: 'udp',
-  //     ip: '0.0.0.0',
-  //     reserveTimeout: 15,
-  //     minPort: env.get('WEBRTC_RTP_MIN_PORT', 10000),
-  //     maxPort: env.get('WEBRTC_RTP_MAX_PORT', 20000),
-  //   }
-  //   const gstreamerBinary = env.get('GSTREAMER_BIN', 'gst-launch-1.0')
-  //   const audioPort = await pickPort(getPortOptions)
-  //   const videoPort = await pickPort(getPortOptions)
-  //   const udp: DGramSocket = createSocket('udp4')
+  async #webrtcStart(service: smartdevicemanagement_v1.Smartdevicemanagement, camera: Camera) {
+    if (!Array.isArray(this.#iceServers)) {
+      throw new Error('Failed to get ICE servers')
+    }
+    const getPortOptions: PickPortOptions = {
+      type: 'udp',
+      ip: '0.0.0.0',
+      reserveTimeout: 15,
+      minPort: env.get('WEBRTC_RTP_MIN_PORT', 10000),
+      maxPort: env.get('WEBRTC_RTP_MAX_PORT', 20000),
+    }
+    // const gstreamerBinary = env.get('GSTREAMER_BIN', 'gst-launch-1.0')
+    const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
+    const audioPort = await pickPort(getPortOptions)
+    const videoPort = await pickPort(getPortOptions)
+    const udp: DGramSocket = createSocket('udp4')
 
-  //   const pc = new RTCPeerConnection({
-  //     bundlePolicy: 'max-bundle',
-  //     codecs: {
-  //       audio: [
-  //         new RTCRtpCodecParameters({
-  //           mimeType: 'audio/opus',
-  //           clockRate: 48000,
-  //           channels: 2,
-  //         }),
-  //       ],
-  //       video: [
-  //         new RTCRtpCodecParameters({
-  //           mimeType: 'video/H264',
-  //           clockRate: 90000,
-  //           rtcpFeedback: [
-  //             { type: 'transport-cc' },
-  //             { type: 'ccm', parameter: 'fir' },
-  //             { type: 'nack' },
-  //             { type: 'nack', parameter: 'pli' },
-  //             { type: 'goog-remb' },
-  //           ],
-  //           parameters: 'level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f',
-  //         }),
-  //       ],
-  //     },
-  //     iceServers: this.#iceServers,
-  //     iceAdditionalHostAddresses: this.#additionalHostAddresses,
-  //     iceTransportPolicy: 'all',
-  //   })
+    const pc = new RTCPeerConnection({
+      bundlePolicy: 'max-bundle',
+      codecs: {
+        audio: [
+          new RTCRtpCodecParameters({
+            mimeType: 'audio/opus',
+            clockRate: 48000,
+            channels: 2,
+          }),
+        ],
+        video: [
+          new RTCRtpCodecParameters({
+            mimeType: 'video/H264',
+            clockRate: 90000,
+            rtcpFeedback: [
+              { type: 'transport-cc' },
+              { type: 'ccm', parameter: 'fir' },
+              { type: 'nack' },
+              { type: 'nack', parameter: 'pli' },
+              { type: 'goog-remb' },
+            ],
+            parameters: 'level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f',
+          }),
+        ],
+      },
+      iceServers: this.#iceServers,
+      iceAdditionalHostAddresses: this.#additionalHostAddresses,
+      iceTransportPolicy: 'all',
+    })
 
-  //   pc.addEventListener('connectionstatechange', () => {
-  //     switch (pc.connectionState) {
-  //       case 'new':
-  //       case 'connecting':
-  //         this.logger.info('WebRTC Peer connection state: connecting')
-  //         break
-  //       case 'connected':
-  //         this.logger.info('WebRTC Peer connection state: connected')
-  //         break
-  //       case 'disconnected':
-  //       case 'closed':
-  //       case 'failed':
-  //         this.logger.warning('WebRTC Peer connection state: disconnected')
-  //         break
-  //       default:
-  //         this.logger.warning('WebRTC Peer connection state: unknown')
-  //         break
-  //     }
-  //   })
+    pc.addEventListener('connectionstatechange', () => {
+      switch (pc.connectionState) {
+        case 'new':
+        case 'connecting':
+          this.logger.info('WebRTC Peer connection state: connecting')
+          break
+        case 'connected':
+          this.logger.info('WebRTC Peer connection state: connected')
+          break
+        case 'disconnected':
+        case 'closed':
+        case 'failed':
+          this.logger.warning('WebRTC Peer connection state: disconnected')
+          break
+        default:
+          this.logger.warning('WebRTC Peer connection state: unknown')
+          break
+      }
+    })
 
-  //   const peerConnectedAbortController = new AbortController()
+    const peerConnectedAbortController = new AbortController()
 
-  //   const peerConnected = new Promise<void>((resolve, reject) => {
-  //     const onConnectionStateChange = () => {
-  //       switch (pc.connectionState) {
-  //         case 'connected':
-  //           pc.removeEventListener('connectionstatechange', onConnectionStateChange)
-  //           return resolve(void 0)
-  //         case 'disconnected':
-  //         case 'closed':
-  //         case 'failed':
-  //           pc.removeEventListener('connectionstatechange', onConnectionStateChange)
-  //           return reject(new Error('WebRTC Peer connection failed'))
-  //         default:
-  //           break
-  //       }
-  //     }
-  //     pc.addEventListener('connectionstatechange', onConnectionStateChange)
-  //     peerConnectedAbortController.signal.addEventListener('abort', () =>
-  //       // reject(new Error('Aborted'))
-  //       resolve(void 0)
-  //     )
-  //   })
+    const peerConnected = new Promise<void>((resolve, reject) => {
+      const onConnectionStateChange = () => {
+        switch (pc.connectionState) {
+          case 'connected':
+            pc.removeEventListener('connectionstatechange', onConnectionStateChange)
+            return resolve(void 0)
+          case 'disconnected':
+          case 'closed':
+          case 'failed':
+            pc.removeEventListener('connectionstatechange', onConnectionStateChange)
+            return reject(new Error('WebRTC Peer connection failed'))
+          default:
+            break
+        }
+      }
+      pc.addEventListener('connectionstatechange', onConnectionStateChange)
+      peerConnectedAbortController.signal.addEventListener('abort', () =>
+        // reject(new Error('Aborted'))
+        resolve(void 0)
+      )
+    })
 
-  //   peerConnected.then(() => {
-  //     this.logger.info('WebRTC Peer connection established')
-  //   })
+    peerConnected.then(() => {
+      this.logger.info('WebRTC Peer connection established')
+    })
 
-  //   pc.addEventListener('icecandidateerror', (event) => {
-  //     const e = new IceCandidateError(
-  //       event.address,
-  //       event.errorCode,
-  //       event.errorText,
-  //       event.port,
-  //       event.url
-  //     )
-  //     this.logger.error(e)
-  //   })
+    pc.addEventListener('icecandidateerror', (event) => {
+      const e = new IceCandidateError(
+        event.address,
+        event.errorCode,
+        event.errorText,
+        event.port,
+        event.url
+      )
+      this.logger.error(e)
+    })
 
-  //   const videoRtpBus = new EventEmitter({
-  //     captureRejections: true,
-  //   })
+    const videoRtpBus = new EventEmitter({
+      captureRejections: true,
+    })
 
-  //   const audioRtpBus = new EventEmitter({
-  //     captureRejections: true,
-  //   })
+    const audioRtpBus = new EventEmitter({
+      captureRejections: true,
+    })
 
-  //   const rtpPromiseAbortController = new AbortController()
+    const rtpPromiseAbortController = new AbortController()
 
-  //   const videoRtpSending = new Promise<void>((resolve, reject) => {
-  //     videoRtpBus.once('sent', () => {
-  //       this.logger.info('Video Stream Started')
-  //       return resolve(void 0)
-  //     })
-  //     videoRtpBus.once('error', (error: Error) => reject(error))
-  //     rtpPromiseAbortController.signal.addEventListener('abort', () => resolve(void 0))
-  //   })
+    const videoRtpSending = new Promise<void>((resolve, reject) => {
+      videoRtpBus.once('sent', () => {
+        this.logger.info('Video Stream Started')
+        return resolve(void 0)
+      })
+      videoRtpBus.once('error', (error: Error) => reject(error))
+      rtpPromiseAbortController.signal.addEventListener('abort', () => resolve(void 0))
+    })
 
-  //   const audioRtpSending = new Promise<void>((resolve, reject) => {
-  //     audioRtpBus.once('sent', () => {
-  //       this.logger.info('Audio Stream Started')
-  //       resolve(void 0)
-  //     })
-  //     audioRtpBus.once('error', (error: Error) => reject(error))
-  //     rtpPromiseAbortController.signal.addEventListener('abort', () => resolve(void 0))
-  //   })
+    const audioRtpSending = new Promise<void>((resolve, reject) => {
+      audioRtpBus.once('sent', () => {
+        this.logger.info('Audio Stream Started')
+        resolve(void 0)
+      })
+      audioRtpBus.once('error', (error: Error) => reject(error))
+      rtpPromiseAbortController.signal.addEventListener('abort', () => resolve(void 0))
+    })
 
-  //   pc.addEventListener('track', (event: RTCTrackEvent) => {
-  //     const { unSubscribe } = event.track.onReceiveRtp.subscribe((rtp) => {
-  //       switch (event.track.kind) {
-  //         case 'video':
-  //           udp.send(rtp.serialize(), videoPort, '0.0.0.0', (error, _bytes) => {
-  //             if (error) {
-  //               this.logger.error(error)
-  //               return
-  //             }
-  //             // this.logger.debug(`Sent ${bytes} bytes of video data to 0.0.0.0:${videoPort}`)
-  //             videoRtpBus.emit('sent')
-  //           })
-  //           break
+    pc.addEventListener('track', (event: RTCTrackEvent) => {
+      const { unSubscribe } = event.track.onReceiveRtp.subscribe((rtp) => {
+        switch (event.track.kind) {
+          case 'video':
+            udp.send(rtp.serialize(), videoPort, '0.0.0.0', (error, _bytes) => {
+              if (error) {
+                this.logger.error(error)
+                return
+              }
+              // this.logger.debug(`Sent ${bytes} bytes of video data to 0.0.0.0:${videoPort}`)
+              videoRtpBus.emit('sent')
+            })
+            break
 
-  //         case 'audio':
-  //           udp.send(rtp.serialize(), audioPort, '0.0.0.0', (error, _bytes) => {
-  //             if (error) {
-  //               this.logger.error(error)
-  //               return
-  //             }
-  //             // this.logger.debug(`Sent ${bytes} bytes of audio data to 0.0.0.0:${audioPort}`)
-  //             audioRtpBus.emit('sent')
-  //           })
-  //           break
+          case 'audio':
+            udp.send(rtp.serialize(), audioPort, '0.0.0.0', (error, _bytes) => {
+              if (error) {
+                this.logger.error(error)
+                return
+              }
+              // this.logger.debug(`Sent ${bytes} bytes of audio data to 0.0.0.0:${audioPort}`)
+              audioRtpBus.emit('sent')
+            })
+            break
 
-  //         default:
-  //           break
-  //       }
-  //     })
-  //     rtpPromiseAbortController.signal.addEventListener('abort', () => unSubscribe())
-  //   })
+          default:
+            break
+        }
+      })
+      rtpPromiseAbortController.signal.addEventListener('abort', () => unSubscribe())
+    })
 
-  //   try {
-  //     pc.addTransceiver('audio', { direction: 'recvonly' })
-  //   } catch (error) {
-  //     throw new Error(`Failed to add audio transceiver: ${error.message}`)
-  //   }
+    try {
+      pc.addTransceiver('audio', { direction: 'recvonly' })
+    } catch (error) {
+      throw new Error(`Failed to add audio transceiver: ${error.message}`)
+    }
 
-  //   try {
-  //     pc.addTransceiver('video', { direction: 'recvonly' })
-  //   } catch (error) {
-  //     throw new Error(`Failed to add video transceiver: ${error.message}`)
-  //   }
+    try {
+      pc.addTransceiver('video', { direction: 'recvonly' })
+    } catch (error) {
+      throw new Error(`Failed to add video transceiver: ${error.message}`)
+    }
 
-  //   // Add a data channel to include the application m line in SDP
-  //   pc.createDataChannel('dataSendChannel', { id: 1 })
+    // Add a data channel to include the application m line in SDP
+    pc.createDataChannel('dataSendChannel', { id: 1 })
 
-  //   const offer = await pc.createOffer()
-  //   await pc.setLocalDescription(offer)
+    const offer = await pc.createOffer()
+    await pc.setLocalDescription(offer)
 
-  //   const {
-  //     data: { results },
-  //   } = await service.enterprises.devices.executeCommand({
-  //     name: camera.uid,
-  //     requestBody: {
-  //       command: 'sdm.devices.commands.CameraLiveStream.GenerateWebRtcStream',
-  //       params: {
-  //         offerSdp: offer.sdp,
-  //       },
-  //     },
-  //   })
+    const {
+      data: { results },
+    } = await service.enterprises.devices.executeCommand({
+      name: camera.uid,
+      requestBody: {
+        command: 'sdm.devices.commands.CameraLiveStream.GenerateWebRtcStream',
+        params: {
+          offerSdp: offer.sdp,
+        },
+      },
+    })
 
-  //   if (!results!.answerSdp) {
-  //     throw new Error('WebRTC Answer SDP not found')
-  //   }
-  //   if (!results!.mediaSessionId) {
-  //     throw new Error('Media Session ID not found')
-  //   }
+    if (!results!.answerSdp) {
+      throw new Error('WebRTC Answer SDP not found')
+    }
+    if (!results!.mediaSessionId) {
+      throw new Error('Media Session ID not found')
+    }
 
-  //   camera.streamExtensionToken = results!.mediaSessionId
-  //   camera.expiresAt = DateTime.utc().plus({ minutes: 5 })
-  //   if (results!.expiresAt) {
-  //     const expiresAt = DateTime.fromISO(results!.expiresAt)
-  //     if (expiresAt.isValid) {
-  //       camera.expiresAt = expiresAt
-  //     }
-  //   }
-  //   await camera.save()
+    camera.streamExtensionToken = results!.mediaSessionId
+    camera.expiresAt = DateTime.utc().plus({ minutes: 5 })
+    if (results!.expiresAt) {
+      const expiresAt = DateTime.fromISO(results!.expiresAt)
+      if (expiresAt.isValid) {
+        camera.expiresAt = expiresAt
+      }
+    }
+    await camera.save()
 
-  //   await pc.setRemoteDescription({
-  //     type: 'answer',
-  //     sdp: results!.answerSdp,
-  //   })
+    await pc.setRemoteDescription({
+      type: 'answer',
+      sdp: results!.answerSdp,
+    })
 
-  //   await Promise.all([videoRtpSending, audioRtpSending])
+    await Promise.all([videoRtpSending, audioRtpSending])
 
-  //   this.logger.info('Starting GStreamer process for WebRTC stream')
+    // this.logger.info('Starting GStreamer process for WebRTC stream')
+    // const mpegtsmuxPort = await pickPort({
+    //   type: 'udp',
+    //   ip: '127.0.0.1',
+    //   reserveTimeout: 15,
+    //   minPort: env.get('WEBRTC_RTP_MIN_PORT', 10000),
+    //   maxPort: env.get('WEBRTC_RTP_MAX_PORT', 20000),
+    // })
+    // let gettingMpegtsStream = false
+    // const mpegtsToOutputStreamer = createSocket('udp4', (msg: Buffer) => {
+    //   if (this.#streamer) {
+    //     if (!gettingMpegtsStream) {
+    //       gettingMpegtsStream = true
+    //       this.logger.info('MPEG-TS Output is Streaming')
+    //     }
+    //     this.#streamer.stdin?.write(msg)
+    //   }
+    // })
+    // const gstreamerArgs: string[] = [
+    //   '-q', // Quiet mode
+    //   `--gst-debug-level=${env.get('GSTREAMER_DEBUG_LEVEL', '2')}`, // Log level set to WARNING
 
-  //   const gstreamerArgs: string[] = [
-  //     '-q', // Quiet mode
-  //     `--gst-debug-level=${env.get('GSTREAMER_DEBUG_LEVEL', '2')}`, // Log level set to WARNING
-  //     // Audio pipeline
-  //     'udpsrc',
-  //     `port=${audioPort}`,
-  //     'caps="application/x-rtp,media=(string)audio,clock-rate=(int)48000,encoding-name=(string)OPUS,payload=(int)96"',
-  //     '!',
-  //     'rtpjitterbuffer',
-  //     'latency=200', // Increased jitter buffer latency
-  //     '!',
-  //     'rtpopusdepay',
-  //     '!',
-  //     'opusdec', // Decode Opus to raw audio
-  //     '!',
-  //     'audioconvert', // Convert raw audio format if needed
-  //     '!',
-  //     'avenc_aac', // Encode to AAC (or 'faac' if available)
-  //     '!',
-  //     'queue',
-  //     'max-size-buffers=0',
-  //     'max-size-time=0',
-  //     'max-size-bytes=0',
-  //     'leaky=downstream',
-  //     '!',
-  //     'rtspclientsink',
-  //     'name=s',
-  //     `location="${this.#location}"`,
-  //     'async-handling=true',
-  //     'protocols=udp', // Use UDP for the RTSP feed
+    //   // Video pipeline
+    //   'udpsrc',
+    //   `port=${videoPort}`,
+    //   'caps="application/x-rtp,media=(string)video,clock-rate=(int)90000,encoding-name=(string)H264,payload=(int)97"', // RTP video caps
+    //   '!',
+    //   'rtpjitterbuffer',
+    //   'latency=200', // Increased jitter buffer latency
+    //   '!',
+    //   'rtph264depay', // Depayloader for RTP -> H.264
+    //   '!',
+    //   'h264parse',
+    //   'config-interval=-1', // Preserve SPS/PPS information
+    //   '!',
+    //   'queue',
+    //   'max-size-buffers=0', // Unlimited queue buffer
+    //   'max-size-time=0',
+    //   'max-size-bytes=0',
+    //   'leaky=downstream', // Drop old buffers if needed
+    //   '!',
+    //   'mpegtsmux name=mux', // Mux the video and audio into MPEG-TS
 
-  //     // Video pipeline
-  //     'udpsrc',
-  //     `port=${videoPort}`,
-  //     'caps="application/x-rtp,media=(string)video,clock-rate=(int)90000,encoding-name=(string)H264,payload=(int)97"',
-  //     '!',
-  //     'rtpjitterbuffer',
-  //     'latency=200', // Increased jitter buffer latency
-  //     '!',
-  //     'rtph264depay',
-  //     '!',
-  //     'h264parse',
-  //     'config-interval=-1', // Preserve the SPS/PPS information
-  //     '!',
-  //     'queue',
-  //     'max-size-buffers=0',
-  //     'max-size-time=0',
-  //     'max-size-bytes=0',
-  //     'leaky=downstream',
-  //     '!',
-  //     's.sink_1',
-  //   ]
+    //   // Audio pipeline
+    //   'udpsrc',
+    //   `port=${audioPort}`,
+    //   'caps="application/x-rtp,media=(string)audio,clock-rate=(int)48000,encoding-name=(string)OPUS,payload=(int)96"', // RTP audio caps
+    //   '!',
+    //   'rtpjitterbuffer',
+    //   'latency=200', // Increased jitter buffer latency
+    //   '!',
+    //   'rtpopusdepay', // Depayloader for RTP -> Opus
+    //   '!',
+    //   'opusdec', // Decode Opus to raw audio
+    //   '!',
+    //   'audioconvert', // Convert raw audio format if needed
+    //   '!',
+    //   'avenc_aac', // Encode to AAC
+    //   '!',
+    //   'queue',
+    //   'max-size-buffers=0', // Unlimited queue buffer
+    //   'max-size-time=0',
+    //   'max-size-bytes=0',
+    //   'leaky=downstream', // Drop old buffers if needed
+    //   '!',
+    //   'mux.', // Link audio to the muxer
 
-  //   this.#streamer = execa(gstreamerBinary, gstreamerArgs, {
-  //     stdio: 'pipe',
-  //     reject: false,
-  //     shell: true,
-  //     signal: this.#abortController.signal,
-  //   })
+    //   // Sink for the final stream
+    //   'mux.', // Muxed output from mpegtsmux
+    //   '!',
+    //   'udpsink', // Send to UDP
+    //   'host="127.0.0.1"', // Set the udp host to the local machine
+    //   `port="${mpegtsmuxPort}"`, // Set the udp port to the mpegtsmux port
+    // ]
+    // mpegtsToOutputStreamer.bind(mpegtsmuxPort, '127.0.0.1')
+    this.#connectingStreamAbortController.abort()
+    // this.#cameraStreamer = execa(gstreamerBinary, gstreamerArgs, {
+    //   stdio: 'pipe',
+    //   reject: false,
+    //   shell: true,
+    //   signal: this.#abortController.signal,
+    // })
+    this.logger.info(`Starting FFMpeg with WebRTC stream`)
+    const ffmpegArgs: string[] = [
+      '-y', // Overwrite output files
+      '-hide_banner', // Hide FFmpeg banner
+      '-loglevel',
+      env.get('FFMPEG_LOG_LEVEL', 'warning'), // Log level set to warning
 
-  //   this.#streamer.stdout!.on('data', (data) => {
-  //     this.logger.info(data.toString())
-  //   })
+      // Video input
+      '-f',
+      'rtp', // Input format
+      '-i',
+      `"udp://127.0.0.1:${videoPort}?fifo_size=5000000&overrun_nonfatal=1"`, // RTP video input
 
-  //   this.#streamer.stderr!.on('data', (data) => {
-  //     this.logger.warning(data.toString())
-  //   })
+      // Audio input
+      '-f',
+      'rtp',
+      '-i',
+      `"udp://127.0.0.1:${audioPort}?fifo_size=5000000&overrun_nonfatal=1"`, // RTP audio input
 
-  //   this.#streamer.on('exit', async (code) => {
-  //     if (code === 1) {
-  //       const result = await this.#streamer
-  //       this.logger.error(`${result!.escapedCommand} failed with code ${result!.exitCode}`)
-  //     } else {
-  //       this.logger.info(`GStreamer exited with code ${code}`)
-  //     }
-  //     process.exit(code ? code : 0)
-  //   })
-  // }
+      // Video encoding (H.264)
+      '-c:v',
+      'copy', // Copy the video codec (no re-encoding)
+
+      // Audio encoding (AAC)
+      '-c:a',
+      'aac', // Encode audio to AAC
+      '-b:a',
+      '128k', // Audio bitrate
+
+      // Muxing into MPEG-TS
+      '-f',
+      'mpegts',
+      '-muxdelay',
+      '0.2', // Set muxing delay
+      '-muxpreload',
+      '0.1', // Set mux preload
+
+      // Output to Unix socket
+      `unix:${this.#streamerPassthroughSock}`, // Unix socket output for the MPEG-TS stream
+    ]
+
+    this.#cameraStreamer = execa(ffmpegBinary, ffmpegArgs, {
+      stdio: 'pipe',
+      reject: false,
+      shell: true,
+      signal: this.#abortController.signal,
+    })
+
+    this.#cameraStreamer.catch((err) => {
+      this.logger.error(err.message)
+    })
+    this.#cameraStreamer.stdout!.on('data', (data) => {
+      data
+        .toString()
+        .split('\n')
+        .map((line: string) => line.trim())
+        .filter((line: string) => line.length > 0)
+        .forEach((line: string) => {
+          this.logger.info(`[camera] ${line}`)
+        })
+    })
+    this.#cameraStreamer.stderr!.on('data', (data) => {
+      data
+        .toString()
+        .split('\n')
+        .map((line: string) => line.trim())
+        .filter((line: string) => line.length > 0)
+        .forEach((line: string) => {
+          this.logger.warning(`[camera] ${line}`)
+        })
+    })
+    this.#cameraStreamer.on('exit', async (code) => {
+      this.logger.info(`RTSP Camera Gstreamer exited with code ${code}`)
+      if (code !== 0) {
+        const res = await this.#streamer
+        if (res) {
+          this.logger.info(res.escapedCommand)
+        }
+        this.#gracefulExit(code || 0)
+      } else {
+        this.#connectingStreamAbortController = new AbortController()
+        this.#streamJpegToOutputStream(
+          this.#connectingFilePath,
+          this.#connectingStreamAbortController.signal
+        )
+        this.#rtspStart(service, camera, 0)
+      }
+    })
+  }
 
   #gracefulExit(code: number = 0) {
     if (this.#streamer) {
@@ -846,6 +933,9 @@ export default class NestmtxStream extends BaseCommand {
     }
     if (this.#staticStreamer) {
       this.#staticStreamer.kill('SIGKILL')
+    }
+    if (this.#cameraStreamer) {
+      this.#cameraStreamer.kill('SIGKILL')
     }
     if (this.#socket) {
       this.#socket.close()
