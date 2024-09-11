@@ -11,6 +11,8 @@ import { createSocket } from 'node:dgram'
 import { EventEmitter } from 'node:events'
 import env from '#start/env'
 import Camera from '#models/camera'
+import { createServer } from 'node:net'
+import { writeFileSync } from 'node:fs'
 
 import type { CommandOptions } from '@adonisjs/core/types/ace'
 import type { ExecaChildProcess } from 'execa'
@@ -20,6 +22,7 @@ import type { Socket as StreamPrivateApiClient } from 'socket.io-client'
 import type { RTCIceServer, RTCTrackEvent } from 'werift'
 import type { PickPortOptions } from '#utilities/ports'
 import type { Socket as DGramSocket } from 'node:dgram'
+import type { Server as UnixSocketServer, Socket as UnixSocket } from 'node:net'
 
 export default class NestmtxStream extends BaseCommand {
   static commandName = 'nestmtx:stream'
@@ -39,6 +42,7 @@ export default class NestmtxStream extends BaseCommand {
   declare port: string
 
   #api?: StreamPrivateApiClient
+  #socket?: UnixSocketServer
   #streamer?: ExecaChildProcess
   #staticStreamer?: ExecaChildProcess
   #abortController: AbortController = new AbortController()
@@ -88,8 +92,9 @@ export default class NestmtxStream extends BaseCommand {
 
   async run() {
     process.once('SIGINT', this.#gracefulExit.bind(this))
-    this.logger.info(`NestMTX Streamer for "${this.path}"`)
-    await execa('mkfifo', [this.#streamerPassthroughSock])
+    this.logger.info(`NestMTX Streamer for "${this.path}". PID: ${process.pid}`)
+    this.#socket = createServer(this.#onUnixSocketConnection.bind(this))
+    this.#socket.listen(this.#streamerPassthroughSock)
     this.#startOutputStreamer()
     const privateApiServerUrl = `http://127.0.0.1:${this.port}`
     this.logger.info(`Searching for Private API Server`)
@@ -160,6 +165,16 @@ export default class NestmtxStream extends BaseCommand {
     // }
   }
 
+  #onUnixSocketConnection(socket: UnixSocket) {
+    socket.on('data', (raw) => {
+      // console.log(raw)
+      // writeFileSync(this.#streamerPassthroughFifo, raw)
+      if (this.#streamer) {
+        this.#streamer.stdin?.write(raw)
+      }
+    })
+  }
+
   #startOutputStreamer() {
     const gstreamerBinary = env.get('GSTREAMER_BIN', 'gst-launch-1.0')
     this.#streamer = execa(
@@ -169,10 +184,13 @@ export default class NestmtxStream extends BaseCommand {
         `--gst-debug-level=${env.get('GSTREAMER_DEBUG_LEVEL', '2')}`, // Set log level
 
         // Input stream
-        'filesrc',
-        `location=${this.#streamerPassthroughSock}`,
+        'fdsrc',
+        'fd=0',
+        'timeout=0',
         '!',
-        'matroskademux',
+        'decodebin',
+        '!',
+        'tsdemux',
         'name=demux',
 
         // Video track handling
@@ -229,6 +247,7 @@ export default class NestmtxStream extends BaseCommand {
         'srtsink',
         'latency=100',
         'localaddress="127.0.0.1"',
+        'mode="caller"',
         `uri="${this.#destination}"`, // SRT URL, wrapped in quotes
       ],
       {
@@ -265,7 +284,7 @@ export default class NestmtxStream extends BaseCommand {
         })
     })
     this.#streamer.on('exit', async (code) => {
-      this.logger.info(`Streamer FFmpeg exited with code ${code}`)
+      this.logger.info(`Streamer exited with code ${code}`)
       if (code !== 0) {
         const res = await this.#streamer
         if (res) {
@@ -281,66 +300,32 @@ export default class NestmtxStream extends BaseCommand {
     const ffmpegArgs = [
       '-loglevel',
       env.get('FFMPEG_DEBUG_LEVEL', 'warning'),
-      '-fflags',
-      '+discardcorrupt', // Ignore corrupted frames
-
-      '-loglevel',
-      'warning',
-      '-stream_loop',
-      '-1', // Loop the input file indefinitely
+      '-loop',
+      '1',
       '-i',
-      src,
-      '-r',
-      '10', // Set maximum frame rate to 10fps
-
-      // Create a fake AAC audio track for streams without audio
+      `${src}`,
       '-f',
       'lavfi',
       '-i',
-      'anullsrc=channel_layout=stereo:sample_rate=48000', // Fake audio input for AAC audio
-
-      // H.264 Video stream encoding
+      'anullsrc=r=48000:cl=stereo',
       '-c:v',
       'libx264',
       '-tune',
-      'zerolatency', // Tune for low latency
-      '-preset',
-      'ultrafast', // Ultrafast preset
+      'zerolatency',
       '-b:v',
-      '1000k', // Set video bitrate
-
-      // Set pixel format to avoid deprecated warnings
-      '-pix_fmt',
-      'yuv420p',
-
-      // Set a default resolution if missing (e.g., 640x480)
-      '-vf',
-      'scale=640:480',
-
-      // AAC Audio Stream
+      '100k',
+      '-r',
+      '1',
       '-c:a',
       'aac',
       '-b:a',
-      '128k', // Audio bitrate for AAC
-
-      // Map the video and audio streams
-      '-map',
-      '0:v', // Map video input to H.264 video stream
-      '-map',
-      '1:a', // Map AAC audio input (silent audio track)
+      '32k',
 
       '-f',
-      // 'matroska', // Set MKV format
-      'fifo',
-      '-fifo_format',
-      'matroska',
-      '-drop_pkts_on_overflow',
-      '1',
-      '-attempt_recovery',
-      '1',
-      '-recovery_wait_time',
-      '1',
-      `${this.#streamerPassthroughSock}`, // Send output to Unix socket
+      'mpegts',
+      '-listen',
+      '0',
+      `unix:${this.#streamerPassthroughSock}`, // Send output to Unix socket
     ]
 
     this.#staticStreamer = execa(ffmpegBinary, ffmpegArgs, {
@@ -827,6 +812,9 @@ export default class NestmtxStream extends BaseCommand {
   #gracefulExit(code: number = 0) {
     if (this.#streamer) {
       this.#streamer.kill('SIGKILL')
+    }
+    if (this.#socket) {
+      this.#socket.close()
     }
     execa('rm', [this.#streamerPassthroughSock])
       .catch(() => {})

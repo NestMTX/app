@@ -15,7 +15,7 @@ export class IPCService extends EventEmitter {
     super()
     this.#app = app
     this.#server = createServer((socket: Socket) => {
-      this.#log.info(`IPC Client Connected`)
+      this.#log.debug(`IPC Client Connected`)
       socket.on('data', (raw) => {
         const asString = raw.toString()
         try {
@@ -39,7 +39,7 @@ export class IPCService extends EventEmitter {
         }
       })
       socket.on('end', () => {
-        this.#log.info(`IPC Client Disconnected`)
+        this.#log.debug(`IPC Client Disconnected`)
       })
     })
   }
