@@ -12,6 +12,7 @@ import { EventEmitter } from 'node:events'
 import env from '#start/env'
 import Camera from '#models/camera'
 import { createServer } from 'node:net'
+import { writeFile } from 'node:fs/promises'
 
 import type { CommandOptions } from '@adonisjs/core/types/ace'
 import type { ExecaChildProcess } from 'execa'
@@ -54,6 +55,10 @@ export default class NestmtxStream extends BaseCommand {
 
   get #streamerPassthroughSock() {
     return this.app.makePath('resources', `streamer.${process.pid}.sock`)
+  }
+
+  get #streamerFFMpegInputSdp() {
+    return this.app.makePath('resources', `streamer.${process.pid}.sdp`)
   }
 
   get #noSuchCameraFilePath() {
@@ -549,7 +554,9 @@ export default class NestmtxStream extends BaseCommand {
     // const gstreamerBinary = env.get('GSTREAMER_BIN', 'gst-launch-1.0')
     const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
     const audioPort = await pickPort(getPortOptions)
+    const audioRTCPPort = await pickPort(getPortOptions)
     const videoPort = await pickPort(getPortOptions)
+    const videoRTCPPort = await pickPort(getPortOptions)
     const udp: DGramSocket = createSocket('udp4')
 
     const pc = new RTCPeerConnection({
@@ -755,106 +762,38 @@ export default class NestmtxStream extends BaseCommand {
 
     await Promise.all([videoRtpSending, audioRtpSending])
 
-    // this.logger.info('Starting GStreamer process for WebRTC stream')
-    // const mpegtsmuxPort = await pickPort({
-    //   type: 'udp',
-    //   ip: '127.0.0.1',
-    //   reserveTimeout: 15,
-    //   minPort: env.get('WEBRTC_RTP_MIN_PORT', 10000),
-    //   maxPort: env.get('WEBRTC_RTP_MAX_PORT', 20000),
-    // })
-    // let gettingMpegtsStream = false
-    // const mpegtsToOutputStreamer = createSocket('udp4', (msg: Buffer) => {
-    //   if (this.#streamer) {
-    //     if (!gettingMpegtsStream) {
-    //       gettingMpegtsStream = true
-    //       this.logger.info('MPEG-TS Output is Streaming')
-    //     }
-    //     this.#streamer.stdin?.write(msg)
-    //   }
-    // })
-    // const gstreamerArgs: string[] = [
-    //   '-q', // Quiet mode
-    //   `--gst-debug-level=${env.get('GSTREAMER_DEBUG_LEVEL', '2')}`, // Log level set to WARNING
-
-    //   // Video pipeline
-    //   'udpsrc',
-    //   `port=${videoPort}`,
-    //   'caps="application/x-rtp,media=(string)video,clock-rate=(int)90000,encoding-name=(string)H264,payload=(int)97"', // RTP video caps
-    //   '!',
-    //   'rtpjitterbuffer',
-    //   'latency=200', // Increased jitter buffer latency
-    //   '!',
-    //   'rtph264depay', // Depayloader for RTP -> H.264
-    //   '!',
-    //   'h264parse',
-    //   'config-interval=-1', // Preserve SPS/PPS information
-    //   '!',
-    //   'queue',
-    //   'max-size-buffers=0', // Unlimited queue buffer
-    //   'max-size-time=0',
-    //   'max-size-bytes=0',
-    //   'leaky=downstream', // Drop old buffers if needed
-    //   '!',
-    //   'mpegtsmux name=mux', // Mux the video and audio into MPEG-TS
-
-    //   // Audio pipeline
-    //   'udpsrc',
-    //   `port=${audioPort}`,
-    //   'caps="application/x-rtp,media=(string)audio,clock-rate=(int)48000,encoding-name=(string)OPUS,payload=(int)96"', // RTP audio caps
-    //   '!',
-    //   'rtpjitterbuffer',
-    //   'latency=200', // Increased jitter buffer latency
-    //   '!',
-    //   'rtpopusdepay', // Depayloader for RTP -> Opus
-    //   '!',
-    //   'opusdec', // Decode Opus to raw audio
-    //   '!',
-    //   'audioconvert', // Convert raw audio format if needed
-    //   '!',
-    //   'avenc_aac', // Encode to AAC
-    //   '!',
-    //   'queue',
-    //   'max-size-buffers=0', // Unlimited queue buffer
-    //   'max-size-time=0',
-    //   'max-size-bytes=0',
-    //   'leaky=downstream', // Drop old buffers if needed
-    //   '!',
-    //   'mux.', // Link audio to the muxer
-
-    //   // Sink for the final stream
-    //   'mux.', // Muxed output from mpegtsmux
-    //   '!',
-    //   'udpsink', // Send to UDP
-    //   'host="127.0.0.1"', // Set the udp host to the local machine
-    //   `port="${mpegtsmuxPort}"`, // Set the udp port to the mpegtsmux port
-    // ]
-    // mpegtsToOutputStreamer.bind(mpegtsmuxPort, '127.0.0.1')
     this.#connectingStreamAbortController.abort()
-    // this.#cameraStreamer = execa(gstreamerBinary, gstreamerArgs, {
-    //   stdio: 'pipe',
-    //   reject: false,
-    //   shell: true,
-    //   signal: this.#abortController.signal,
-    // })
+
+    const sdp = `v=0
+o=- 0 0 IN IP4 127.0.0.1
+s=FFmpeg RTP Stream
+c=IN IP4 127.0.0.1
+t=0 0
+
+m=video ${videoPort} RTP/AVP 97
+a=rtpmap:97 H264/90000
+a=recvonly
+a=rtcp:${videoRTCPPort}
+
+m=audio ${audioPort} RTP/AVP 96
+a=rtpmap:96 OPUS/48000/2
+a=recvonly
+a=rtcp:${audioRTCPPort}
+`
+
+    await writeFile(this.#streamerFFMpegInputSdp, sdp)
     this.logger.info(`Starting FFMpeg with WebRTC stream`)
     const ffmpegArgs: string[] = [
       '-y', // Overwrite output files
       '-hide_banner', // Hide FFmpeg banner
       '-loglevel',
       env.get('FFMPEG_LOG_LEVEL', 'warning'), // Log level set to warning
+      '-protocol_whitelist',
+      'file,crypto,data,udp,rtp',
 
-      // Video input
-      '-f',
-      'rtp', // Input format
+      // SDP input
       '-i',
-      `"udp://127.0.0.1:${videoPort}?fifo_size=5000000&overrun_nonfatal=1"`, // RTP video input
-
-      // Audio input
-      '-f',
-      'rtp',
-      '-i',
-      `"udp://127.0.0.1:${audioPort}?fifo_size=5000000&overrun_nonfatal=1"`, // RTP audio input
+      `"${this.#streamerFFMpegInputSdp}"`, // SDP File input with quotes
 
       // Video encoding (H.264)
       '-c:v',
@@ -909,7 +848,7 @@ export default class NestmtxStream extends BaseCommand {
         })
     })
     this.#cameraStreamer.on('exit', async (code) => {
-      this.logger.info(`RTSP Camera Gstreamer exited with code ${code}`)
+      this.logger.info(`WebRTC Camera FFMpeg exited with code ${code}`)
       if (code !== 0) {
         const res = await this.#streamer
         if (res) {
@@ -940,7 +879,7 @@ export default class NestmtxStream extends BaseCommand {
     if (this.#socket) {
       this.#socket.close()
     }
-    execa('rm', [this.#streamerPassthroughSock])
+    execa('rm', [this.#streamerPassthroughSock, this.#streamerFFMpegInputSdp])
       .catch(() => {})
       .finally(() => {
         process.exit(code)
