@@ -2,13 +2,14 @@ import env from '#start/env'
 import fs from 'node:fs/promises'
 import yaml from 'yaml'
 import { mediamtxClientFactory } from '#clients/mediamtx'
+import { logger as main } from '#services/logger'
 import type { PM3 } from '#services/pm3'
 import type { ApplicationService } from '@adonisjs/core/types'
 import type { LoggerService } from '@adonisjs/core/types'
-import type { Logger } from '@adonisjs/logger'
 import type { NATService } from '#services/nat'
 import type { ICEService } from '#services/ice'
 import type { MediaMTXClient } from '#clients/mediamtx'
+import type winston from 'winston'
 
 interface MediaMTXApiPathSource {
   type?:
@@ -64,11 +65,12 @@ export class MediaMTXService {
   readonly #configPath: string
   readonly #app: ApplicationService
   readonly #paths: Map<string, MediaMtxPath> = new Map()
-  #logger?: Logger
+  readonly #logger: winston.Logger
   #apiClient?: MediaMTXClient
   #cronAbortController?: AbortController
 
   constructor(app: ApplicationService) {
+    this.#logger = main.child({ service: 'mediamtx' })
     this.#app = app
     this.#binaryPath = env.get('MEDIA_MTX_PATH')!
     this.#configPath = env.get('MEDIA_MTX_CONFIG_PATH')!
@@ -82,12 +84,11 @@ export class MediaMTXService {
     return [...this.#paths].map(([, path]) => path)
   }
 
-  async boot(logger: LoggerService, nat: NATService, ice: ICEService, pm3: PM3) {
-    this.#logger = logger.child({ service: 'mediamtx' })
+  async boot(_logger: LoggerService, nat: NATService, ice: ICEService, pm3: PM3) {
     pm3.on('stdout:mediamtx', (data) => {
       if (data.includes('INF reloading configuration (file changed)')) {
         pm3.restart('mediamtx')
-        this.#logger!.warn('Restarting MediaMTX service due to configuration change')
+        this.#logger!.warning('Restarting MediaMTX service due to configuration change')
       } else {
         this.#logger!.info(data)
       }

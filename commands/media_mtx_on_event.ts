@@ -1,6 +1,7 @@
 import { BaseCommand, args } from '@adonisjs/core/ace'
 import joi from 'joi'
 import { connect } from 'node:net'
+import { subProcessLogger as logger } from '#services/logger'
 import type { CommandOptions } from '@adonisjs/core/types/ace'
 import type { Socket } from 'node:net'
 
@@ -37,7 +38,7 @@ export default class MediaMtxOnEvent extends BaseCommand {
       .required()
     const { error } = knownEventSchema.validate(this.event)
     if (error) {
-      this.logger.error(error)
+      logger.error(error)
       process.exit(1)
     }
     /**
@@ -62,7 +63,7 @@ export default class MediaMtxOnEvent extends BaseCommand {
     })
     const { error: bodyError } = schema.validate(body)
     if (bodyError) {
-      this.logger.error(bodyError)
+      logger.error(bodyError)
       process.exit(1)
     }
     const payload = JSON.stringify([event, body])
@@ -77,11 +78,11 @@ export default class MediaMtxOnEvent extends BaseCommand {
         client.on('error', reject)
       })
     } catch (err) {
-      this.logger.error(err)
+      logger.error(err)
       process.exit(1)
     }
     client!.on('error', (err) => {
-      this.logger.error(err)
+      logger.error(err)
       process.exit(1)
     })
     client!.write(payload)

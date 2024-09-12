@@ -1,7 +1,6 @@
 import Camera from '#models/camera'
 import { CronJob } from '#services/cron'
-// import { DateTime } from 'luxon'
-// import { inspect } from 'node:util'
+import { logger as main } from '#services/logger'
 import type { ApplicationService } from '@adonisjs/core/types'
 
 export default class ExtendCameraStreamAuthenticationJob extends CronJob {
@@ -18,8 +17,7 @@ export default class ExtendCameraStreamAuthenticationJob extends CronJob {
     if (!this.#app || !this.#app.mediamtx) {
       return
     }
-    const mainLogger = await this.#app.container.make('logger')
-    const logger = mainLogger.child({ service: `job-ExtendCameraStreamAuthenticationJob` })
+    const logger = main.child({ service: 'cron', job: 'cameras.extend' })
     const livePaths = this.#app.mediamtx.paths.map((path) => path.path)
     const liveCameras = await Camera.query()
       .whereIn('mtx_path', livePaths)

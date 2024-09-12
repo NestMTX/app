@@ -5,6 +5,7 @@
 import { execa } from 'execa'
 import { EventEmitter } from 'node:events'
 import pidusage from 'pidusage'
+
 import type { ExecaChildProcess, Options as ProcessOptions } from 'execa'
 
 interface DesiredProcess {

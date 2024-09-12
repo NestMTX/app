@@ -3,8 +3,10 @@ import axios from 'axios'
 import joi from 'joi'
 import os from 'node:os'
 import { execa } from 'execa'
+import { logger as main } from '#services/logger'
+
 import type { LoggerService } from '@adonisjs/core/types'
-import type { Logger } from '@adonisjs/logger'
+import type winston from 'winston'
 
 const ipValidationSchema = joi.string().ip({
   cidr: 'forbidden',
@@ -93,9 +95,10 @@ export class NATService {
   readonly #resolvers: string[] = []
   readonly #lan: Set<string> = new Set()
   #resolved?: string
-  #logger?: Logger
+  readonly #logger: winston.Logger
 
   constructor() {
+    this.#logger = main.child({ service: 'nat' })
     const preConfiguredResolved = env.get('IP_PUBLIC_RESOLVED')
     const preConfiguredResolvers = env.get('IP_RESOLVERS_ENABLED')
     const preConfiguredLan = env.get('IP_LAN_RESOLVED')
@@ -133,8 +136,7 @@ export class NATService {
     return [...this.#lan] as string[]
   }
 
-  async boot(logger: LoggerService) {
-    this.#logger = logger.child({ service: 'nat' })
+  async boot(_logger: LoggerService) {
     this.#resolveLanIpsFromOs()
     if ('string' === typeof this.#resolved) {
       this.#logger.info('Using pre-configured public IP', { ip: this.#resolved })
@@ -168,7 +170,7 @@ export class NATService {
     if (this.#lan.size) {
       this.#logger.info(`Resolved ${this.#lan.size} LAN IP's`)
     } else {
-      this.#logger.warn('Failed to resolve LAN IP addresses')
+      this.#logger.warning('Failed to resolve LAN IP addresses')
     }
   }
 
@@ -196,7 +198,7 @@ export class NATService {
         await this.#resolveLanIpsFromUnixTerminal()
         break
       default:
-        this.#logger?.warn(
+        this.#logger?.warning(
           `Unable to resolve LAN IP's from terminal: Unsupported platform "${os.platform()}"`
         )
     }

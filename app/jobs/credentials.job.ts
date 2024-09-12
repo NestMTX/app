@@ -1,6 +1,7 @@
 import Credential from '#models/credential'
 import { CronJob } from '#services/cron'
 import { DateTime } from 'luxon'
+import { logger as main } from '#services/logger'
 
 import type { ApplicationService } from '@adonisjs/core/types'
 
@@ -16,8 +17,7 @@ export default class CredentialsJob extends CronJob {
   }
 
   async run() {
-    const mainLogger = await this.#app.container.make('logger')
-    const logger = mainLogger.child({ service: `job-CredentialsJob` })
+    const logger = main.child({ service: 'cron', job: 'credentials' })
     const authenticatedCredentials = await Credential.query().whereNotNull('tokens')
     for (const credential of authenticatedCredentials) {
       if (

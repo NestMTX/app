@@ -10,7 +10,8 @@
 */
 
 import 'reflect-metadata'
-import { Ignitor, prettyPrintError } from '@adonisjs/core'
+import { Ignitor } from '@adonisjs/core'
+import { prettyPrintError } from '#services/logger'
 process.env.TZ = 'UTC'
 process.env.NODE_ENV = 'production'
 process.env.PORT = '2000'

@@ -3,13 +3,15 @@ import { execa } from 'execa'
 import Camera from '#models/camera'
 import string from '@adonisjs/core/helpers/string'
 import { Server as StreamPrivateApiServer } from 'socket.io'
+import { logger as main } from '#services/logger'
+
 import type { PM3 } from '#services/pm3'
 import type { ApplicationService } from '@adonisjs/core/types'
 import type { LoggerService } from '@adonisjs/core/types'
-import type { Logger } from '@adonisjs/logger'
 import type { NATService } from '#services/nat'
 import type { ICEService } from '#services/ice'
 import type { IPCService } from '#services/ipc'
+import type winston from 'winston'
 
 interface DemandEventPayload {
   MTX_PATH: string
@@ -35,8 +37,8 @@ export class StreamerService {
   readonly #managedProcesses: Set<string>
   readonly #shuttingDownProcesses: Set<string>
   readonly #internalApiPort: number
+  readonly #logger: winston.Logger
 
-  #logger?: Logger
   #ffmpegHwAccelerator?: string
   #ffmpegHwAcceleratorDevice?: string
 
@@ -47,6 +49,7 @@ export class StreamerService {
     this.#managedProcesses = new Set()
     this.#shuttingDownProcesses = new Set()
     this.#internalApiPort = env.get('INTERNAL_API_PORT', 62005)
+    this.#logger = main.child({ service: 'streamer' })
   }
 
   get managedProcesses() {
@@ -65,8 +68,13 @@ export class StreamerService {
     return this.#ffmpegHwAcceleratorDevice
   }
 
-  async boot(logger: LoggerService, _nat: NATService, _ice: ICEService, pm3: PM3, ipc: IPCService) {
-    this.#logger = logger.child({ service: 'streamer' })
+  async boot(
+    _logger: LoggerService,
+    _nat: NATService,
+    _ice: ICEService,
+    pm3: PM3,
+    ipc: IPCService
+  ) {
     const gstreamerBinary = env.get('GSTREAMER_BIN', 'gst-launch-1.0')
     const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
     this.#logger.info(`Checking for GStreamer Binary`)
@@ -169,7 +177,7 @@ export class StreamerService {
     if (['camera-', 'ffmpeg-', 'gstreamer-', 'mtx-'].some((prefix) => name.startsWith(prefix))) {
       if (this.#logger) {
         const logger = this.#logger.child({ mtx: name })
-        logger.warn(data)
+        logger.warning(data)
       }
     }
   }
