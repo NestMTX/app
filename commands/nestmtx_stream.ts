@@ -74,10 +74,6 @@ export default class NestmtxStream extends BaseCommand {
     return this.app.makePath('resources/mediamtx/camera-disabled.jpg')
   }
 
-  get #connectingFilePath() {
-    return this.app.makePath('resources/mediamtx/connecting.jpg')
-  }
-
   get #destination() {
     return `srt://127.0.0.1:${env.get('MEDIA_MTX_SRT_PORT', 8890)}/?streamid=publish:${this.path}&pkt_size=1316`
   }
@@ -129,10 +125,6 @@ export default class NestmtxStream extends BaseCommand {
       })
       this.#api.connect()
     })
-    this.#streamJpegToOutputStream(
-      this.#connectingFilePath,
-      this.#connectingStreamAbortController.signal
-    )
     this.logger.info(`Searching for Camera`)
     const camera = await Camera.findBy({ mtx_path: this.path })
     if (!camera) {
@@ -181,7 +173,7 @@ export default class NestmtxStream extends BaseCommand {
       // writeFileSync(this.#streamerPassthroughFifo, raw)
       if (this.#streamer) {
         // @ts-expect-error - this is correct
-        this.#streamer.stdio[4].write(raw)
+        this.#streamer.stdio[3].write(raw)
       }
     })
   }
@@ -195,8 +187,6 @@ export default class NestmtxStream extends BaseCommand {
       '+discardcorrupt', // Ignore corrupted frames
       '-i',
       `pipe:3`,
-      '-i',
-      `pipe:4`,
       // Single H.264 Video Stream (without B-frames)
       '-c:v',
       'libx264',
@@ -242,7 +232,7 @@ export default class NestmtxStream extends BaseCommand {
       `"${this.#destination}"`, // SRT destination with quotes
     ]
     this.#streamer = execa(ffmpegBinary, ffmpegArgs, {
-      stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
       reject: false,
       shell: true,
       signal: this.#abortController.signal,
@@ -437,16 +427,16 @@ export default class NestmtxStream extends BaseCommand {
       if (depth > 5) {
         return this.#gracefulExit(1)
       } else {
-        this.#connectingStreamAbortController = new AbortController()
-        this.#streamJpegToOutputStream(
-          this.#connectingFilePath,
-          this.#connectingStreamAbortController.signal
-        )
         this.#rtspStart(service, camera, depth + 1)
         return
       }
     }
     const videoBitrate = characteristics.video.bitrate || 1000
+
+    const videoSizeArguments =
+      characteristics.video.width && characteristics.video.height
+        ? ['-s', `${characteristics.video.width}x${characteristics.video.height}`]
+        : []
 
     const ffmpegArgs: string[] = [
       '-loglevel',
@@ -478,8 +468,7 @@ export default class NestmtxStream extends BaseCommand {
       'ultrafast', // Ultrafast preset
       `-b:v`,
       `${videoBitrate}k`, // Set video bitrate dynamically
-      '-s',
-      '1920x1080',
+      ...videoSizeArguments,
       '-r',
       `10`, // Set frame rate dynamically
 
@@ -553,11 +542,11 @@ export default class NestmtxStream extends BaseCommand {
         }
         this.#gracefulExit(code || 0)
       } else {
-        this.#connectingStreamAbortController = new AbortController()
-        this.#streamJpegToOutputStream(
-          this.#connectingFilePath,
-          this.#connectingStreamAbortController.signal
-        )
+        // this.#connectingStreamAbortController = new AbortController()
+        // this.#streamJpegToOutputStream(
+        //   this.#connectingFilePath,
+        //   this.#connectingStreamAbortController.signal
+        // )
         this.#rtspStart(service, camera, 0)
       }
     })
@@ -821,6 +810,8 @@ a=rtcp:${audioRTCPPort}
       // Video encoding (H.264)
       '-c:v',
       'copy', // Copy the video codec (no re-encoding)
+      '-s',
+      '1920x1080', // Set video size
 
       // Audio encoding (AAC)
       '-c:a',
@@ -879,11 +870,6 @@ a=rtcp:${audioRTCPPort}
         }
         this.#gracefulExit(code || 0)
       } else {
-        this.#connectingStreamAbortController = new AbortController()
-        this.#streamJpegToOutputStream(
-          this.#connectingFilePath,
-          this.#connectingStreamAbortController.signal
-        )
         this.#rtspStart(service, camera, 0)
       }
     })
