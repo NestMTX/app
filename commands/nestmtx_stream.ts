@@ -45,6 +45,10 @@ export default class NestmtxStream extends BaseCommand {
   })
   declare port: string
 
+  #bus: EventEmitter = new EventEmitter({
+    captureRejections: true,
+  })
+
   #api?: StreamPrivateApiClient
   #streamerSocket?: UnixSocketServer
   #cameraSocket?: UnixSocketServer
@@ -57,6 +61,11 @@ export default class NestmtxStream extends BaseCommand {
   #iceServers: RTCIceServer[] = []
   #additionalHostAddresses: string[] = []
   #rtspCameraStreamUrl?: string
+
+  #packetsToOutputCount: number = 0
+  #packetsToOutputInterval?: NodeJS.Timeout
+  #lastThirtyPacketCounts: number[] = []
+  #stalled: boolean = false
 
   get #streamerPassthroughSock() {
     return this.app.makePath('resources', `streamer.${process.pid}.sock`)
@@ -103,6 +112,11 @@ export default class NestmtxStream extends BaseCommand {
   async run() {
     process.once('SIGINT', this.#gracefulExit.bind(this))
     this.logger.info(`NestMTX Streamer for "${this.path}". PID: ${process.pid}`)
+    this.#abortController.signal.addEventListener('abort', () => {
+      if (this.#packetsToOutputInterval) {
+        clearInterval(this.#packetsToOutputInterval)
+      }
+    })
     this.#streamerSocket = createServer(this.#onStreamerUnixSocketConnection.bind(this))
     this.#streamerSocket.listen(this.#streamerPassthroughSock)
     this.#cameraSocket = createServer(this.#onCameraUnixSocketConnection.bind(this))
@@ -149,6 +163,26 @@ export default class NestmtxStream extends BaseCommand {
     })
     this.logger.info(`Searching for Camera`)
     const camera = await Camera.findBy({ mtx_path: this.path })
+    this.#packetsToOutputInterval = setInterval(() => {
+      const packets = this.#packetsToOutputCount
+      this.#api!.emit('packetRate', packets)
+      this.#packetsToOutputCount = 0
+      this.#lastThirtyPacketCounts.push(packets)
+      if (this.#lastThirtyPacketCounts.length > 30) {
+        this.#lastThirtyPacketCounts.shift()
+      }
+      if (
+        !this.#stalled &&
+        this.#lastThirtyPacketCounts.length === 30 &&
+        this.#lastThirtyPacketCounts.every((count) => count === 0) &&
+        ((this.#staticStreamer && this.#staticStreamer.pid) ||
+          (this.#cameraStreamer && this.#cameraStreamer.pid))
+      ) {
+        this.logger.warning(`No packets received in the last 30 seconds. Stall detected.`)
+        this.#stalled = true
+        this.#bus.emit('stall')
+      }
+    }, 1000)
     if (!camera) {
       this.logger.info(`Camera not found`)
       this.#connectingStreamAbortController.abort()
@@ -183,6 +217,8 @@ export default class NestmtxStream extends BaseCommand {
       // console.log(raw)
       // writeFileSync(this.#streamerPassthroughFifo, raw)
       if (this.#streamer) {
+        this.#packetsToOutputCount += 1
+        this.#stalled = false
         // @ts-expect-error - this is correct
         this.#streamer.stdio[3].write(raw)
       }
@@ -194,6 +230,8 @@ export default class NestmtxStream extends BaseCommand {
       // console.log(raw)
       // writeFileSync(this.#streamerPassthroughFifo, raw)
       if (this.#streamer) {
+        this.#packetsToOutputCount += 1
+        this.#stalled = false
         // @ts-expect-error - this is correct
         this.#streamer.stdio[3].write(raw)
       }
@@ -392,12 +430,12 @@ export default class NestmtxStream extends BaseCommand {
           this.logger.warning(`[static] ${line}`)
         })
     })
-    this.#staticStreamer.on('exit', async (code) => {
+    this.#staticStreamer.on('exit', async (code, es?: NodeJS.Signals) => {
       this.logger.info(`Static Input FFMpeg exited with code ${code}`)
       if (signal && signal.aborted) {
         return
       }
-      if (code !== 0 && code !== 8) {
+      if (code !== 0 && code !== 8 && es !== 'SIGABRT') {
         const res = await this.#streamer
         if (res) {
           this.logger.info(res.escapedCommand)
@@ -406,6 +444,9 @@ export default class NestmtxStream extends BaseCommand {
       } else {
         this.#streamJpegToOutputStream(src, size, signal)
       }
+    })
+    this.#bus.once('stall', () => {
+      this.#staticStreamer!.kill('SIGABRT')
     })
   }
 
@@ -591,9 +632,9 @@ export default class NestmtxStream extends BaseCommand {
           this.logger.warning(`[camera] ${line}`)
         })
     })
-    this.#cameraStreamer.on('exit', async (code) => {
+    this.#cameraStreamer.on('exit', async (code, es?: NodeJS.Signals) => {
       this.logger.info(`RTSP Camera FFMpeg exited with code ${code}`)
-      if (code !== 0 && code !== 8) {
+      if (code !== 0 && code !== 8 && es !== 'SIGABRT') {
         const res = await this.#streamer
         if (res) {
           this.logger.info(res.escapedCommand)
@@ -609,12 +650,23 @@ export default class NestmtxStream extends BaseCommand {
         this.#rtspStart(service, camera, 0)
       }
     })
+    this.#bus.once('stall', () => {
+      this.#staticStreamer!.kill('SIGABRT')
+    })
   }
 
   async #webrtcStart(service: smartdevicemanagement_v1.Smartdevicemanagement, camera: Camera) {
     if (!Array.isArray(this.#iceServers)) {
       throw new Error('Failed to get ICE servers')
     }
+
+    this.#connectingStreamAbortController = new AbortController()
+    this.#streamJpegToOutputStream(
+      this.#connectingFilePath,
+      '1920x1080',
+      this.#connectingStreamAbortController.signal
+    )
+
     const getPortOptions: PickPortOptions = {
       type: 'udp',
       ip: '0.0.0.0',
@@ -833,8 +885,6 @@ export default class NestmtxStream extends BaseCommand {
 
     await Promise.all([videoRtpSending, audioRtpSending])
 
-    this.#connectingStreamAbortController.abort()
-
     const sdp = `v=0
 o=- 0 0 IN IP4 127.0.0.1
 s=FFmpeg RTP Stream
@@ -853,6 +903,7 @@ a=rtcp:${audioRTCPPort}
 `
 
     await writeFile(this.#streamerFFMpegInputSdp, sdp)
+    this.#connectingStreamAbortController.abort()
     this.logger.info(`Starting FFMpeg with WebRTC stream`)
     const ffmpegArgs: string[] = [
       '-y', // Overwrite output files
@@ -956,16 +1007,16 @@ a=rtcp:${audioRTCPPort}
           this.logger.warning(`[camera] ${line}`)
         })
     })
-    this.#cameraStreamer.on('exit', async (code) => {
+    this.#cameraStreamer.on('exit', async (code, es?: NodeJS.Signals) => {
       this.logger.info(`WebRTC Camera FFMpeg exited with code ${code}`)
-      if (code !== 0 && code !== 8) {
+      if (code !== 0 && code !== 8 && es !== 'SIGABRT') {
         const res = await this.#streamer
         if (res) {
           this.logger.info(res.escapedCommand)
         }
         this.#gracefulExit(code || 0)
       } else {
-        this.#rtspStart(service, camera, 0)
+        this.#webrtcStart(service, camera)
       }
     })
   }
