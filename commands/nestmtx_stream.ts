@@ -42,7 +42,8 @@ export default class NestmtxStream extends BaseCommand {
   declare port: string
 
   #api?: StreamPrivateApiClient
-  #socket?: UnixSocketServer
+  #streamerSocket?: UnixSocketServer
+  #cameraSocket?: UnixSocketServer
   #streamer?: ExecaChildProcess
   #staticStreamer?: ExecaChildProcess
   #cameraStreamer?: ExecaChildProcess
@@ -55,6 +56,10 @@ export default class NestmtxStream extends BaseCommand {
 
   get #streamerPassthroughSock() {
     return this.app.makePath('resources', `streamer.${process.pid}.sock`)
+  }
+
+  get #cameraPassthroughSock() {
+    return this.app.makePath('resources', `camera.${process.pid}.sock`)
   }
 
   get #streamerFFMpegInputSdp() {
@@ -80,8 +85,10 @@ export default class NestmtxStream extends BaseCommand {
   async run() {
     process.once('SIGINT', this.#gracefulExit.bind(this))
     this.logger.info(`NestMTX Streamer for "${this.path}". PID: ${process.pid}`)
-    this.#socket = createServer(this.#onUnixSocketConnection.bind(this))
-    this.#socket.listen(this.#streamerPassthroughSock)
+    this.#streamerSocket = createServer(this.#onStreamerUnixSocketConnection.bind(this))
+    this.#streamerSocket.listen(this.#streamerPassthroughSock)
+    this.#cameraSocket = createServer(this.#onCameraUnixSocketConnection.bind(this))
+    this.#cameraSocket.listen(this.#cameraPassthroughSock)
     this.#startOutputStreamer()
     const privateApiServerUrl = `http://127.0.0.1:${this.port}`
     this.logger.info(`Searching for Private API Server`)
@@ -157,12 +164,24 @@ export default class NestmtxStream extends BaseCommand {
     }
   }
 
-  #onUnixSocketConnection(socket: UnixSocket) {
+  #onStreamerUnixSocketConnection(socket: UnixSocket) {
     socket.on('data', (raw) => {
       // console.log(raw)
       // writeFileSync(this.#streamerPassthroughFifo, raw)
       if (this.#streamer) {
-        this.#streamer.stdin?.write(raw)
+        // @ts-expect-error - this is correct
+        this.#streamer.stdio[3].write(raw)
+      }
+    })
+  }
+
+  #onCameraUnixSocketConnection(socket: UnixSocket) {
+    socket.on('data', (raw) => {
+      // console.log(raw)
+      // writeFileSync(this.#streamerPassthroughFifo, raw)
+      if (this.#streamer) {
+        // @ts-expect-error - this is correct
+        this.#streamer.stdio[4].write(raw)
       }
     })
   }
@@ -175,7 +194,9 @@ export default class NestmtxStream extends BaseCommand {
       '-fflags',
       '+discardcorrupt', // Ignore corrupted frames
       '-i',
-      `pipe:`,
+      `pipe:3`,
+      '-i',
+      `pipe:4`,
       // Single H.264 Video Stream (without B-frames)
       '-c:v',
       'libx264',
@@ -221,7 +242,7 @@ export default class NestmtxStream extends BaseCommand {
       `"${this.#destination}"`, // SRT destination with quotes
     ]
     this.#streamer = execa(ffmpegBinary, ffmpegArgs, {
-      stdio: 'pipe',
+      stdio: ['pipe', 'pipe', 'pipe', 'pipe', 'pipe'],
       reject: false,
       shell: true,
       signal: this.#abortController.signal,
@@ -457,6 +478,8 @@ export default class NestmtxStream extends BaseCommand {
       'ultrafast', // Ultrafast preset
       `-b:v`,
       `${videoBitrate}k`, // Set video bitrate dynamically
+      '-s',
+      '1920x1080',
       '-r',
       `10`, // Set frame rate dynamically
 
@@ -488,7 +511,7 @@ export default class NestmtxStream extends BaseCommand {
       'mpegts',
       '-listen',
       '0',
-      `unix:${this.#streamerPassthroughSock}`, // Send output to Unix socket
+      `unix:${this.#cameraPassthroughSock}`, // Send output to Unix socket
     ]
     this.#connectingStreamAbortController.abort()
     this.logger.info(`Starting FFMpeg with RTSP stream`)
@@ -814,7 +837,7 @@ a=rtcp:${audioRTCPPort}
       '0.1', // Set mux preload
 
       // Output to Unix socket
-      `unix:${this.#streamerPassthroughSock}`, // Unix socket output for the MPEG-TS stream
+      `unix:${this.#cameraPassthroughSock}`, // Unix socket output for the MPEG-TS stream
     ]
 
     this.#cameraStreamer = execa(ffmpegBinary, ffmpegArgs, {
@@ -876,8 +899,8 @@ a=rtcp:${audioRTCPPort}
     if (this.#cameraStreamer) {
       this.#cameraStreamer.kill('SIGKILL')
     }
-    if (this.#socket) {
-      this.#socket.close()
+    if (this.#streamerSocket) {
+      this.#streamerSocket.close()
     }
     execa('rm', [this.#streamerPassthroughSock, this.#streamerFFMpegInputSdp])
       .catch(() => {})
