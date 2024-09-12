@@ -13,6 +13,10 @@ import env from '#start/env'
 import Camera from '#models/camera'
 import { createServer } from 'node:net'
 import { writeFile } from 'node:fs/promises'
+import {
+  getHardwareAcceleratedDecodingArgumentsFor,
+  getHardwareAcceleratedEncodingArgumentsFor,
+} from '#utilities/ffmpeg'
 
 import type { CommandOptions } from '@adonisjs/core/types/ace'
 import type { ExecaChildProcess } from 'execa'
@@ -80,6 +84,20 @@ export default class NestmtxStream extends BaseCommand {
 
   get #destination() {
     return `srt://127.0.0.1:${env.get('MEDIA_MTX_SRT_PORT', 8890)}/?streamid=publish:${this.path}&pkt_size=1316`
+  }
+
+  get #hardwareAcceleratedDecodingArguments() {
+    return getHardwareAcceleratedDecodingArgumentsFor(
+      env.get('FFMPEG_HW_ACCELERATOR', ''),
+      env.get('FFMPEG_HW_ACCELERATOR_DEVICE', '')
+    )
+  }
+
+  get #hardwareAcceleratedEncodingArguments() {
+    return getHardwareAcceleratedEncodingArgumentsFor(
+      env.get('FFMPEG_HW_ACCELERATOR', ''),
+      env.get('FFMPEG_HW_ACCELERATOR_DEVICE', '')
+    )
   }
 
   async run() {
@@ -190,13 +208,17 @@ export default class NestmtxStream extends BaseCommand {
       '-fflags',
       '+discardcorrupt', // Ignore corrupted frames
 
+      // Hardware-accelerated decoding arguments
+      ...this.#hardwareAcceleratedDecodingArguments,
+
       // Input from pipe:3
       '-i',
       `pipe:3`,
 
-      // Single H.264 Video Stream (without B-frames)
-      '-c:v',
-      'libx264',
+      // Hardware-accelerated encoding arguments (no conflict now)
+      ...this.#hardwareAcceleratedEncodingArguments,
+
+      // Other video options such as tune, bitrate, etc.
       '-tune',
       'zerolatency', // Tune for low latency
       '-x264opts',
@@ -293,14 +315,16 @@ export default class NestmtxStream extends BaseCommand {
       env.get('FFMPEG_DEBUG_LEVEL', 'warning'),
       '-loop',
       '1',
+      // Hardware-accelerated decoding arguments
+      ...this.#hardwareAcceleratedDecodingArguments,
       '-i',
       `${src}`,
       '-f',
       'lavfi',
       '-i',
-      'anullsrc=r=48000:cl=stereo',
-      '-c:v',
-      'libx264',
+      'anullsrc=r=48000:cl=stereo', // Synthetic audio source
+      // Hardware-accelerated encoding arguments (no conflict now)
+      ...this.#hardwareAcceleratedEncodingArguments,
       '-profile:v',
       'main',
       '-tune',
@@ -311,10 +335,6 @@ export default class NestmtxStream extends BaseCommand {
       size,
       '-pix_fmt',
       'yuv420p',
-      // '-c:a',
-      // 'aac',
-      // '-b:a',
-      // '32k',
 
       // AAC Audio Stream (track 1)
       '-c:a:0',
@@ -330,11 +350,11 @@ export default class NestmtxStream extends BaseCommand {
 
       // Mapping inputs and outputs
       '-map',
-      '0:v', // Map the video input to the H.264 video stream
+      '0:v', // Map the video input to the H.264 video stream (image source)
       '-map',
-      '0:a', // Map the original AAC audio to the first audio track
+      '1:a', // Map the synthetic audio source to the AAC stream
       '-map',
-      '0:a', // Map the original audio again for Opus encoding
+      '1:a', // Map the synthetic audio source again for Opus encoding
 
       '-f',
       'mpegts',
@@ -477,6 +497,10 @@ export default class NestmtxStream extends BaseCommand {
       '-fflags',
       '+discardcorrupt', // Ignore corrupted frames
       '-re', // Read input at native frame rate
+
+      // Hardware-accelerated decoding arguments
+      ...this.#hardwareAcceleratedDecodingArguments,
+
       '-i',
       `"${rtspSrc}"`, // Input RTSP stream with quotes
 
@@ -490,9 +514,10 @@ export default class NestmtxStream extends BaseCommand {
       '-rw_timeout',
       '6000000',
 
+      // Hardware-accelerated encoding arguments (no conflict now)
+      ...this.#hardwareAcceleratedEncodingArguments,
+
       // Single H.264 Video Stream (without B-frames)
-      '-c:v',
-      'libx264',
       '-tune',
       'zerolatency', // Tune for low latency
       '-x264opts',
@@ -837,13 +862,16 @@ a=rtcp:${audioRTCPPort}
       '-protocol_whitelist',
       'file,crypto,data,udp,rtp',
 
+      // Hardware-accelerated decoding arguments
+      ...this.#hardwareAcceleratedDecodingArguments,
+
       // SDP input
       '-i',
       `"${this.#streamerFFMpegInputSdp}"`, // SDP File input with quotes
 
-      // Video encoding (H.264)
-      '-c:v',
-      'libx264',
+      // Hardware-accelerated encoding arguments (no conflict now)
+      ...this.#hardwareAcceleratedEncodingArguments,
+
       '-tune',
       'zerolatency', // Tune for low latency
       '-x264opts',
