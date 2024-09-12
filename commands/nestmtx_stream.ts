@@ -70,6 +70,10 @@ export default class NestmtxStream extends BaseCommand {
     return this.app.makePath('resources/mediamtx/no-such-camera.jpg')
   }
 
+  get #connectingFilePath() {
+    return this.app.makePath('resources/mediamtx/connecting.jpg')
+  }
+
   get #cameraDisabledFilePath() {
     return this.app.makePath('resources/mediamtx/camera-disabled.jpg')
   }
@@ -185,8 +189,11 @@ export default class NestmtxStream extends BaseCommand {
       env.get('FFMPEG_DEBUG_LEVEL', 'warning'),
       '-fflags',
       '+discardcorrupt', // Ignore corrupted frames
+
+      // Input from pipe:3
       '-i',
       `pipe:3`,
+
       // Single H.264 Video Stream (without B-frames)
       '-c:v',
       'libx264',
@@ -196,41 +203,45 @@ export default class NestmtxStream extends BaseCommand {
       'bframes=0', // No B-frames
       '-preset',
       'ultrafast', // Ultrafast preset
-      `-b:v`,
-      `100k`, // Set video bitrate dynamically
+      '-b:v',
+      '100k', // Set video bitrate dynamically
       '-r',
-      `10`, // Set frame rate dynamically
+      '10', // Set frame rate dynamically
 
       // Set pixel format to avoid deprecated warning
       '-pix_fmt',
       'yuv420p',
 
-      // AAC Audio Stream
+      // AAC Audio Stream (track 1)
       '-c:a:0',
       'aac',
       '-b:a:0',
       '128k', // Audio bitrate for AAC
 
-      // Opus Audio Stream
+      // Opus Audio Stream (track 2)
       '-c:a:1',
       'libopus',
       '-b:a:1',
       '128k', // Audio bitrate for Opus
 
-      // Mapping inputs and outputs
+      // Explicit Mapping of Video and Audio Streams
       '-map',
-      '0:v', // Map the video input to the H.264 video stream
+      '0:v:0', // Map the first video track (H.264)
       '-map',
-      '0:a', // Map the original AAC audio to the first audio track
+      '0:a:0', // Map the first audio track (AAC)
       '-map',
-      '0:a', // Map the original audio again for Opus encoding
+      '0:a:1', // Map the second audio track (Opus)
 
+      // Output Format
       '-f',
       'mpegts', // Set the format to MPEG-TS
       '-use_wallclock_as_timestamps',
       '1',
-      `"${this.#destination}"`, // SRT destination with quotes
+
+      // Destination (SRT or other media server)
+      `"${this.#destination}"`, // Destination path (quoted)
     ]
+
     this.#streamer = execa(ffmpegBinary, ffmpegArgs, {
       stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
       reject: false,
@@ -265,7 +276,7 @@ export default class NestmtxStream extends BaseCommand {
     })
     this.#streamer.on('exit', async (code) => {
       this.logger.info(`Streamer exited with code ${code}`)
-      if (code !== 0) {
+      if (code !== 0 && code !== 8) {
         const res = await this.#streamer
         if (res) {
           this.logger.info(res.escapedCommand)
@@ -275,7 +286,7 @@ export default class NestmtxStream extends BaseCommand {
     })
   }
 
-  #streamJpegToOutputStream(src: string, signal?: AbortSignal) {
+  #streamJpegToOutputStream(src: string, size: string = '640x480', signal?: AbortSignal) {
     const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
     const ffmpegArgs = [
       '-loglevel',
@@ -297,13 +308,33 @@ export default class NestmtxStream extends BaseCommand {
       '-r',
       '25',
       '-s',
-      '640x480',
+      size,
       '-pix_fmt',
       'yuv420p',
-      '-c:a',
+      // '-c:a',
+      // 'aac',
+      // '-b:a',
+      // '32k',
+
+      // AAC Audio Stream (track 1)
+      '-c:a:0',
       'aac',
-      '-b:a',
-      '32k',
+      '-b:a:0',
+      '128k', // Audio bitrate for AAC
+
+      // Opus Audio Stream (track 2)
+      '-c:a:1',
+      'libopus',
+      '-b:a:1',
+      '128k', // Audio bitrate for Opus
+
+      // Mapping inputs and outputs
+      '-map',
+      '0:v', // Map the video input to the H.264 video stream
+      '-map',
+      '0:a', // Map the original AAC audio to the first audio track
+      '-map',
+      '0:a', // Map the original audio again for Opus encoding
 
       '-f',
       'mpegts',
@@ -346,14 +377,14 @@ export default class NestmtxStream extends BaseCommand {
       if (signal && signal.aborted) {
         return
       }
-      if (code !== 0) {
+      if (code !== 0 && code !== 8) {
         const res = await this.#streamer
         if (res) {
           this.logger.info(res.escapedCommand)
         }
         this.#gracefulExit(code || 0)
       } else {
-        this.#streamJpegToOutputStream(src)
+        this.#streamJpegToOutputStream(src, size, signal)
       }
     })
   }
@@ -432,11 +463,13 @@ export default class NestmtxStream extends BaseCommand {
       }
     }
     const videoBitrate = characteristics.video.bitrate || 1000
+    const size =
+      characteristics.video.width && characteristics.video.height
+        ? `${characteristics.video.width}x${characteristics.video.height}`
+        : camera.resolution || '640x480'
 
     const videoSizeArguments =
-      characteristics.video.width && characteristics.video.height
-        ? ['-s', `${characteristics.video.width}x${characteristics.video.height}`]
-        : []
+      characteristics.video.width && characteristics.video.height ? ['-s', size] : []
 
     const ffmpegArgs: string[] = [
       '-loglevel',
@@ -535,18 +568,19 @@ export default class NestmtxStream extends BaseCommand {
     })
     this.#cameraStreamer.on('exit', async (code) => {
       this.logger.info(`RTSP Camera FFMpeg exited with code ${code}`)
-      if (code !== 0) {
+      if (code !== 0 && code !== 8) {
         const res = await this.#streamer
         if (res) {
           this.logger.info(res.escapedCommand)
         }
         this.#gracefulExit(code || 0)
       } else {
-        // this.#connectingStreamAbortController = new AbortController()
-        // this.#streamJpegToOutputStream(
-        //   this.#connectingFilePath,
-        //   this.#connectingStreamAbortController.signal
-        // )
+        this.#connectingStreamAbortController = new AbortController()
+        this.#streamJpegToOutputStream(
+          this.#connectingFilePath,
+          size,
+          this.#connectingStreamAbortController.signal
+        )
         this.#rtspStart(service, camera, 0)
       }
     })
@@ -809,15 +843,48 @@ a=rtcp:${audioRTCPPort}
 
       // Video encoding (H.264)
       '-c:v',
-      'copy', // Copy the video codec (no re-encoding)
+      'libx264',
+      '-tune',
+      'zerolatency', // Tune for low latency
+      '-x264opts',
+      'bframes=0', // No B-frames
+      '-preset',
+      'ultrafast', // Ultrafast preset
+      '-b:v',
+      '100k', // Set video bitrate dynamically
+      '-r',
+      '10', // Set frame rate dynamically
+      // 'copy', // Copy the video codec (no re-encoding)
       '-s',
       '1920x1080', // Set video size
+      '-pix_fmt',
+      'yuv420p',
 
-      // Audio encoding (AAC)
-      '-c:a',
-      'aac', // Encode audio to AAC
-      '-b:a',
-      '128k', // Audio bitrate
+      // // Audio encoding (AAC)
+      // '-c:a',
+      // 'aac', // Encode audio to AAC
+      // '-b:a',
+      // '128k', // Audio bitrate
+
+      // AAC Audio Stream (track 1)
+      '-c:a:0',
+      'aac',
+      '-b:a:0',
+      '128k', // Audio bitrate for AAC
+
+      // Opus Audio Stream (track 2)
+      '-c:a:1',
+      'libopus',
+      '-b:a:1',
+      '128k', // Audio bitrate for Opus
+
+      // Mapping inputs and outputs
+      '-map',
+      '0:v', // Map the video input to the H.264 video stream
+      '-map',
+      '0:a', // Map the original AAC audio to the first audio track
+      '-map',
+      '0:a', // Map the original audio again for Opus encoding
 
       // Muxing into MPEG-TS
       '-f',
@@ -863,7 +930,7 @@ a=rtcp:${audioRTCPPort}
     })
     this.#cameraStreamer.on('exit', async (code) => {
       this.logger.info(`WebRTC Camera FFMpeg exited with code ${code}`)
-      if (code !== 0) {
+      if (code !== 0 && code !== 8) {
         const res = await this.#streamer
         if (res) {
           this.logger.info(res.escapedCommand)
