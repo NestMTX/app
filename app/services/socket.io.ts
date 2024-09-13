@@ -6,7 +6,7 @@ import { inspect } from 'node:util'
 import logEmitter from '#services/emitter.log'
 import { tokensUserProvider } from '@adonisjs/auth/access_tokens'
 import { DateTime } from 'luxon'
-import { logger as main } from '#services/logger'
+import { logger as main, loggerBus } from '#services/logger'
 
 import type { ApplicationService } from '@adonisjs/core/types'
 import type server from '@adonisjs/core/services/server'
@@ -98,6 +98,8 @@ export class SocketIoService {
     this.#io.on('connection', this.#onIncomingConnection.bind(this))
     logEmitter.on('log', this.broadcast.bind(this, 'log'))
     logEmitter.on('log', (log) => this.#pushLog(log))
+    loggerBus.on('log', this.broadcast.bind(this, 'log'))
+    loggerBus.on('log', (log) => this.#pushLog(log))
   }
 
   get #log() {

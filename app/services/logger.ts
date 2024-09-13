@@ -1,7 +1,64 @@
+import { hostname } from 'node:os'
 import winston from 'winston'
+import Transport from 'winston-transport'
 import env from '#start/env'
 import { inspect as nodeInspect } from 'node:util'
+import { EventEmitter } from 'node:events'
+import { DateTime } from 'luxon'
+
 const level = env.get('LOG_LEVEL', process.env.LOG_LEVEL || 'info')
+
+export const loggerBus = new EventEmitter({
+  captureRejections: true,
+})
+
+export const getPinoLogLevel = (winstonLevel: string) => {
+  switch (winstonLevel) {
+    case 'emerg':
+      return 'fatal'
+    case 'alert':
+      return 'fatal'
+    case 'crit':
+      return 'fatal'
+    case 'error':
+      return 'error'
+    case 'warning':
+      return 'warn'
+    case 'notice':
+      return 'info'
+    case 'info':
+      return 'info'
+    case 'debug':
+      return 'debug'
+    default:
+      return 'trace'
+  }
+}
+
+export class LoggerBusTransport extends Transport {
+  constructor(opts: Transport.TransportStreamOptions) {
+    super({
+      ...opts,
+    })
+  }
+  log(info: any, callback: () => void) {
+    setImmediate(() => {
+      this.emit('logged', info)
+    })
+    const now = DateTime.utc()
+    loggerBus.emit('log', {
+      level: getPinoLogLevel(info.level),
+      msg: info.message,
+      time: now.toMillis(),
+      timestamp: now.toISO(),
+      pid: process.pid,
+      hostname: hostname(),
+      service: info.service || 'core',
+    })
+    callback()
+  }
+}
+
 export const logger = winston.createLogger({
   levels: winston.config.syslog.levels,
   level,
@@ -9,6 +66,9 @@ export const logger = winston.createLogger({
   transports: [
     new winston.transports.Console({
       format: winston.format.combine(winston.format.colorize(), winston.format.simple()),
+      level,
+    }),
+    new LoggerBusTransport({
       level,
     }),
   ],

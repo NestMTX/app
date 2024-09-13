@@ -164,9 +164,21 @@ export class StreamerService {
     }
   }
 
+  #logFromSubProcess = (name: string, data: string) => {
+    try {
+      const decoded = JSON.parse(data)
+      const logger = this.#logger.child({ service: 'streamer', mtx: name.replace('mtx-', '') })
+      logger.log(decoded)
+      return true
+    } catch {
+      return false
+    }
+  }
+
   #logProcessToInfo = (name: string, data: string) => {
     if (['camera-', 'ffmpeg-', 'gstreamer-', 'mtx-'].some((prefix) => name.startsWith(prefix))) {
-      if (this.#logger) {
+      const output = this.#logFromSubProcess(name, data)
+      if (!output) {
         const logger = this.#logger.child({ mtx: name })
         logger.info(data)
       }
@@ -175,7 +187,8 @@ export class StreamerService {
 
   #logProcessToWarn = (name: string, data: string) => {
     if (['camera-', 'ffmpeg-', 'gstreamer-', 'mtx-'].some((prefix) => name.startsWith(prefix))) {
-      if (this.#logger) {
+      const output = this.#logFromSubProcess(name, data)
+      if (!output) {
         const logger = this.#logger.child({ mtx: name })
         logger.warning(data)
       }

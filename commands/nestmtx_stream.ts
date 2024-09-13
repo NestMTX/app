@@ -68,6 +68,14 @@ export default class NestmtxStream extends BaseCommand {
   #lastThirtyPacketCounts: number[] = []
   #stalled: boolean = false
 
+  get #outputStreamLogger() {
+    return logger.child({ stream: 'output' })
+  }
+
+  get #cameraStreamLogger() {
+    return logger.child({ stream: 'camera' })
+  }
+
   get #streamerPassthroughSock() {
     return this.app.makePath('resources', `streamer.${process.pid}.sock`)
   }
@@ -316,7 +324,7 @@ export default class NestmtxStream extends BaseCommand {
         .map((line: string) => line.trim())
         .filter((line: string) => line.length > 0)
         .forEach((line: string) => {
-          logger.info(`[output] ${line}`)
+          this.#outputStreamLogger.info(line)
         })
     })
     this.#streamer.stderr!.on('data', (data) => {
@@ -327,11 +335,11 @@ export default class NestmtxStream extends BaseCommand {
         .filter((line: string) => line.length > 0)
         .forEach((line: string) => {
           if (line.includes('ERROR')) {
-            logger.error(`[output] ${line}`)
+            this.#outputStreamLogger.error(line)
           } else if (line.includes('INFO')) {
-            logger.info(`[output] ${line}`)
+            this.#outputStreamLogger.info(line)
           } else {
-            logger.warning(`[output] ${line}`)
+            this.#outputStreamLogger.warning(line)
           }
         })
     })
@@ -620,7 +628,7 @@ export default class NestmtxStream extends BaseCommand {
         .map((line: string) => line.trim())
         .filter((line: string) => line.length > 0)
         .forEach((line: string) => {
-          logger.info(`[camera] ${line}`)
+          this.#cameraStreamLogger.info(line)
         })
     })
     this.#cameraStreamer.stderr!.on('data', (data) => {
@@ -630,7 +638,7 @@ export default class NestmtxStream extends BaseCommand {
         .map((line: string) => line.trim())
         .filter((line: string) => line.length > 0)
         .forEach((line: string) => {
-          logger.warning(`[camera] ${line}`)
+          this.#cameraStreamLogger.warning(line)
         })
     })
     this.#cameraStreamer.on('exit', async (code, es?: NodeJS.Signals) => {
@@ -995,7 +1003,7 @@ a=rtcp:${audioRTCPPort}
         .map((line: string) => line.trim())
         .filter((line: string) => line.length > 0)
         .forEach((line: string) => {
-          logger.info(`[camera] ${line}`)
+          this.#cameraStreamLogger.info(line)
         })
     })
     this.#cameraStreamer.stderr!.on('data', (data) => {
@@ -1005,7 +1013,7 @@ a=rtcp:${audioRTCPPort}
         .map((line: string) => line.trim())
         .filter((line: string) => line.length > 0)
         .forEach((line: string) => {
-          logger.warning(`[camera] ${line}`)
+          this.#cameraStreamLogger.warning(line)
         })
     })
     this.#cameraStreamer.on('exit', async (code, es?: NodeJS.Signals) => {
