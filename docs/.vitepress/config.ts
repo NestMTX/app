@@ -47,6 +47,7 @@ export default defineConfig({
           { text: 'Cameras', link: '/setup/cameras' },
           { text: 'Cron Jobs', link: '/setup/cronjobs' },
           { text: 'User Management', link: '/setup/users' },
+          { text: 'Logs', link: '/setup/logs' },
         ],
         collapsed: true
       },

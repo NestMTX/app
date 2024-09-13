@@ -95,3 +95,89 @@ socket.connect();
 ```
 
 This ensures that all subsequent requests are authenticated using the new token.
+
+## Getting Status Updates
+
+NestMTX provides camera feed status updates over socket.io which can be subscribed to.
+
+### Topic Format
+
+Socket.IO Topics (event names) will be constructed as follows:
+
+`<domain>:<event type>`
+
+The placeholders are defined as follows:
+
+| Placeholder    | Definition                                                                                                                     |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `<domain>`     | The type of entity that the event is being reported for. <br />Initial feature release will include `camera` and `credentials` |
+| `<event type>` | The type of event which is being emitted. <br />See the event types below for more information.                                |
+
+Additionally, there will be the following wildcard topics:
+
+- `<domain>:*` - Domain specific wildcard topic
+- `nestmtx:*` - Application-wide wildcard topic
+
+### Payload Format
+
+Payloads will be JSON objects which can be easily parsed. They will have the following properties:
+
+| Payload Property | Description                                                                                                                                                                               |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `domain`         | The type of entity that the event is being reported for. <br />Initial feature release will include `camera` and `credentials`                                                            |
+| `entity`         | An identifier used to identify which entity of the domain the event is being reported for. <br />This will be the `id` column in the database where possible, or `null` when not possible |
+| `event`          | The type of event which is being emitted. <br />See the event types below for more information.                                                                                           |
+| `details`        | Any additional information related to the event that is being triggered to give additional useful context. Will be a JSON object (`{}`). See event types below for more information       |
+
+### Event Types
+
+The following event types will be reported for the following domains
+
+#### Event Types for the `camera` domain
+
+| Event              | Description                                                                     |
+| ------------------ | ------------------------------------------------------------------------------- |
+| `demand`           | Emitted when a client attempts to read from the camera feed                     |
+| `unDemand`         | Emitted when no more clients are remaining to read from the camera feed         |
+| `ready`            | Emitted when the camera feed is ready to be read from the camera feed           |
+| `notReady`         | Emitted when the camera feed is no longer ready to be read from the camera feed |
+| `read`             | Emitted when a client starts consuming the camera feed                          |
+| `unread`           | Emitted when a client stops consuming the camera feed                           |
+| `extended`         | Emitted when the source stream authentication has been extended                 |
+| `failed-extension` | Emitted when the source stream authentication fails to be extended              |
+
+#### Event Types for the `credentials` domain
+
+| Event             | Description                                                                                                   |
+| ----------------- | ------------------------------------------------------------------------------------------------------------- |
+| `authenticated`   | Emitted when credentials have been authenticated for the first time                                           |
+| `reauthenticated` | Emitted when credentials have been refreshed using a refresh token                                            |
+| `unauthenticated` | Emitted when credentials fail to refresh using a refresh token and the credentials need to be reauthenticated |
+
+## Streaming Logs
+
+NestMTX sends all logs to Socket.IO using the `log` event. This is the same mechanism used by the "Logs" page in the interface. You can subscribe to this event to get a real-time feed of the logs from NestMTX.
+Log events have a payload which contain a JSON object with the following properties:
+
+| Property    | Description                                              |
+| ----------- | -------------------------------------------------------- |
+| `hostname`  | The hostname of the process which output the log.        |
+| `level`     | The level of the log. See the table below for reference. |
+| `msg`       | The message of the log event.                            |
+| `pid`       | The process ID which output the log.                     |
+| `service`   | The service which made the log entry.                    |
+| `time`      | The millisecond timestamp of the log entry.              |
+| `timestamp` | The ISO formatted timestamp of the log entry.            |
+
+### Log Levels
+
+The log levels are defined as follows:
+
+| Log Level | Description |
+| --------- | ----------- |
+| `20`      | trace       |
+| `30`      | debug       |
+| `40`      | info        |
+| `50`      | warn        |
+| `60`      | error       |
+| `70`      | fatal       |

@@ -79,3 +79,51 @@ Replace `your-access-token` with the actual token you received from the authenti
 ### Middleware for Authentication
 
 The server will automatically handle the authentication process when a client sends a request. If the token is valid, the request will proceed; otherwise, the server will reject the request, and the client will receive an error message in the response topic.
+
+## Getting Status Updates
+
+NestMTX provides camera feed status updates over MQTT which can be subscribed to.
+
+### Topic Format
+
+MQTT Topics will be constructed as follows:
+
+`/<nestmtx base>/events/<domain>/<entity>/<event type>`
+
+and
+
+`/<nestmtx base>/stream/<domain>/<event type>`
+
+The placeholders are defined as follows:
+
+| Placeholder      | Definition                                                                                                                                                                                |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<nestmtx base>` | The base topic as defined by the `MQTT_BASE_TOPIC` configuration option                                                                                                                   |
+| `<domain>`       | The type of entity that the event is being reported for. <br />Initial feature release will include `camera` and `credentials`                                                            |
+| `<entity>`       | An identifier used to identify which entity of the domain the event is being reported for. <br />This will be the `id` column in the database where possible, or `null` when not possible |
+| `<event type>`   | The type of event which is being emitted. <br />See the event types below for more information.                                                                                           |
+
+### Event Types
+
+The following event types will be reported for the following domains
+
+#### Event Types for the `camera` domain
+
+| Event              | Description                                                                     |
+| ------------------ | ------------------------------------------------------------------------------- |
+| `demand`           | Emitted when a client attempts to read from the camera feed                     |
+| `unDemand`         | Emitted when no more clients are remaining to read from the camera feed         |
+| `ready`            | Emitted when the camera feed is ready to be read from the camera feed           |
+| `notReady`         | Emitted when the camera feed is no longer ready to be read from the camera feed |
+| `read`             | Emitted when a client starts consuming the camera feed                          |
+| `unread`           | Emitted when a client stops consuming the camera feed                           |
+| `extended`         | Emitted when the source stream authentication has been extended                 |
+| `failed-extension` | Emitted when the source stream authentication fails to be extended              |
+
+#### Event Types for the `credentials` domain
+
+| Event             | Description                                                                                                   |
+| ----------------- | ------------------------------------------------------------------------------------------------------------- |
+| `authenticated`   | Emitted when credentials have been authenticated for the first time                                           |
+| `reauthenticated` | Emitted when credentials have been refreshed using a refresh token                                            |
+| `unauthenticated` | Emitted when credentials fail to refresh using a refresh token and the credentials need to be reauthenticated |
