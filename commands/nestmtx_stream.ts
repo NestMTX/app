@@ -153,6 +153,9 @@ export default class NestmtxStream extends BaseCommand {
       this.#api.on('test:stall', () => {
         this.#bus.emit('stall')
       })
+      this.#api.on(`${this.path}:stall`, () => {
+        this.#bus.emit('stall')
+      })
       Promise.all([
         new Promise<void>((r) => {
           this.#api!.once('ice', (iceServers: RTCIceServer[]) => {

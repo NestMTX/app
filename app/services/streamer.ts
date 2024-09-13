@@ -38,6 +38,7 @@ export class StreamerService {
   readonly #shuttingDownProcesses: Set<string>
   readonly #internalApiPort: number
   readonly #logger: winston.Logger
+  readonly #lastDataCounts: Map<string, number>
 
   #ffmpegHwAccelerator?: string
   #ffmpegHwAcceleratorDevice?: string
@@ -50,6 +51,7 @@ export class StreamerService {
     this.#shuttingDownProcesses = new Set()
     this.#internalApiPort = env.get('INTERNAL_API_PORT', 62005)
     this.#logger = main.child({ service: 'streamer' })
+    this.#lastDataCounts = new Map()
   }
 
   get managedProcesses() {
@@ -146,7 +148,28 @@ export class StreamerService {
     this.#logger.info(`Streamer Service API listening on port ${this.#internalApiPort}`)
   }
 
-  async cronjob() {}
+  async cronjob() {
+    /**
+     * For all live paths that are streaming, check that the amount of data received is continuing to increase.
+     * If the amount of data received is not increasing, then the stream is stalled and should be restarted.
+     */
+    const paths = this.#app.mediamtx.getPaths()
+    const livePaths = paths.filter((path) => path.ready)
+    livePaths.forEach((path) => {
+      const last = this.#lastDataCounts.get(path.path)
+      if ('number' === typeof last && last >= path.dataRx) {
+        this.#logger.warn(
+          `Stream for path "${path.path}" is stalled, based on data transmission statistics`
+        )
+        if (this.#internalApiServer) {
+          this.#internalApiServer.emit(`${path.path}:stall`)
+          this.#logger.info(`Sent ${path.path}:stall to processes for path "${path.path}"`)
+          this.#lastDataCounts.set(path.path, path.dataRx)
+        }
+      }
+      this.#lastDataCounts.set(path.path, path.dataRx)
+    })
+  }
 
   async #getAvailableHwAccelerators() {
     const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
