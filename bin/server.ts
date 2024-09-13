@@ -21,8 +21,7 @@ process.env.BUILDPLATFORM = process.env.BUILDPLATFORM || 'local'
 process.env.SHA = process.env.SHA || 'unknown'
 
 import 'reflect-metadata'
-import { Ignitor } from '@adonisjs/core'
-import { prettyPrintError } from '#services/logger'
+import { Ignitor, prettyPrintError } from '@adonisjs/core'
 
 /**
  * URL to the application root. AdonisJS need it to resolve

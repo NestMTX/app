@@ -26,8 +26,7 @@ process.env.MEDIA_MTX_CONFIG_PATH =
   process.env.MEDIA_MTX_CONFIG_PATH || '/home/node/mediamtx/mediamtx.yml'
 
 import 'reflect-metadata'
-import { Ignitor } from '@adonisjs/core'
-import { prettyPrintError } from '#services/logger'
+import { Ignitor, prettyPrintError } from '@adonisjs/core'
 
 /**
  * URL to the application root. AdonisJS need it to resolve
