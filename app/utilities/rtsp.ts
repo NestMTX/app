@@ -1,5 +1,4 @@
 import { execa } from 'execa'
-import app from '@adonisjs/core/services/app'
 import { getHostnameFromRtspUrl } from '#utilities/url'
 import { logger as main } from '#services/logger'
 

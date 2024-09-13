@@ -232,7 +232,6 @@ export default class AppProvider {
    * The application has been booted
    */
   async start() {
-    const logger = await this.app.container.make('logger')
     const env = this.app.getEnvironment()
     if ('web' === env) {
       this.#logger.info('Starting Cron Service...')
@@ -263,7 +262,6 @@ export default class AppProvider {
    * Preparing to shutdown the app
    */
   async shutdown() {
-    const logger = await this.app.container.make('logger')
     const env = this.app.getEnvironment()
     if ('web' === env) {
       this.#bus.publish('application', 'shutdown', null, {
