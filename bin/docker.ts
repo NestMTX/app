@@ -9,9 +9,6 @@
 |
 */
 
-import 'reflect-metadata'
-import { Ignitor } from '@adonisjs/core'
-import { prettyPrintError } from '#services/logger'
 process.env.TZ = 'UTC'
 process.env.NODE_ENV = 'production'
 process.env.PORT = '2000'
@@ -38,6 +35,10 @@ process.env.IP_RESOLVERS_ENABLED = process.env.IP_RESOLVERS_ENABLED || 'cloudfla
 process.env.VERSION = process.env.VERSION || 'source'
 process.env.BUILDPLATFORM = process.env.BUILDPLATFORM || 'local'
 process.env.SHA = process.env.SHA || 'unknown'
+
+import 'reflect-metadata'
+import { Ignitor } from '@adonisjs/core'
+import { prettyPrintError } from '#services/logger'
 
 /**
  * URL to the application root. AdonisJS need it to resolve

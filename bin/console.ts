@@ -11,10 +11,6 @@
 |
 */
 
-import 'reflect-metadata'
-import { Ignitor } from '@adonisjs/core'
-import { prettyPrintError } from '#services/logger'
-
 process.env.TZ = 'UTC'
 process.env.PORT = '2000'
 process.env.HTTPS_PORT = '2001'
@@ -28,6 +24,10 @@ process.env.SHA = process.env.SHA || 'unknown'
 process.env.MEDIA_MTX_PATH = process.env.MEDIA_MTX_PATH || '/home/node/mediamtx/mediamtx'
 process.env.MEDIA_MTX_CONFIG_PATH =
   process.env.MEDIA_MTX_CONFIG_PATH || '/home/node/mediamtx/mediamtx.yml'
+
+import 'reflect-metadata'
+import { Ignitor } from '@adonisjs/core'
+import { prettyPrintError } from '#services/logger'
 
 /**
  * URL to the application root. AdonisJS need it to resolve
