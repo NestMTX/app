@@ -134,9 +134,9 @@ const getRtspStreamCharacteristicsFromGstDiscoverer = async (
     if (signal.aborted) {
       return undefined
     }
-    // logger.error(
-    //   `Error getting stream characteristics for camera being served by ${getHostnameFromRtspUrl(url)} from gst-discoverer: ${error.message}`
-    // )
+    logger.error(
+      `Error getting stream characteristics for camera being served by ${getHostnameFromRtspUrl(url)} from gst-discoverer: ${error.message}`
+    )
     return undefined
   }
   if (signal.aborted) {
@@ -264,18 +264,18 @@ const getRtspStreamCharacteristicsFromFfprobe = async (
     if (signal.aborted) {
       return undefined
     }
-    // logger.error(
-    //   `Error getting stream characteristics for camera being served by ${getHostnameFromRtspUrl(url)} from ffprobe: ${error.message}`
-    // )
+    logger.error(
+      `Error getting stream characteristics for camera being served by ${getHostnameFromRtspUrl(url)} from ffprobe: ${error.message}`
+    )
     return undefined
   }
   let parsed: FFprobeResult
   try {
     parsed = JSON.parse(characteristics.raw)
   } catch {
-    // logger.error(
-    //   `Error getting stream characteristics for camera being served by ${getHostnameFromRtspUrl(url)} from ffprobe: Invalid JSON response`
-    // )
+    logger.error(
+      `Error getting stream characteristics for camera being served by ${getHostnameFromRtspUrl(url)} from ffprobe: Invalid JSON response`
+    )
     return undefined
   }
   // Populate the characteristics object with video and audio stream details
