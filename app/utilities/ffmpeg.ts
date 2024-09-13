@@ -60,7 +60,7 @@ export const getHardwareAcceleratedEncodingArgumentsFor = (
         'h264_vaapi',
         ...(hwaccel_device ? ['-vaapi_device', hwaccel_device] : []),
         '-vf',
-        'format=nv12|vaapi,hwupload',
+        'format="nv12,hwupload"',
       ]
 
     case 'qsv':
