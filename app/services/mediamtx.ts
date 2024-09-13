@@ -86,18 +86,13 @@ export class MediaMTXService {
 
   async boot(_logger: LoggerService, nat: NATService, ice: ICEService, pm3: PM3) {
     pm3.on('stdout:mediamtx', (data) => {
-      if (data.includes('INF reloading configuration (file changed)')) {
-        pm3.restart('mediamtx')
-        this.#logger!.warning('Restarting MediaMTX service due to configuration change')
-      } else {
-        this.#logger!.info(data)
-      }
+      this.#logFromMediaMtx(data)
     })
     pm3.on('stderr:mediamtx', (data) => {
-      this.#logger!.error(data)
+      this.#logFromMediaMtx(data, 'error')
     })
     pm3.on('error:mediamtx', (data) => {
-      this.#logger!.error(data)
+      this.#logFromMediaMtx(data, 'error')
     })
     const mediaMtxConfigRaw = await fs.readFile(this.#configPath, 'utf-8')
     const mediaMtxConfig = yaml.parse(mediaMtxConfigRaw)
@@ -337,5 +332,38 @@ export class MediaMTXService {
       }
     }
     return ret
+  }
+
+  #logFromMediaMtx(line: string, fallback: string = 'info') {
+    const pattern =
+      /^\d+\/\d+\/\d+\s+\d+:\d+:\d+\s+((DEB|INF|WAR|ERR))\s+(\[[a-zA-Z0-9]+\]\s*)?(.*)$/gm
+    const matches = [...line.matchAll(pattern)]
+    matches.forEach((match) => {
+      const mediaMtxLevel = match[1] ? match[1].trim() : undefined
+      const mediaMtxService = match[3]
+        ? match[3].trim().replace('[', '').replace(']', '').trim()
+        : undefined
+      const mediaMtxMessage = match[4] ? match[4].trim() : undefined
+      let level: string = fallback
+      switch (mediaMtxLevel) {
+        case 'DEB':
+          level = 'debug'
+          break
+
+        case 'INF':
+          level = 'info'
+          break
+
+        case 'WAR':
+          level = 'warning'
+          break
+
+        case 'ERR':
+          level = 'error'
+          break
+      }
+      const logger = this.#logger.child({ subservice: mediaMtxService })
+      logger.log(level, mediaMtxMessage)
+    })
   }
 }

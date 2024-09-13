@@ -111,6 +111,12 @@ export class StreamerService {
     ipc.on('notReady', this.#onNotReady.bind(this))
     ipc.on('read', this.#onRead.bind(this))
     ipc.on('unread', this.#onUnread.bind(this))
+    ipc.on('test:stall', () => {
+      if (this.#internalApiServer) {
+        this.#internalApiServer.emit('test:stall')
+        this.#logger.info(`Sent test:stall to all connected processes`)
+      }
+    })
     this.#logger.info(`Streamer Service booted`)
     pm3.on('log:out', this.#logProcessToInfo)
     pm3.on('log:err', this.#logProcessToWarn)

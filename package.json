@@ -96,6 +96,7 @@
     "pidusage": "^3.0.2",
     "pino-abstract-transport": "^1.2.0",
     "reflect-metadata": "^0.2.1",
+    "rtp": "^0.1.0",
     "socket.io": "^4.7.5",
     "socket.io-client": "^4.7.5",
     "twilio": "^5.0.4",

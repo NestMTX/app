@@ -35,6 +35,29 @@ export const getPinoLogLevel = (winstonLevel: string) => {
   }
 }
 
+export const getNumericLogLevel = (winstonLevel: string) => {
+  switch (winstonLevel) {
+    case 'emerg':
+      return 90
+    case 'alert':
+      return 80
+    case 'crit':
+      return 70
+    case 'error':
+      return 60
+    case 'warning':
+      return 50
+    case 'notice':
+      return 40
+    case 'info':
+      return 30
+    case 'debug':
+      return 20
+    default:
+      return 10
+  }
+}
+
 export class LoggerBusTransport extends Transport {
   constructor(opts: Transport.TransportStreamOptions) {
     super({
@@ -47,7 +70,7 @@ export class LoggerBusTransport extends Transport {
     })
     const now = DateTime.utc()
     loggerBus.emit('log', {
-      level: getPinoLogLevel(info.level),
+      level: getNumericLogLevel(info.level),
       msg: info.message,
       time: now.toMillis(),
       timestamp: now.toISO(),

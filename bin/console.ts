@@ -21,9 +21,6 @@ process.env.NODE_ENV = process.env.NODE_ENV || 'development'
 process.env.VERSION = process.env.VERSION || 'source'
 process.env.BUILDPLATFORM = process.env.BUILDPLATFORM || 'local'
 process.env.SHA = process.env.SHA || 'unknown'
-process.env.MEDIA_MTX_PATH = process.env.MEDIA_MTX_PATH || '/home/node/mediamtx/mediamtx'
-process.env.MEDIA_MTX_CONFIG_PATH =
-  process.env.MEDIA_MTX_CONFIG_PATH || '/home/node/mediamtx/mediamtx.yml'
 
 import 'reflect-metadata'
 import { Ignitor, prettyPrintError } from '@adonisjs/core'

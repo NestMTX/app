@@ -6761,6 +6761,11 @@ rollup@^4.20.0:
     "@rollup/rollup-win32-x64-msvc" "4.21.0"
     fsevents "~2.3.2"
 
+rtp@^0.1.0:
+  version "0.1.0"
+  resolved "https://registry.yarnpkg.com/rtp/-/rtp-0.1.0.tgz#4fc3552be77d9c064bbca42d6af90a43fb10d3fb"
+  integrity sha512-c+Zw80zWCuMCDSTirxRzekn5U8ciz3wu+g3Jklq4ZetRXdpsPrBABIdbUu9GrDhu2Dy9Jx9jn3Fa9eFt7HXGjg==
+
 run-parallel@^1.1.9:
   version "1.2.0"
   resolved "https://registry.yarnpkg.com/run-parallel/-/run-parallel-1.2.0.tgz#66d1368da7bdf921eb9d95bd1a9229e7f21a43ee"

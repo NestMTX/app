@@ -1,6 +1,6 @@
 import { execa } from 'execa'
 import { getHostnameFromRtspUrl } from '#utilities/url'
-import { logger as main } from '#services/logger'
+import { subProcessLogger as main } from '#services/logger'
 
 import {
   MissingStreamCharacteristicsException,

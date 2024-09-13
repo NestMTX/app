@@ -52,7 +52,7 @@
         const logContainer = ref<VCard | null>(null)
         const scrollLogContainerToBottom = () => {
           if (logContainer.value) {
-            logContainer.value.$el.scrollTop = logContainer.value.$el.scrollHeight
+            logContainer.value.$el.scrollTop = logContainer.value.$el.scrollHeight + 50
           } else {
             // do nothing
             console.log('logContainer is not ready')
