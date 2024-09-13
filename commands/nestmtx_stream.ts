@@ -28,6 +28,7 @@ import type { RTCIceServer, RTCTrackEvent } from 'werift'
 import type { PickPortOptions } from '#utilities/ports'
 import type { Socket as DGramSocket } from 'node:dgram'
 import type { Server as UnixSocketServer, Socket as UnixSocket } from 'node:net'
+import type winston from 'winston'
 
 export default class NestmtxStream extends BaseCommand {
   static commandName = 'nestmtx:stream'
@@ -67,6 +68,9 @@ export default class NestmtxStream extends BaseCommand {
   #packetsToOutputInterval?: NodeJS.Timeout
   #lastThirtyPacketCounts: number[] = []
   #stalled: boolean = false
+  #firstUnderflowWarningAt?: DateTime
+  #lastUnderflowWarningAt?: DateTime
+  #clearUnderflowWarningInterval?: NodeJS.Timeout
 
   get #outputStreamLogger() {
     return logger.child({ stream: 'output' })
@@ -74,6 +78,10 @@ export default class NestmtxStream extends BaseCommand {
 
   get #cameraStreamLogger() {
     return logger.child({ stream: 'camera' })
+  }
+
+  get #staticStreamLogger() {
+    return logger.child({ stream: 'static' })
   }
 
   get #streamerPassthroughSock() {
@@ -368,7 +376,7 @@ export default class NestmtxStream extends BaseCommand {
           } else if (line.includes('INFO')) {
             this.#outputStreamLogger.info(line)
           } else {
-            this.#outputStreamLogger.warning(line)
+            this.#outputStreamLogger.info(line)
           }
         })
     })
@@ -382,6 +390,43 @@ export default class NestmtxStream extends BaseCommand {
       }
       this.#gracefulExit(code || 0)
     })
+  }
+
+  // ^(.*)\s+VBV\s+underflow\s+\(frame\s+\d+,\s+\-?\d+\s+bits\)$
+
+  #onFFMpegCameraStreamOutput(data: Buffer, log: winston.Logger) {
+    data
+      .toString()
+      .split('\n')
+      .map((line: string) => line.trim())
+      .filter((line: string) => line.length > 0)
+      .forEach((line: string) => {
+        if (line.match(/^(.*)\s+VBV\s+underflow\s+\(frame\s+\d+,\s+\-?\d+\s+bits\)$/gm)) {
+          if (this.#clearUnderflowWarningInterval) {
+            clearTimeout(this.#clearUnderflowWarningInterval)
+          }
+          if (!this.#firstUnderflowWarningAt) {
+            this.#firstUnderflowWarningAt = DateTime.utc()
+          }
+          this.#lastUnderflowWarningAt = DateTime.utc()
+          this.#clearUnderflowWarningInterval = setTimeout(() => {
+            this.#firstUnderflowWarningAt = undefined
+            this.#lastUnderflowWarningAt = undefined
+          }, 10000)
+          const duration = this.#lastUnderflowWarningAt.diff(this.#firstUnderflowWarningAt)
+          if (duration.as('seconds') > 10) {
+            log.warning('VBV underflow detected for more than 10 seconds. Sending "stall" signal')
+            this.#bus.emit('stall')
+          }
+        }
+        if (line.includes('Last message repeated 3')) {
+          return
+        }
+        log.log({
+          level: 'info',
+          message: line,
+        })
+      })
   }
 
   #streamJpegToOutputStream(src: string, size: string = '640x480', signal?: AbortSignal) {
@@ -450,26 +495,12 @@ export default class NestmtxStream extends BaseCommand {
     this.#staticStreamer.catch((err) => {
       logger.error(err.message)
     })
-    this.#staticStreamer.stdout!.on('data', (data) => {
-      data
-        .toString()
-        .split('\n')
-        .map((line: string) => line.trim())
-        .filter((line: string) => line.length > 0)
-        .forEach((line: string) => {
-          logger.info(`[static] ${line}`)
-        })
-    })
-    this.#staticStreamer.stderr!.on('data', (data) => {
-      data
-        .toString()
-        .split('\n')
-        .map((line: string) => line.trim())
-        .filter((line: string) => line.length > 0)
-        .forEach((line: string) => {
-          logger.warning(`[static] ${line}`)
-        })
-    })
+    this.#staticStreamer.stdout!.on('data', (data) =>
+      this.#onFFMpegCameraStreamOutput(data, this.#staticStreamLogger)
+    )
+    this.#staticStreamer.stderr!.on('data', (data) =>
+      this.#onFFMpegCameraStreamOutput(data, this.#staticStreamLogger)
+    )
     this.#staticStreamer.on('exit', async (code, es?: NodeJS.Signals) => {
       logger.info(`Static Input FFMpeg exited with code ${code}`)
       if (signal && signal.aborted) {
@@ -653,26 +684,12 @@ export default class NestmtxStream extends BaseCommand {
     this.#cameraStreamer.catch((err) => {
       this.#cameraStreamLogger.error(err.message)
     })
-    this.#cameraStreamer.stdout!.on('data', (data) => {
-      data
-        .toString()
-        .split('\n')
-        .map((line: string) => line.trim())
-        .filter((line: string) => line.length > 0)
-        .forEach((line: string) => {
-          this.#cameraStreamLogger.info(line)
-        })
-    })
-    this.#cameraStreamer.stderr!.on('data', (data) => {
-      data
-        .toString()
-        .split('\n')
-        .map((line: string) => line.trim())
-        .filter((line: string) => line.length > 0)
-        .forEach((line: string) => {
-          this.#cameraStreamLogger.warning(line)
-        })
-    })
+    this.#cameraStreamer.stdout!.on('data', (data) =>
+      this.#onFFMpegCameraStreamOutput(data, this.#cameraStreamLogger)
+    )
+    this.#cameraStreamer.stderr!.on('data', (data) =>
+      this.#onFFMpegCameraStreamOutput(data, this.#cameraStreamLogger)
+    )
     this.#cameraStreamer.on('exit', async (code, es?: NodeJS.Signals) => {
       this.#cameraStreamLogger.info(`RTSP Camera FFMpeg exited with code ${code}`)
       if (code !== 0 && code !== 8 && es !== 'SIGABRT') {
@@ -1031,26 +1048,12 @@ a=rtcp:${audioRTCPPort}
     this.#cameraStreamer.catch((err) => {
       logger.error(err.message)
     })
-    this.#cameraStreamer.stdout!.on('data', (data) => {
-      data
-        .toString()
-        .split('\n')
-        .map((line: string) => line.trim())
-        .filter((line: string) => line.length > 0)
-        .forEach((line: string) => {
-          this.#cameraStreamLogger.info(line)
-        })
-    })
-    this.#cameraStreamer.stderr!.on('data', (data) => {
-      data
-        .toString()
-        .split('\n')
-        .map((line: string) => line.trim())
-        .filter((line: string) => line.length > 0)
-        .forEach((line: string) => {
-          this.#cameraStreamLogger.warning(line)
-        })
-    })
+    this.#cameraStreamer.stdout!.on('data', (data) =>
+      this.#onFFMpegCameraStreamOutput(data, this.#cameraStreamLogger)
+    )
+    this.#cameraStreamer.stderr!.on('data', (data) =>
+      this.#onFFMpegCameraStreamOutput(data, this.#cameraStreamLogger)
+    )
     this.#cameraStreamer.on('exit', async (code, es?: NodeJS.Signals) => {
       this.#cameraStreamLogger.info(`WebRTC Camera FFMpeg exited with code ${code}`)
       if (code !== 0 && code !== 8 && es !== 'SIGABRT') {
