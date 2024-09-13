@@ -82,9 +82,9 @@ FROM base AS build
 ENV NODE_ENV=production
 COPY --from=dependencies /home/node/app/node_modules /home/node/app/node_modules
 ADD --chown=node:node . .
-RUN node ace build
 ENV MEDIA_MTX_PATH=/home/node/mediamtx/mediamtx
 ENV MEDIA_MTX_CONFIG_PATH=/home/node/mediamtx/mediamtx.yml
+RUN node ace build
 RUN node ace mediamtx:install
 
 ##################################################
