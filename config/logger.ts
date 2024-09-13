@@ -1,7 +1,7 @@
 import env from '#start/env'
 import app from '@adonisjs/core/services/app'
 import { defineConfig, targets } from '@adonisjs/core/logger'
-import '#services/server.log'
+import { getPinoLogLevel } from '#services/logger'
 
 const loggerConfig = defineConfig({
   default: 'app',
@@ -14,15 +14,9 @@ const loggerConfig = defineConfig({
     app: {
       enabled: true,
       name: env.get('APP_NAME'),
-      level: env.get('LOG_LEVEL'),
+      level: getPinoLogLevel(env.get('LOG_LEVEL', 'warning')),
       transport: {
         targets: targets()
-          .pushIf('web' === app.getEnvironment(), {
-            target: app.makePath('logger-transports', 'event_emitter.mjs'),
-            options: {
-              destination: env.get('PINO_PORT', 62000),
-            },
-          })
           .pushIf(!app.inProduction, targets.pretty())
           .pushIf(app.inProduction, targets.file({ destination: 1 }))
           .toArray(),

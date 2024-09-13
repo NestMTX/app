@@ -1,8 +1,3 @@
-import type { ApiService, CommandContext } from '#services/api'
-import type { LoggerService } from '@adonisjs/core/types'
-import type { Logger } from '@adonisjs/logger'
-import type { MqttClient, IPublishPacket } from 'mqtt'
-import type User from '#models/user'
 import { ApiServiceRequestError } from '#services/api'
 import { inspect } from 'node:util'
 import env from '#start/env'
@@ -12,6 +7,13 @@ import { createServer } from 'node:net'
 import { tokensUserProvider } from '@adonisjs/auth/access_tokens'
 import { Secret } from '@adonisjs/core/helpers'
 import { DateTime } from 'luxon'
+import { logger as main } from '#services/logger'
+
+import type { ApiService, CommandContext } from '#services/api'
+import type { LoggerService } from '@adonisjs/core/types'
+import type { MqttClient, IPublishPacket } from 'mqtt'
+import type User from '#models/user'
+import type winston from 'winston'
 
 type UserProvider = ReturnType<typeof tokensUserProvider>
 
@@ -49,10 +51,10 @@ const requestPayloadSchema = Joi.object({
 export class MqttService {
   readonly #api: ApiService
   readonly #client: MqttClient
-  readonly #logger: Logger
+  readonly #logger: winston.Logger
   readonly #userProvider: UserProvider
 
-  constructor(api: ApiService, client: MqttClient, logger: LoggerService) {
+  constructor(api: ApiService, client: MqttClient, _logger: LoggerService) {
     this.#api = api
     this.#client = client
     this.#userProvider = tokensUserProvider({
@@ -60,7 +62,7 @@ export class MqttService {
       // @ts-ignore it works - shutup!
       model: () => import('#models/user'),
     })
-    this.#logger = logger.child({ service: 'mqtt' })
+    this.#logger = main.child({ service: 'mqtt' })
     this.#client.on('connect', () => {
       this.#logger.info('Connected to broker')
       this.#client.subscribe(MqttService.topic('+'), (error) => {

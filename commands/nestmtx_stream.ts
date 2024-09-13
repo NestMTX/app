@@ -11,6 +11,13 @@ import { createSocket } from 'node:dgram'
 import { EventEmitter } from 'node:events'
 import env from '#start/env'
 import Camera from '#models/camera'
+import { createServer } from 'node:net'
+import { writeFile } from 'node:fs/promises'
+import {
+  getHardwareAcceleratedDecodingArgumentsFor,
+  getHardwareAcceleratedEncodingArgumentsFor,
+} from '#utilities/ffmpeg'
+import { subProcessLogger as logger } from '#services/logger'
 
 import type { CommandOptions } from '@adonisjs/core/types/ace'
 import type { ExecaChildProcess } from 'execa'
@@ -20,6 +27,7 @@ import type { Socket as StreamPrivateApiClient } from 'socket.io-client'
 import type { RTCIceServer, RTCTrackEvent } from 'werift'
 import type { PickPortOptions } from '#utilities/ports'
 import type { Socket as DGramSocket } from 'node:dgram'
+import type { Server as UnixSocketServer, Socket as UnixSocket } from 'node:net'
 
 export default class NestmtxStream extends BaseCommand {
   static commandName = 'nestmtx:stream'
@@ -38,48 +46,93 @@ export default class NestmtxStream extends BaseCommand {
   })
   declare port: string
 
+  #bus: EventEmitter = new EventEmitter({
+    captureRejections: true,
+  })
+
   #api?: StreamPrivateApiClient
+  #streamerSocket?: UnixSocketServer
+  #cameraSocket?: UnixSocketServer
   #streamer?: ExecaChildProcess
   #staticStreamer?: ExecaChildProcess
+  #cameraStreamer?: ExecaChildProcess
   #abortController: AbortController = new AbortController()
-
-  #cameraMissingPort?: number
-  #cameraDisabledPort?: number
-  #cameraConnectingPort?: number
+  #connectingStreamAbortController: AbortController = new AbortController()
 
   #iceServers: RTCIceServer[] = []
   #additionalHostAddresses: string[] = []
+  #rtspCameraStreamUrl?: string
+
+  #packetsToOutputCount: number = 0
+  #packetsToOutputInterval?: NodeJS.Timeout
+  #lastThirtyPacketCounts: number[] = []
+  #stalled: boolean = false
+
+  get #outputStreamLogger() {
+    return logger.child({ stream: 'output' })
+  }
+
+  get #cameraStreamLogger() {
+    return logger.child({ stream: 'camera' })
+  }
 
   get #streamerPassthroughSock() {
     return this.app.makePath('resources', `streamer.${process.pid}.sock`)
   }
 
-  get #cameraMissingMjpegStream() {
-    return `http://127.0.0.1:${this.#cameraMissingPort}`
+  get #cameraPassthroughSock() {
+    return this.app.makePath('resources', `camera.${process.pid}.sock`)
   }
 
-  get #cameraDisabledMjpegStream() {
-    return `http://127.0.0.1:${this.#cameraDisabledPort}`
+  get #streamerFFMpegInputSdp() {
+    return this.app.makePath('resources', `streamer.${process.pid}.sdp`)
   }
 
-  get #cameraConnectingMjpegStream() {
-    return `http://127.0.0.1:${this.#cameraConnectingPort}`
+  get #noSuchCameraFilePath() {
+    return this.app.makePath('resources/mediamtx/no-such-camera.jpg')
+  }
+
+  get #connectingFilePath() {
+    return this.app.makePath('resources/mediamtx/connecting.jpg')
+  }
+
+  get #cameraDisabledFilePath() {
+    return this.app.makePath('resources/mediamtx/camera-disabled.jpg')
   }
 
   get #destination() {
     return `srt://127.0.0.1:${env.get('MEDIA_MTX_SRT_PORT', 8890)}/?streamid=publish:${this.path}&pkt_size=1316`
   }
 
-  get #location() {
-    return `rtsp://127.0.0.1:${env.get('MEDIA_MTX_RTSP_TCP_PORT', 8554)}/${this.path}`
+  get #hardwareAcceleratedDecodingArguments() {
+    return getHardwareAcceleratedDecodingArgumentsFor(
+      env.get('FFMPEG_HW_ACCELERATOR', ''),
+      env.get('FFMPEG_HW_ACCELERATOR_DEVICE', '')
+    )
+  }
+
+  get #hardwareAcceleratedEncodingArguments() {
+    return getHardwareAcceleratedEncodingArgumentsFor(
+      env.get('FFMPEG_HW_ACCELERATOR', ''),
+      env.get('FFMPEG_HW_ACCELERATOR_DEVICE', '')
+    )
   }
 
   async run() {
     process.once('SIGINT', this.#gracefulExit.bind(this))
-    this.logger.info(`NestMTX Streamer for "${this.path}"`)
+    logger.info(`NestMTX Streamer for "${this.path}". PID: ${process.pid}`)
+    this.#abortController.signal.addEventListener('abort', () => {
+      if (this.#packetsToOutputInterval) {
+        clearInterval(this.#packetsToOutputInterval)
+      }
+    })
+    this.#streamerSocket = createServer(this.#onStreamerUnixSocketConnection.bind(this))
+    this.#streamerSocket.listen(this.#streamerPassthroughSock)
+    this.#cameraSocket = createServer(this.#onCameraUnixSocketConnection.bind(this))
+    this.#cameraSocket.listen(this.#cameraPassthroughSock)
     this.#startOutputStreamer()
     const privateApiServerUrl = `http://127.0.0.1:${this.port}`
-    this.logger.info(`Searching for Private API Server`)
+    logger.info(`Searching for Private API Server`)
     await new Promise<void>((resolve) => {
       this.#api = io(privateApiServerUrl, {
         autoConnect: false,
@@ -87,44 +140,31 @@ export default class NestmtxStream extends BaseCommand {
         timeout: 1000,
       })
       this.#api.once('error', () => {
-        this.logger.error(`Private API Server not found`)
+        logger.error(`Private API Server not found`)
         process.exit(1)
       })
       this.#api.once('connect', () => {
-        this.logger.info(`Private API Server connected`)
+        logger.info(`Private API Server connected`)
       })
       this.#api.once('disconnect', () => {
-        this.logger.error(`Private API Server disconnected`)
+        logger.error(`Private API Server disconnected`)
         process.exit(1)
+      })
+      this.#api.on('test:stall', () => {
+        this.#bus.emit('stall')
       })
       Promise.all([
         new Promise<void>((r) => {
-          this.#api!.once(
-            'ports',
-            (ports: {
-              cameraMissing: number
-              cameraDisabled: number
-              cameraConnecting: number
-            }) => {
-              this.#cameraMissingPort = ports.cameraMissing
-              this.#cameraDisabledPort = ports.cameraDisabled
-              this.#cameraConnectingPort = ports.cameraConnecting
-              this.logger.info(`Ports configured`)
-              r(void 0)
-            }
-          )
-        }),
-        new Promise<void>((r) => {
           this.#api!.once('ice', (iceServers: RTCIceServer[]) => {
             this.#iceServers = iceServers
-            this.logger.info(`ICE Servers configured`)
+            logger.info(`ICE Servers configured`)
             r(void 0)
           })
         }),
         new Promise<void>((r) => {
           this.#api!.once('hosts', (additionalHostAddresses: string[]) => {
             this.#additionalHostAddresses = additionalHostAddresses
-            this.logger.info(`Hosts configured`)
+            logger.info(`Hosts configured`)
             r(void 0)
           })
         }),
@@ -133,92 +173,176 @@ export default class NestmtxStream extends BaseCommand {
       })
       this.#api.connect()
     })
-    this.#streamMjpegToOutputStream(this.#cameraConnectingMjpegStream)
-    this.logger.info(`Searching for Camera`)
+    logger.info(`Searching for Camera`)
     const camera = await Camera.findBy({ mtx_path: this.path })
-    // if (!camera) {
-    //   this.logger.info(`Camera not found`)
-    //   this.#streamMjpegToOutputStream(this.#cameraMissingMjpegStream)
-    // } else if (
-    //   !camera.isEnabled ||
-    //   !camera.protocols ||
-    //   (!camera.protocols.includes('WEB_RTC') && !camera.protocols.includes('RTSP'))
-    // ) {
-    //   this.logger.info(`Camera disabled`)
-    //   this.#streamMjpegToOutputStream(this.#cameraDisabledMjpegStream)
-    // } else {
-    // await camera.load('credential')
-    // const service: smartdevicemanagement_v1.Smartdevicemanagement =
-    //   await camera.credential.getSDMClient()
-    // try {
-    //   if (camera.protocols.includes('WEB_RTC')) {
-    //     await this.#webrtcStart(service, camera)
-    //   } else if (camera.protocols.includes('RTSP')) {
-    //     await this.#rtspStart(service, camera)
-    //   }
-    // } catch (err) {
-    //   this.logger.error(err.message)
-    //   process.exit(1)
-    // }
-    // }
+    this.#packetsToOutputInterval = setInterval(() => {
+      const packets = this.#packetsToOutputCount
+      this.#api!.emit('packetRate', packets)
+      this.#packetsToOutputCount = 0
+      this.#lastThirtyPacketCounts.push(packets)
+      if (this.#lastThirtyPacketCounts.length > 30) {
+        this.#lastThirtyPacketCounts.shift()
+      }
+      if (
+        !this.#stalled &&
+        this.#lastThirtyPacketCounts.length === 30 &&
+        this.#lastThirtyPacketCounts.every((count) => count === 0) &&
+        ((this.#staticStreamer && this.#staticStreamer.pid) ||
+          (this.#cameraStreamer && this.#cameraStreamer.pid))
+      ) {
+        logger.warning(`No packets received in the last 30 seconds. Stall detected.`)
+        this.#stalled = true
+        this.#bus.emit('stall')
+      }
+    }, 1000)
+    if (!camera) {
+      logger.info(`Camera not found`)
+      this.#connectingStreamAbortController.abort()
+      this.#streamJpegToOutputStream(this.#noSuchCameraFilePath)
+    } else if (
+      !camera.isEnabled ||
+      !camera.protocols ||
+      (!camera.protocols.includes('WEB_RTC') && !camera.protocols.includes('RTSP'))
+    ) {
+      logger.info(`Camera disabled`)
+      this.#connectingStreamAbortController.abort()
+      this.#streamJpegToOutputStream(this.#cameraDisabledFilePath)
+    } else {
+      await camera.load('credential')
+      const service: smartdevicemanagement_v1.Smartdevicemanagement =
+        await camera.credential.getSDMClient()
+      try {
+        if (camera.protocols.includes('WEB_RTC')) {
+          await this.#webrtcStart(service, camera)
+        } else if (camera.protocols.includes('RTSP')) {
+          await this.#rtspStart(service, camera)
+        }
+      } catch (err) {
+        logger.error(err.message)
+        process.exit(1)
+      }
+    }
+    this.#bus.on('stall', () => {
+      if (this.#staticStreamer) {
+        this.#staticStreamer.kill('SIGABRT')
+      }
+      if (this.#cameraStreamer) {
+        this.#cameraStreamer.kill('SIGABRT')
+      }
+    })
+  }
+
+  #validateRtpPacket(packet: Buffer) {
+    if (packet.length < 12) {
+      return false
+    }
+    return true
+  }
+
+  #onStreamerUnixSocketConnection(socket: UnixSocket) {
+    socket.on('data', (raw) => {
+      const valid = this.#validateRtpPacket(raw)
+      if (!valid) {
+        return
+      }
+      // console.log(raw)
+      // writeFileSync(this.#streamerPassthroughFifo, raw)
+      if (this.#streamer) {
+        this.#packetsToOutputCount += 1
+        this.#stalled = false
+        // @ts-expect-error - this is correct
+        this.#streamer.stdio[3].write(raw)
+      }
+    })
+  }
+
+  #onCameraUnixSocketConnection(socket: UnixSocket) {
+    socket.on('data', (raw) => {
+      const valid = this.#validateRtpPacket(raw)
+      if (!valid) {
+        return
+      }
+      // console.log(raw)
+      // writeFileSync(this.#streamerPassthroughFifo, raw)
+      if (this.#streamer) {
+        this.#packetsToOutputCount += 1
+        this.#stalled = false
+        // @ts-expect-error - this is correct
+        this.#streamer.stdio[3].write(raw)
+      }
+    })
   }
 
   #startOutputStreamer() {
-    this.#streamer = execa(
-      'ffmpeg',
-      [
-        '-loglevel',
-        env.get('FFMPEG_DEBUG_LEVEL', 'warning'),
-        '-fflags',
-        '+discardcorrupt', // Ignore corrupted frames
-        '-listen',
-        '1',
-        '-i',
-        `unix:${this.#streamerPassthroughSock}`,
-        '-timeout',
-        '-1',
+    const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
+    const ffmpegArgs = [
+      '-loglevel',
+      env.get('FFMPEG_DEBUG_LEVEL', 'warning'),
+      '-fflags',
+      '+discardcorrupt', // Ignore corrupted frames
 
-        // Video stream: H.264 with no B-frames
-        '-c:v',
-        'libx264',
-        '-tune',
-        'zerolatency', // Tune for low latency
-        '-x264opts',
-        'bframes=0', // No B-frames
-        '-preset',
-        'ultrafast', // Ultrafast preset
-        '-b:v',
-        '1000k', // Set video bitrate
-        '-r',
-        '10', // Set frame rate dynamically
+      // Hardware-accelerated decoding arguments
+      ...this.#hardwareAcceleratedDecodingArguments,
 
-        // AAC Audio Stream (single audio track)
-        '-c:a',
-        'aac',
-        '-b:a',
-        '128k', // Audio bitrate for AAC
+      // Input from pipe:3
+      '-i',
+      `pipe:3`,
 
-        // Map the video and audio streams to the RTSP output
-        '-map',
-        '0:v', // Map the video input stream to the RTSP output
-        '-map',
-        '0:a', // Map the audio input stream to the RTSP output
+      // Hardware-accelerated encoding arguments (no conflict now)
+      ...this.#hardwareAcceleratedEncodingArguments,
 
-        '-f',
-        'rtsp', // RTSP output format
-        '-rtsp_transport',
-        'udp', // Use UDP for RTSP
-        '-use_wallclock_as_timestamps',
-        '1',
-        `"${this.#location}"`, // RTSP destination with quotes
-      ],
-      {
-        stdio: 'pipe',
-        reject: false,
-        shell: true,
-        signal: this.#abortController.signal,
-      }
-    )
+      // Other video options such as tune, bitrate, etc.
+      '-tune',
+      'zerolatency', // Tune for low latency
+      '-x264opts',
+      'bframes=0', // No B-frames
+      '-preset',
+      'ultrafast', // Ultrafast preset
+      '-b:v',
+      '100k', // Set video bitrate dynamically
+      '-r',
+      '10', // Set frame rate dynamically
+
+      // Set pixel format to avoid deprecated warning
+      '-pix_fmt',
+      'yuv420p',
+
+      // AAC Audio Stream (track 1)
+      '-c:a:0',
+      'aac',
+      '-b:a:0',
+      '128k', // Audio bitrate for AAC
+
+      // Opus Audio Stream (track 2)
+      '-c:a:1',
+      'libopus',
+      '-b:a:1',
+      '128k', // Audio bitrate for Opus
+
+      // Explicit Mapping of Video and Audio Streams
+      '-map',
+      '0:v:0', // Map the first video track (H.264)
+      '-map',
+      '0:a:0', // Map the first audio track (AAC)
+      '-map',
+      '0:a:1', // Map the second audio track (Opus)
+
+      // Output Format
+      '-f',
+      'mpegts', // Set the format to MPEG-TS
+      '-use_wallclock_as_timestamps',
+      '1',
+
+      // Destination (SRT or other media server)
+      `"${this.#destination}"`, // Destination path (quoted)
+    ]
+
+    this.#streamer = execa(ffmpegBinary, ffmpegArgs, {
+      stdio: ['pipe', 'pipe', 'pipe', 'pipe'],
+      reject: false,
+      shell: true,
+      signal: this.#abortController.signal,
+    })
     this.#streamer.stdout!.on('data', (data) => {
       data
         .toString()
@@ -226,7 +350,7 @@ export default class NestmtxStream extends BaseCommand {
         .map((line: string) => line.trim())
         .filter((line: string) => line.length > 0)
         .forEach((line: string) => {
-          this.logger.info(line)
+          this.#outputStreamLogger.info(line)
         })
     })
     this.#streamer.stderr!.on('data', (data) => {
@@ -236,74 +360,81 @@ export default class NestmtxStream extends BaseCommand {
         .map((line: string) => line.trim())
         .filter((line: string) => line.length > 0)
         .forEach((line: string) => {
-          this.logger.warning(line)
+          if (line.includes('ERROR')) {
+            this.#outputStreamLogger.error(line)
+          } else if (line.includes('INFO')) {
+            this.#outputStreamLogger.info(line)
+          } else {
+            this.#outputStreamLogger.warning(line)
+          }
         })
     })
     this.#streamer.on('exit', async (code) => {
-      this.logger.info(`Streamer FFmpeg exited with code ${code}`)
-      if (code !== 0) {
+      logger.info(`Streamer exited with code ${code}`)
+      if (code !== 0 && code !== 8) {
         const res = await this.#streamer
         if (res) {
-          this.logger.info(res.escapedCommand)
+          logger.info(res.escapedCommand)
         }
       }
       this.#gracefulExit(code || 0)
     })
   }
 
-  #streamMjpegToOutputStream(src: string) {
+  #streamJpegToOutputStream(src: string, size: string = '640x480', signal?: AbortSignal) {
     const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
     const ffmpegArgs = [
       '-loglevel',
       env.get('FFMPEG_DEBUG_LEVEL', 'warning'),
-      '-fflags',
-      '+discardcorrupt', // Ignore corrupted frames
-
-      // Input MJPEG stream
+      '-loop',
+      '1',
+      // Hardware-accelerated decoding arguments
+      ...this.#hardwareAcceleratedDecodingArguments,
       '-i',
-      `"${src}"`,
-
-      // Create a fake AAC audio track for streams without audio
+      `${src}`,
       '-f',
       'lavfi',
       '-i',
-      'anullsrc=channel_layout=stereo:sample_rate=48000', // Fake audio input for AAC audio
-
-      // H.264 Video stream encoding
-      '-c:v',
-      'libx264',
+      'anullsrc=r=48000:cl=stereo', // Synthetic audio source
+      // Hardware-accelerated encoding arguments (no conflict now)
+      ...this.#hardwareAcceleratedEncodingArguments,
+      '-profile:v',
+      'main',
       '-tune',
-      'zerolatency', // Tune for low latency
-      '-preset',
-      'ultrafast', // Ultrafast preset
-      '-b:v',
-      '1000k', // Set video bitrate
-
-      // Set pixel format to avoid deprecated warnings
+      'zerolatency',
+      '-r',
+      '25',
+      '-s',
+      size,
       '-pix_fmt',
       'yuv420p',
 
-      // Set a default resolution if missing (e.g., 640x480)
-      '-vf',
-      'scale=640:480',
-
-      // AAC Audio Stream
-      '-c:a',
+      // AAC Audio Stream (track 1)
+      '-c:a:0',
       'aac',
-      '-b:a',
+      '-b:a:0',
       '128k', // Audio bitrate for AAC
 
-      // Map the video and audio streams
+      // Opus Audio Stream (track 2)
+      '-c:a:1',
+      'libopus',
+      '-b:a:1',
+      '128k', // Audio bitrate for Opus
+
+      // Mapping inputs and outputs
       '-map',
-      '0:v', // Map video input to H.264 video stream
+      '0:v', // Map the video input to the H.264 video stream (image source)
       '-map',
-      '1:a', // Map AAC audio input (silent audio track)
+      '1:a', // Map the synthetic audio source to the AAC stream
+      '-map',
+      '1:a', // Map the synthetic audio source again for Opus encoding
 
       '-f',
-      'matroska', // Set MKV format
-
+      'mpegts',
       '-listen',
       '0',
+      '-use_wallclock_as_timestamps',
+      '1',
       `unix:${this.#streamerPassthroughSock}`, // Send output to Unix socket
     ]
 
@@ -311,6 +442,10 @@ export default class NestmtxStream extends BaseCommand {
       stdio: 'pipe',
       reject: false,
       shell: true,
+      signal,
+    })
+    this.#staticStreamer.catch((err) => {
+      logger.error(err.message)
     })
     this.#staticStreamer.stdout!.on('data', (data) => {
       data
@@ -319,7 +454,7 @@ export default class NestmtxStream extends BaseCommand {
         .map((line: string) => line.trim())
         .filter((line: string) => line.length > 0)
         .forEach((line: string) => {
-          this.logger.info(line)
+          logger.info(`[static] ${line}`)
         })
     })
     this.#staticStreamer.stderr!.on('data', (data) => {
@@ -329,469 +464,621 @@ export default class NestmtxStream extends BaseCommand {
         .map((line: string) => line.trim())
         .filter((line: string) => line.length > 0)
         .forEach((line: string) => {
-          this.logger.warning(line)
+          logger.warning(`[static] ${line}`)
         })
     })
-    this.#staticStreamer.on('exit', async (code) => {
-      this.logger.info(`Static Input FFMpeg exited with code ${code}`)
-      if (code !== 0) {
+    this.#staticStreamer.on('exit', async (code, es?: NodeJS.Signals) => {
+      logger.info(`Static Input FFMpeg exited with code ${code}`)
+      if (signal && signal.aborted) {
+        return
+      }
+      if (code !== 0 && code !== 8 && es !== 'SIGABRT') {
         const res = await this.#streamer
         if (res) {
-          this.logger.info(res.escapedCommand)
+          logger.info(res.escapedCommand)
         }
+        this.#gracefulExit(code || 0)
       } else {
-        this.#streamMjpegToOutputStream(src)
+        this.#streamJpegToOutputStream(src, size, signal)
       }
-      this.#gracefulExit(code || 0)
     })
   }
 
-  // async #rtspStart(service: smartdevicemanagement_v1.Smartdevicemanagement, camera: Camera) {
-  //   const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
-  //   const {
-  //     data: { results },
-  //   } = await service.enterprises.devices.executeCommand({
-  //     name: camera.uid,
-  //     requestBody: {
-  //       command: 'sdm.devices.commands.CameraLiveStream.GenerateRtspStream',
-  //     },
-  //   })
-  //   if (!results!.streamUrls || !results!.streamUrls.rtspUrl) {
-  //     throw new Error('RTSP Stream URL not found')
-  //   }
-  //   if (!results!.streamExtensionToken) {
-  //     throw new Error('No stream extension token found')
-  //   }
+  async #getRtspUrl(service: smartdevicemanagement_v1.Smartdevicemanagement, camera: Camera) {
+    while ('string' !== typeof this.#rtspCameraStreamUrl) {
+      let rtspUrl: any | undefined
+      let streamExtensionToken: string | undefined
+      let expiresAt: string | undefined
+      try {
+        const {
+          data: { results },
+        } = await service.enterprises.devices.executeCommand({
+          name: camera.uid,
+          requestBody: {
+            command: 'sdm.devices.commands.CameraLiveStream.GenerateRtspStream',
+          },
+        })
+        if (!results!.streamUrls || !results!.streamUrls.rtspUrl) {
+          throw new Error('RTSP Stream URL not found')
+        }
+        if (!results!.streamExtensionToken) {
+          throw new Error('No stream extension token found')
+        }
+        rtspUrl = results!.streamUrls.rtspUrl
+        streamExtensionToken = results!.streamExtensionToken
+        expiresAt = results!.expiresAt
+      } catch (error) {
+        if ((error as Error).message.includes('Rate limited')) {
+          logger.warning('Rate limited. Waiting 30 seconds before retrying')
+          await new Promise((r) => setTimeout(r, 30000))
+        } else {
+          this.#gracefulExit(1)
+        }
+      }
+      camera.streamExtensionToken = streamExtensionToken || null
+      camera.expiresAt = DateTime.utc().plus({ minutes: 5 })
+      if (expiresAt) {
+        const expiresAtDateTime = DateTime.fromISO(expiresAt)
+        if (expiresAtDateTime.isValid) {
+          camera.expiresAt = expiresAtDateTime
+        }
+      }
+      await camera.save()
+      this.#rtspCameraStreamUrl = rtspUrl
+    }
+    return this.#rtspCameraStreamUrl
+  }
 
-  //   camera.streamExtensionToken = results!.streamExtensionToken
-  //   camera.expiresAt = DateTime.utc().plus({ minutes: 5 })
-  //   if (results!.expiresAt) {
-  //     const expiresAt = DateTime.fromISO(results!.expiresAt)
-  //     if (expiresAt.isValid) {
-  //       camera.expiresAt = expiresAt
-  //     }
-  //   }
-  //   await camera.save()
-  //   const rtspSrc = results!.streamUrls.rtspUrl
-  //   this.logger.info(`Getting RTSP stream characteristics for "${getHostnameFromRtspUrl(rtspSrc)}"`)
-  //   const getCharacteristicsAbortController = new AbortController()
-  //   setTimeout(() => {
-  //     getCharacteristicsAbortController.abort()
-  //   }, 30000)
-  //   const characteristics: RtspStreamCharacteristics = await getRtspStreamCharacteristics(
-  //     rtspSrc,
-  //     getCharacteristicsAbortController.signal
-  //   )
-  //   const videoBitrate = characteristics.video.bitrate || 1000
+  async #rtspStart(
+    service: smartdevicemanagement_v1.Smartdevicemanagement,
+    camera: Camera,
+    depth: number = 0
+  ) {
+    const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
+    const rtspSrc = await this.#getRtspUrl(service, camera)
+    this.#cameraStreamLogger.info(
+      `Getting RTSP stream characteristics for "${getHostnameFromRtspUrl(rtspSrc)}"`
+    )
+    const getCharacteristicsAbortController = new AbortController()
+    setTimeout(() => {
+      getCharacteristicsAbortController.abort()
+    }, 30000)
+    let characteristics: RtspStreamCharacteristics
+    try {
+      characteristics = await getRtspStreamCharacteristics(
+        rtspSrc,
+        getCharacteristicsAbortController.signal
+      )
+    } catch (error) {
+      this.#cameraStreamLogger.error(error.message)
+      this.#rtspCameraStreamUrl = undefined
+      if (depth > 5) {
+        return this.#gracefulExit(1)
+      } else {
+        this.#rtspStart(service, camera, depth + 1)
+        return
+      }
+    }
+    const videoBitrate = characteristics.video.bitrate || 1000
+    const size =
+      characteristics.video.width && characteristics.video.height
+        ? `${characteristics.video.width}x${characteristics.video.height}`
+        : camera.resolution || '640x480'
 
-  //   const ffmpegArgs: string[] = [
-  //     '-loglevel',
-  //     env.get('FFMPEG_DEBUG_LEVEL', 'warning'), // Suppress most log messages, only show warnings
-  //     '-fflags',
-  //     '+discardcorrupt', // Ignore corrupted frames
-  //     '-re', // Read input at native frame rate
-  //     '-i',
-  //     `"${rtspSrc}"`, // Input RTSP stream with quotes
+    const videoSizeArguments =
+      characteristics.video.width && characteristics.video.height ? ['-s', size] : []
 
-  //     // Retry options for network issues
-  //     '-rtsp_transport',
-  //     'udp', // Use TCP for RTSP transport
+    const ffmpegArgs: string[] = [
+      '-loglevel',
+      env.get('FFMPEG_DEBUG_LEVEL', 'warning'), // Suppress most log messages, only show warnings
+      '-fflags',
+      '+discardcorrupt+nobuffer', // Ignore corrupted frames and minimize buffering
 
-  //     // Add timeouts to avoid premature exits
-  //     '-timeout',
-  //     '6000000', // Wait up to 1 minute for the RTSP stream to start
-  //     '-rw_timeout',
-  //     '6000000',
+      // Hardware-accelerated decoding arguments
+      ...this.#hardwareAcceleratedDecodingArguments,
 
-  //     // Single H.264 Video Stream (without B-frames)
-  //     '-c:v',
-  //     'libx264',
-  //     '-tune',
-  //     'zerolatency', // Tune for low latency
-  //     '-x264opts',
-  //     'bframes=0', // No B-frames
-  //     '-preset',
-  //     'ultrafast', // Ultrafast preset
-  //     `-b:v`,
-  //     `${videoBitrate}k`, // Set video bitrate dynamically
-  //     '-r',
-  //     `10`, // Set frame rate dynamically
+      '-i',
+      `"${rtspSrc}"`, // Input RTSP stream with quotes
 
-  //     // Set pixel format to avoid deprecated warning
-  //     '-pix_fmt',
-  //     'yuv420p',
+      // Retry options for network issues
+      '-rtsp_transport',
+      'udp', // Use UDP to reduce latency
 
-  //     // AAC Audio Stream
-  //     '-c:a:0',
-  //     'aac',
-  //     '-b:a:0',
-  //     '128k', // Audio bitrate for AAC
+      // Hardware-accelerated encoding arguments
+      ...this.#hardwareAcceleratedEncodingArguments,
 
-  //     // Opus Audio Stream
-  //     '-c:a:1',
-  //     'libopus',
-  //     '-b:a:1',
-  //     '128k', // Audio bitrate for Opus
+      // Single H.264 Video Stream (without B-frames)
+      '-tune',
+      'zerolatency', // Tune for low latency
+      '-x264opts',
+      'bframes=0', // No B-frames
+      '-preset',
+      'ultrafast', // Ultrafast preset
+      `-b:v`,
+      `${videoBitrate}k`, // Set video bitrate dynamically
+      ...videoSizeArguments,
 
-  //     // Mapping inputs and outputs
-  //     '-map',
-  //     '0:v', // Map the video input to the H.264 video stream
-  //     '-map',
-  //     '0:a', // Map the original AAC audio to the first audio track
-  //     '-map',
-  //     '0:a', // Map the original audio again for Opus encoding
+      // Set buffer size and limit delay
+      '-bufsize',
+      `${videoBitrate}k`, // Set buffer size equal to the bitrate for low latency
+      '-max_delay',
+      '1000000', // Max delay of 1000ms
 
-  //     '-f',
-  //     'mpegts', // Set the format to MPEG-TS
-  //     '-use_wallclock_as_timestamps',
-  //     '1',
-  //     `"${this.#destination}"`, // SRT destination with quotes
-  //   ]
+      // Set pixel format to avoid deprecated warning
+      '-pix_fmt',
+      'yuv420p',
 
-  //   this.logger.info(`Starting FFMpeg with RTSP stream`)
-  //   this.#streamer = execa(ffmpegBinary, ffmpegArgs, {
-  //     stdio: 'pipe',
-  //     reject: false,
-  //     shell: true,
-  //     signal: this.#abortController.signal,
-  //   })
+      // AAC Audio Stream
+      '-c:a:0',
+      'aac',
+      '-b:a:0',
+      '128k', // Audio bitrate for AAC
 
-  //   this.#streamer.stdout!.on('data', (data) => {
-  //     this.logger.info(data.toString())
-  //   })
+      // Opus Audio Stream
+      '-c:a:1',
+      'libopus',
+      '-b:a:1',
+      '128k', // Audio bitrate for Opus
 
-  //   this.#streamer.stderr!.on('data', (data) => {
-  //     this.logger.warning(data.toString())
-  //   })
+      // Mapping inputs and outputs
+      '-map',
+      '0:v', // Map the video input to the H.264 video stream
+      '-map',
+      '0:a', // Map the original AAC audio to the first audio track
+      '-map',
+      '0:a', // Map the original audio again for Opus encoding
 
-  //   this.#streamer.on('exit', async (code) => {
-  //     if (code === 255) {
-  //       return
-  //     }
-  //     if (code === 8) {
-  //       const result = await this.#streamer
-  //       this.logger.error(`${result!.escapedCommand} failed with code ${result!.exitCode}`)
-  //     } else {
-  //       this.logger.info(`FFMpeg exited with code ${code}`)
-  //     }
-  //     if (code === 0) {
-  //       this.logger.info(`FFMpeg exited with code ${code}. Restarting.`)
-  //       this.#streamer = execa(ffmpegBinary, ffmpegArgs, {
-  //         stdio: 'pipe',
-  //         reject: false,
-  //         shell: true,
-  //         signal: this.#abortController.signal,
-  //       })
-  //       return
-  //     }
-  //     process.exit(code ? code : 0)
-  //   })
-  // }
+      '-f',
+      'mpegts',
+      '-listen',
+      '0',
+      `unix:${this.#cameraPassthroughSock}`, // Send output to Unix socket
 
-  // async #webrtcStart(service: smartdevicemanagement_v1.Smartdevicemanagement, camera: Camera) {
-  //   if (!Array.isArray(this.#iceServers)) {
-  //     throw new Error('Failed to get ICE servers')
-  //   }
-  //   const getPortOptions: PickPortOptions = {
-  //     type: 'udp',
-  //     ip: '0.0.0.0',
-  //     reserveTimeout: 15,
-  //     minPort: env.get('WEBRTC_RTP_MIN_PORT', 10000),
-  //     maxPort: env.get('WEBRTC_RTP_MAX_PORT', 20000),
-  //   }
-  //   const gstreamerBinary = env.get('GSTREAMER_BIN', 'gst-launch-1.0')
-  //   const audioPort = await pickPort(getPortOptions)
-  //   const videoPort = await pickPort(getPortOptions)
-  //   const udp: DGramSocket = createSocket('udp4')
+      // Optional: Limit the number of threads for real-time processing
+      '-threads',
+      '1',
+    ]
 
-  //   const pc = new RTCPeerConnection({
-  //     bundlePolicy: 'max-bundle',
-  //     codecs: {
-  //       audio: [
-  //         new RTCRtpCodecParameters({
-  //           mimeType: 'audio/opus',
-  //           clockRate: 48000,
-  //           channels: 2,
-  //         }),
-  //       ],
-  //       video: [
-  //         new RTCRtpCodecParameters({
-  //           mimeType: 'video/H264',
-  //           clockRate: 90000,
-  //           rtcpFeedback: [
-  //             { type: 'transport-cc' },
-  //             { type: 'ccm', parameter: 'fir' },
-  //             { type: 'nack' },
-  //             { type: 'nack', parameter: 'pli' },
-  //             { type: 'goog-remb' },
-  //           ],
-  //           parameters: 'level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f',
-  //         }),
-  //       ],
-  //     },
-  //     iceServers: this.#iceServers,
-  //     iceAdditionalHostAddresses: this.#additionalHostAddresses,
-  //     iceTransportPolicy: 'all',
-  //   })
+    this.#connectingStreamAbortController.abort()
+    this.#cameraStreamLogger.info(`Starting FFMpeg with RTSP stream`)
+    this.#cameraStreamer = execa(ffmpegBinary, ffmpegArgs, {
+      stdio: 'pipe',
+      reject: false,
+      shell: true,
+      signal: this.#abortController.signal,
+    })
+    this.#cameraStreamer.catch((err) => {
+      this.#cameraStreamLogger.error(err.message)
+    })
+    this.#cameraStreamer.stdout!.on('data', (data) => {
+      data
+        .toString()
+        .split('\n')
+        .map((line: string) => line.trim())
+        .filter((line: string) => line.length > 0)
+        .forEach((line: string) => {
+          this.#cameraStreamLogger.info(line)
+        })
+    })
+    this.#cameraStreamer.stderr!.on('data', (data) => {
+      data
+        .toString()
+        .split('\n')
+        .map((line: string) => line.trim())
+        .filter((line: string) => line.length > 0)
+        .forEach((line: string) => {
+          this.#cameraStreamLogger.warning(line)
+        })
+    })
+    this.#cameraStreamer.on('exit', async (code, es?: NodeJS.Signals) => {
+      this.#cameraStreamLogger.info(`RTSP Camera FFMpeg exited with code ${code}`)
+      if (code !== 0 && code !== 8 && es !== 'SIGABRT') {
+        const res = await this.#streamer
+        if (res) {
+          this.#cameraStreamLogger.info(res.escapedCommand)
+        }
+        this.#gracefulExit(code || 0)
+      } else {
+        this.#connectingStreamAbortController = new AbortController()
+        this.#streamJpegToOutputStream(
+          this.#connectingFilePath,
+          size,
+          this.#connectingStreamAbortController.signal
+        )
+        this.#rtspStart(service, camera, 0)
+      }
+    })
+  }
 
-  //   pc.addEventListener('connectionstatechange', () => {
-  //     switch (pc.connectionState) {
-  //       case 'new':
-  //       case 'connecting':
-  //         this.logger.info('WebRTC Peer connection state: connecting')
-  //         break
-  //       case 'connected':
-  //         this.logger.info('WebRTC Peer connection state: connected')
-  //         break
-  //       case 'disconnected':
-  //       case 'closed':
-  //       case 'failed':
-  //         this.logger.warning('WebRTC Peer connection state: disconnected')
-  //         break
-  //       default:
-  //         this.logger.warning('WebRTC Peer connection state: unknown')
-  //         break
-  //     }
-  //   })
+  async #webrtcStart(service: smartdevicemanagement_v1.Smartdevicemanagement, camera: Camera) {
+    if (!Array.isArray(this.#iceServers)) {
+      throw new Error('Failed to get ICE servers')
+    }
 
-  //   const peerConnectedAbortController = new AbortController()
+    this.#connectingStreamAbortController = new AbortController()
+    this.#streamJpegToOutputStream(
+      this.#connectingFilePath,
+      '1920x1080',
+      this.#connectingStreamAbortController.signal
+    )
 
-  //   const peerConnected = new Promise<void>((resolve, reject) => {
-  //     const onConnectionStateChange = () => {
-  //       switch (pc.connectionState) {
-  //         case 'connected':
-  //           pc.removeEventListener('connectionstatechange', onConnectionStateChange)
-  //           return resolve(void 0)
-  //         case 'disconnected':
-  //         case 'closed':
-  //         case 'failed':
-  //           pc.removeEventListener('connectionstatechange', onConnectionStateChange)
-  //           return reject(new Error('WebRTC Peer connection failed'))
-  //         default:
-  //           break
-  //       }
-  //     }
-  //     pc.addEventListener('connectionstatechange', onConnectionStateChange)
-  //     peerConnectedAbortController.signal.addEventListener('abort', () =>
-  //       // reject(new Error('Aborted'))
-  //       resolve(void 0)
-  //     )
-  //   })
+    const getPortOptions: PickPortOptions = {
+      type: 'udp',
+      ip: '0.0.0.0',
+      reserveTimeout: 15,
+      minPort: env.get('WEBRTC_RTP_MIN_PORT', 10000),
+      maxPort: env.get('WEBRTC_RTP_MAX_PORT', 20000),
+    }
+    const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
+    const audioPort = await pickPort(getPortOptions)
+    const audioRTCPPort = await pickPort(getPortOptions)
+    const videoPort = await pickPort(getPortOptions)
+    const videoRTCPPort = await pickPort(getPortOptions)
+    const udp: DGramSocket = createSocket('udp4')
 
-  //   peerConnected.then(() => {
-  //     this.logger.info('WebRTC Peer connection established')
-  //   })
+    const pc = new RTCPeerConnection({
+      bundlePolicy: 'max-bundle',
+      codecs: {
+        audio: [
+          new RTCRtpCodecParameters({
+            mimeType: 'audio/opus',
+            clockRate: 48000,
+            channels: 2,
+          }),
+        ],
+        video: [
+          new RTCRtpCodecParameters({
+            mimeType: 'video/H264',
+            clockRate: 90000,
+            rtcpFeedback: [
+              { type: 'transport-cc' },
+              { type: 'ccm', parameter: 'fir' },
+              { type: 'nack' },
+              { type: 'nack', parameter: 'pli' },
+              { type: 'goog-remb' },
+            ],
+            parameters: 'level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f',
+          }),
+        ],
+      },
+      iceServers: this.#iceServers,
+      iceAdditionalHostAddresses: this.#additionalHostAddresses,
+      iceTransportPolicy: 'all',
+    })
 
-  //   pc.addEventListener('icecandidateerror', (event) => {
-  //     const e = new IceCandidateError(
-  //       event.address,
-  //       event.errorCode,
-  //       event.errorText,
-  //       event.port,
-  //       event.url
-  //     )
-  //     this.logger.error(e)
-  //   })
+    pc.addEventListener('connectionstatechange', () => {
+      switch (pc.connectionState) {
+        case 'new':
+        case 'connecting':
+          this.#cameraStreamLogger.info('WebRTC Peer connection state: connecting')
+          break
+        case 'connected':
+          this.#cameraStreamLogger.info('WebRTC Peer connection state: connected')
+          break
+        case 'disconnected':
+        case 'closed':
+        case 'failed':
+          this.#cameraStreamLogger.warning('WebRTC Peer connection state: disconnected')
+          break
+        default:
+          this.#cameraStreamLogger.warning('WebRTC Peer connection state: unknown')
+          break
+      }
+    })
 
-  //   const videoRtpBus = new EventEmitter({
-  //     captureRejections: true,
-  //   })
+    const peerConnectedAbortController = new AbortController()
 
-  //   const audioRtpBus = new EventEmitter({
-  //     captureRejections: true,
-  //   })
+    const peerConnected = new Promise<void>((resolve, reject) => {
+      const onConnectionStateChange = () => {
+        switch (pc.connectionState) {
+          case 'connected':
+            pc.removeEventListener('connectionstatechange', onConnectionStateChange)
+            return resolve(void 0)
+          case 'disconnected':
+          case 'closed':
+          case 'failed':
+            pc.removeEventListener('connectionstatechange', onConnectionStateChange)
+            return reject(new Error('WebRTC Peer connection failed'))
+          default:
+            break
+        }
+      }
+      pc.addEventListener('connectionstatechange', onConnectionStateChange)
+      peerConnectedAbortController.signal.addEventListener('abort', () =>
+        // reject(new Error('Aborted'))
+        resolve(void 0)
+      )
+    })
 
-  //   const rtpPromiseAbortController = new AbortController()
+    peerConnected.then(() => {
+      this.#cameraStreamLogger.info('WebRTC Peer connection established')
+    })
 
-  //   const videoRtpSending = new Promise<void>((resolve, reject) => {
-  //     videoRtpBus.once('sent', () => {
-  //       this.logger.info('Video Stream Started')
-  //       return resolve(void 0)
-  //     })
-  //     videoRtpBus.once('error', (error: Error) => reject(error))
-  //     rtpPromiseAbortController.signal.addEventListener('abort', () => resolve(void 0))
-  //   })
+    pc.addEventListener('icecandidateerror', (event) => {
+      const e = new IceCandidateError(
+        event.address,
+        event.errorCode,
+        event.errorText,
+        event.port,
+        event.url
+      )
+      this.#cameraStreamLogger.error(e)
+    })
 
-  //   const audioRtpSending = new Promise<void>((resolve, reject) => {
-  //     audioRtpBus.once('sent', () => {
-  //       this.logger.info('Audio Stream Started')
-  //       resolve(void 0)
-  //     })
-  //     audioRtpBus.once('error', (error: Error) => reject(error))
-  //     rtpPromiseAbortController.signal.addEventListener('abort', () => resolve(void 0))
-  //   })
+    const videoRtpBus = new EventEmitter({
+      captureRejections: true,
+    })
 
-  //   pc.addEventListener('track', (event: RTCTrackEvent) => {
-  //     const { unSubscribe } = event.track.onReceiveRtp.subscribe((rtp) => {
-  //       switch (event.track.kind) {
-  //         case 'video':
-  //           udp.send(rtp.serialize(), videoPort, '0.0.0.0', (error, _bytes) => {
-  //             if (error) {
-  //               this.logger.error(error)
-  //               return
-  //             }
-  //             // this.logger.debug(`Sent ${bytes} bytes of video data to 0.0.0.0:${videoPort}`)
-  //             videoRtpBus.emit('sent')
-  //           })
-  //           break
+    const audioRtpBus = new EventEmitter({
+      captureRejections: true,
+    })
 
-  //         case 'audio':
-  //           udp.send(rtp.serialize(), audioPort, '0.0.0.0', (error, _bytes) => {
-  //             if (error) {
-  //               this.logger.error(error)
-  //               return
-  //             }
-  //             // this.logger.debug(`Sent ${bytes} bytes of audio data to 0.0.0.0:${audioPort}`)
-  //             audioRtpBus.emit('sent')
-  //           })
-  //           break
+    const rtpPromiseAbortController = new AbortController()
 
-  //         default:
-  //           break
-  //       }
-  //     })
-  //     rtpPromiseAbortController.signal.addEventListener('abort', () => unSubscribe())
-  //   })
+    const videoRtpSending = new Promise<void>((resolve, reject) => {
+      videoRtpBus.once('sent', () => {
+        this.#cameraStreamLogger.info('Video Stream Started')
+        return resolve(void 0)
+      })
+      videoRtpBus.once('error', (error: Error) => reject(error))
+      rtpPromiseAbortController.signal.addEventListener('abort', () => resolve(void 0))
+    })
 
-  //   try {
-  //     pc.addTransceiver('audio', { direction: 'recvonly' })
-  //   } catch (error) {
-  //     throw new Error(`Failed to add audio transceiver: ${error.message}`)
-  //   }
+    const audioRtpSending = new Promise<void>((resolve, reject) => {
+      audioRtpBus.once('sent', () => {
+        this.#cameraStreamLogger.info('Audio Stream Started')
+        resolve(void 0)
+      })
+      audioRtpBus.once('error', (error: Error) => reject(error))
+      rtpPromiseAbortController.signal.addEventListener('abort', () => resolve(void 0))
+    })
 
-  //   try {
-  //     pc.addTransceiver('video', { direction: 'recvonly' })
-  //   } catch (error) {
-  //     throw new Error(`Failed to add video transceiver: ${error.message}`)
-  //   }
+    pc.addEventListener('track', (event: RTCTrackEvent) => {
+      const { unSubscribe } = event.track.onReceiveRtp.subscribe((rtp) => {
+        switch (event.track.kind) {
+          case 'video':
+            udp.send(rtp.serialize(), videoPort, '0.0.0.0', (error, _bytes) => {
+              if (error) {
+                this.#cameraStreamLogger.error(error)
+                return
+              }
+              // logger.debug(`Sent ${bytes} bytes of video data to 0.0.0.0:${videoPort}`)
+              videoRtpBus.emit('sent')
+            })
+            break
 
-  //   // Add a data channel to include the application m line in SDP
-  //   pc.createDataChannel('dataSendChannel', { id: 1 })
+          case 'audio':
+            udp.send(rtp.serialize(), audioPort, '0.0.0.0', (error, _bytes) => {
+              if (error) {
+                this.#cameraStreamLogger.error(error)
+                return
+              }
+              // logger.debug(`Sent ${bytes} bytes of audio data to 0.0.0.0:${audioPort}`)
+              audioRtpBus.emit('sent')
+            })
+            break
 
-  //   const offer = await pc.createOffer()
-  //   await pc.setLocalDescription(offer)
+          default:
+            break
+        }
+      })
+      rtpPromiseAbortController.signal.addEventListener('abort', () => unSubscribe())
+    })
 
-  //   const {
-  //     data: { results },
-  //   } = await service.enterprises.devices.executeCommand({
-  //     name: camera.uid,
-  //     requestBody: {
-  //       command: 'sdm.devices.commands.CameraLiveStream.GenerateWebRtcStream',
-  //       params: {
-  //         offerSdp: offer.sdp,
-  //       },
-  //     },
-  //   })
+    try {
+      pc.addTransceiver('audio', { direction: 'recvonly' })
+    } catch (error) {
+      throw new Error(`Failed to add audio transceiver: ${error.message}`)
+    }
 
-  //   if (!results!.answerSdp) {
-  //     throw new Error('WebRTC Answer SDP not found')
-  //   }
-  //   if (!results!.mediaSessionId) {
-  //     throw new Error('Media Session ID not found')
-  //   }
+    try {
+      pc.addTransceiver('video', { direction: 'recvonly' })
+    } catch (error) {
+      throw new Error(`Failed to add video transceiver: ${error.message}`)
+    }
 
-  //   camera.streamExtensionToken = results!.mediaSessionId
-  //   camera.expiresAt = DateTime.utc().plus({ minutes: 5 })
-  //   if (results!.expiresAt) {
-  //     const expiresAt = DateTime.fromISO(results!.expiresAt)
-  //     if (expiresAt.isValid) {
-  //       camera.expiresAt = expiresAt
-  //     }
-  //   }
-  //   await camera.save()
+    // Add a data channel to include the application m line in SDP
+    pc.createDataChannel('dataSendChannel', { id: 1 })
 
-  //   await pc.setRemoteDescription({
-  //     type: 'answer',
-  //     sdp: results!.answerSdp,
-  //   })
+    const offer = await pc.createOffer()
+    await pc.setLocalDescription(offer)
 
-  //   await Promise.all([videoRtpSending, audioRtpSending])
+    const {
+      data: { results },
+    } = await service.enterprises.devices.executeCommand({
+      name: camera.uid,
+      requestBody: {
+        command: 'sdm.devices.commands.CameraLiveStream.GenerateWebRtcStream',
+        params: {
+          offerSdp: offer.sdp,
+        },
+      },
+    })
 
-  //   this.logger.info('Starting GStreamer process for WebRTC stream')
+    if (!results!.answerSdp) {
+      throw new Error('WebRTC Answer SDP not found')
+    }
+    if (!results!.mediaSessionId) {
+      throw new Error('Media Session ID not found')
+    }
 
-  //   const gstreamerArgs: string[] = [
-  //     '-q', // Quiet mode
-  //     `--gst-debug-level=${env.get('GSTREAMER_DEBUG_LEVEL', '2')}`, // Log level set to WARNING
-  //     // Audio pipeline
-  //     'udpsrc',
-  //     `port=${audioPort}`,
-  //     'caps="application/x-rtp,media=(string)audio,clock-rate=(int)48000,encoding-name=(string)OPUS,payload=(int)96"',
-  //     '!',
-  //     'rtpjitterbuffer',
-  //     'latency=200', // Increased jitter buffer latency
-  //     '!',
-  //     'rtpopusdepay',
-  //     '!',
-  //     'opusdec', // Decode Opus to raw audio
-  //     '!',
-  //     'audioconvert', // Convert raw audio format if needed
-  //     '!',
-  //     'avenc_aac', // Encode to AAC (or 'faac' if available)
-  //     '!',
-  //     'queue',
-  //     'max-size-buffers=0',
-  //     'max-size-time=0',
-  //     'max-size-bytes=0',
-  //     'leaky=downstream',
-  //     '!',
-  //     'rtspclientsink',
-  //     'name=s',
-  //     `location="${this.#location}"`,
-  //     'async-handling=true',
-  //     'protocols=udp', // Use UDP for the RTSP feed
+    camera.streamExtensionToken = results!.mediaSessionId
+    camera.expiresAt = DateTime.utc().plus({ minutes: 5 })
+    if (results!.expiresAt) {
+      const expiresAt = DateTime.fromISO(results!.expiresAt)
+      if (expiresAt.isValid) {
+        camera.expiresAt = expiresAt
+      }
+    }
+    await camera.save()
 
-  //     // Video pipeline
-  //     'udpsrc',
-  //     `port=${videoPort}`,
-  //     'caps="application/x-rtp,media=(string)video,clock-rate=(int)90000,encoding-name=(string)H264,payload=(int)97"',
-  //     '!',
-  //     'rtpjitterbuffer',
-  //     'latency=200', // Increased jitter buffer latency
-  //     '!',
-  //     'rtph264depay',
-  //     '!',
-  //     'h264parse',
-  //     'config-interval=-1', // Preserve the SPS/PPS information
-  //     '!',
-  //     'queue',
-  //     'max-size-buffers=0',
-  //     'max-size-time=0',
-  //     'max-size-bytes=0',
-  //     'leaky=downstream',
-  //     '!',
-  //     's.sink_1',
-  //   ]
+    await pc.setRemoteDescription({
+      type: 'answer',
+      sdp: results!.answerSdp,
+    })
 
-  //   this.#streamer = execa(gstreamerBinary, gstreamerArgs, {
-  //     stdio: 'pipe',
-  //     reject: false,
-  //     shell: true,
-  //     signal: this.#abortController.signal,
-  //   })
+    await Promise.all([videoRtpSending, audioRtpSending])
 
-  //   this.#streamer.stdout!.on('data', (data) => {
-  //     this.logger.info(data.toString())
-  //   })
+    const sdp = `v=0
+o=- 0 0 IN IP4 127.0.0.1
+s=FFmpeg RTP Stream
+c=IN IP4 127.0.0.1
+t=0 0
 
-  //   this.#streamer.stderr!.on('data', (data) => {
-  //     this.logger.warning(data.toString())
-  //   })
+m=video ${videoPort} RTP/AVP 97
+a=rtpmap:97 H264/90000
+a=recvonly
+a=rtcp:${videoRTCPPort}
 
-  //   this.#streamer.on('exit', async (code) => {
-  //     if (code === 1) {
-  //       const result = await this.#streamer
-  //       this.logger.error(`${result!.escapedCommand} failed with code ${result!.exitCode}`)
-  //     } else {
-  //       this.logger.info(`GStreamer exited with code ${code}`)
-  //     }
-  //     process.exit(code ? code : 0)
-  //   })
-  // }
+m=audio ${audioPort} RTP/AVP 96
+a=rtpmap:96 OPUS/48000/2
+a=recvonly
+a=rtcp:${audioRTCPPort}
+`
+
+    await writeFile(this.#streamerFFMpegInputSdp, sdp)
+    this.#connectingStreamAbortController.abort()
+    this.#cameraStreamLogger.info(`Starting FFMpeg with WebRTC stream`)
+    const ffmpegArgs: string[] = [
+      '-y', // Overwrite output files
+      '-hide_banner', // Hide FFmpeg banner
+      '-loglevel',
+      env.get('FFMPEG_LOG_LEVEL', 'warning'), // Log level set to warning
+      '-protocol_whitelist',
+      'file,crypto,data,udp,rtp',
+      '-fflags',
+      '+discardcorrupt+nobuffer', // Ignore corrupted frames and minimize buffering
+
+      // Hardware-accelerated decoding arguments
+      ...this.#hardwareAcceleratedDecodingArguments,
+
+      // SDP input
+      '-i',
+      `"${this.#streamerFFMpegInputSdp}"`, // SDP File input with quotes
+
+      // Hardware-accelerated encoding arguments (no conflict now)
+      ...this.#hardwareAcceleratedEncodingArguments,
+
+      '-tune',
+      'zerolatency', // Tune for low latency
+      '-x264opts',
+      'bframes=0', // No B-frames
+      '-preset',
+      'ultrafast', // Ultrafast preset
+      '-b:v',
+      '100k',
+      '-r',
+      '10', // Set frame rate dynamically
+
+      // Set the size and pixel format
+      '-s',
+      '1920x1080', // Set video size
+      '-pix_fmt',
+      'yuv420p',
+
+      // Set buffer size and limit delay
+      '-bufsize',
+      `100k`, // Set buffer size equal to the bitrate for low latency
+      '-max_delay',
+      '1000000', // Max delay of 1000ms
+
+      // AAC Audio Stream (track 1)
+      '-c:a:0',
+      'aac',
+      '-b:a:0',
+      '128k', // Audio bitrate for AAC
+
+      // Opus Audio Stream (track 2)
+      '-c:a:1',
+      'libopus',
+      '-b:a:1',
+      '128k', // Audio bitrate for Opus
+
+      // Mapping inputs and outputs
+      '-map',
+      '0:v', // Map the video input to the H.264 video stream
+      '-map',
+      '0:a', // Map the original AAC audio to the first audio track
+      '-map',
+      '0:a', // Map the original audio again for Opus encoding
+
+      // Muxing into MPEG-TS
+      '-f',
+      'mpegts',
+      '-muxdelay',
+      '0.2', // Set muxing delay
+      '-muxpreload',
+      '0.1', // Set mux preload
+
+      // Output to Unix socket
+      `unix:${this.#cameraPassthroughSock}`, // Unix socket output for the MPEG-TS stream
+
+      // Optional: Limit the number of threads for real-time processing
+      '-threads',
+      '1',
+    ]
+
+    this.#cameraStreamer = execa(ffmpegBinary, ffmpegArgs, {
+      stdio: 'pipe',
+      reject: false,
+      shell: true,
+      signal: this.#abortController.signal,
+    })
+
+    this.#cameraStreamer.catch((err) => {
+      logger.error(err.message)
+    })
+    this.#cameraStreamer.stdout!.on('data', (data) => {
+      data
+        .toString()
+        .split('\n')
+        .map((line: string) => line.trim())
+        .filter((line: string) => line.length > 0)
+        .forEach((line: string) => {
+          this.#cameraStreamLogger.info(line)
+        })
+    })
+    this.#cameraStreamer.stderr!.on('data', (data) => {
+      data
+        .toString()
+        .split('\n')
+        .map((line: string) => line.trim())
+        .filter((line: string) => line.length > 0)
+        .forEach((line: string) => {
+          this.#cameraStreamLogger.warning(line)
+        })
+    })
+    this.#cameraStreamer.on('exit', async (code, es?: NodeJS.Signals) => {
+      this.#cameraStreamLogger.info(`WebRTC Camera FFMpeg exited with code ${code}`)
+      if (code !== 0 && code !== 8 && es !== 'SIGABRT') {
+        const res = await this.#streamer
+        if (res) {
+          this.#cameraStreamLogger.info(res.escapedCommand)
+        }
+        this.#gracefulExit(code || 0)
+      } else {
+        this.#webrtcStart(service, camera)
+      }
+    })
+  }
 
   #gracefulExit(code: number = 0) {
     if (this.#streamer) {
       this.#streamer.kill('SIGKILL')
     }
-    process.exit(0)
+    if (this.#staticStreamer) {
+      this.#staticStreamer.kill('SIGKILL')
+    }
+    if (this.#cameraStreamer) {
+      this.#cameraStreamer.kill('SIGKILL')
+    }
+    if (this.#streamerSocket) {
+      this.#streamerSocket.close()
+    }
+    execa('rm', [this.#streamerPassthroughSock, this.#streamerFFMpegInputSdp])
+      .catch(() => {})
+      .finally(() => {
+        process.exit(code)
+      })
   }
 }

@@ -6,18 +6,19 @@ import { readFile } from 'node:fs/promises'
 import { execa } from 'execa'
 import { resolve } from 'node:path'
 import { DateTime } from 'luxon'
+import { logger as main } from '#services/logger'
 
 import type { ApplicationService } from '@adonisjs/core/types'
 import type { LoggerService } from '@adonisjs/core/types'
-import type { Logger } from '@adonisjs/logger'
 import type { Server } from 'node:https'
+import type winston from 'winston'
 
 export class HttpsService {
   readonly #app: ApplicationService
   readonly #httpsPort: number
   readonly #httpsCertPath: string
   readonly #httpsKeyPath: string
-  #logger?: Logger
+  readonly #logger: winston.Logger
   #proxy?: HttpProxy
   #server?: Server
 
@@ -26,6 +27,7 @@ export class HttpsService {
     this.#httpsPort = env.get('HTTPS_PORT', 2001)
     this.#httpsCertPath = this.#getCertPath(env.get('HTTPS_CERT_PATH', 'nestmtx.crt'))
     this.#httpsKeyPath = this.#getCertPath(env.get('HTTPS_KEY_PATH', 'nestmtx.pem'))
+    this.#logger = main.child({ service: 'https' })
   }
 
   #getCertPath(raw: string) {
@@ -37,22 +39,10 @@ export class HttpsService {
   }
 
   get #log() {
-    if (!this.#logger) {
-      return {
-        debug: () => {},
-        info: () => {},
-        warn: () => {},
-        error: () => {},
-        fatal: () => {},
-        silent: () => {},
-      }
-    } else {
-      return this.#logger
-    }
+    return this.#logger
   }
 
-  async boot(logger: LoggerService) {
-    this.#logger = logger.child({ service: 'https' })
+  async boot(_logger: LoggerService) {
     this.#log.info(`Checking for SSL Certificates...`)
     const certExists = existsSync(this.#httpsCertPath)
     const keyExists = existsSync(this.#httpsKeyPath)
@@ -60,10 +50,10 @@ export class HttpsService {
     let generate = false
     if (missing) {
       if (!certExists) {
-        this.#log.warn(`Certificate file not found: ${this.#httpsCertPath}`)
+        this.#log.warning(`Certificate file not found: ${this.#httpsCertPath}`)
       }
       if (!keyExists) {
-        this.#log.warn(`Key file not found: ${this.#httpsKeyPath}`)
+        this.#log.warning(`Key file not found: ${this.#httpsKeyPath}`)
       }
       generate = true
     } else {
@@ -79,7 +69,7 @@ export class HttpsService {
       const notAfterDateTime = DateTime.fromFormat(notAfter, 'MMM d HH:mm:ss yyyy ZZZZ')
       const now = DateTime.utc()
       if (now > notAfterDateTime) {
-        this.#log.warn(`Certificate expired on ${notAfter}. SSL Cerficates will be regenerated.`)
+        this.#log.warning(`Certificate expired on ${notAfter}. SSL Cerficates will be regenerated.`)
         generate = true
       } else {
         this.#log.info(`Certificate expires on ${notAfter}. SSL Certificates are valid.`)

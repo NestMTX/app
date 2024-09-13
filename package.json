@@ -53,6 +53,7 @@
     "@types/luxon": "^3.4.2",
     "@types/node": "^20.11.10",
     "@types/pidusage": "^2.0.5",
+    "@types/socket.io-client": "^3.0.0",
     "jiti": "^1.21.6",
     "pino-pretty": "^10.3.1",
     "prettier": "^3.2.4",
@@ -95,10 +96,12 @@
     "pidusage": "^3.0.2",
     "pino-abstract-transport": "^1.2.0",
     "reflect-metadata": "^0.2.1",
+    "rtp": "^0.1.0",
     "socket.io": "^4.7.5",
     "socket.io-client": "^4.7.5",
     "twilio": "^5.0.4",
     "werift": "^0.19.8",
+    "winston": "^3.14.2",
     "yaml": "^2.4.1"
   },
   "eslintConfig": {

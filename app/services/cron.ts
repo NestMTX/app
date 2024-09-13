@@ -2,6 +2,7 @@ import { readdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import Cronjob from '#models/cronjob'
 import { DateTime } from 'luxon'
+import { logger as main } from '#services/logger'
 
 import type { MiliCron } from '@jakguru/milicron'
 import type { LoggerService } from '@adonisjs/core/types'
@@ -39,8 +40,9 @@ export const loadJobs = async (app: ApplicationService): Promise<Array<CronJob>>
 export const init = async (
   app: ApplicationService,
   cron: MiliCron,
-  logger: LoggerServiceWithConfig
+  _logger: LoggerServiceWithConfig
 ): Promise<void> => {
+  const logger = main.child({ service: 'cron' })
   const jobs = await loadJobs(app)
   logger.info(`Loaded ${jobs.length} jobs`)
   const doJob = async (job: CronJob) => {

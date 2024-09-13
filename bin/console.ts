@@ -11,9 +11,6 @@
 |
 */
 
-import 'reflect-metadata'
-import { Ignitor, prettyPrintError } from '@adonisjs/core'
-
 process.env.TZ = 'UTC'
 process.env.PORT = '2000'
 process.env.HTTPS_PORT = '2001'
@@ -24,6 +21,9 @@ process.env.NODE_ENV = process.env.NODE_ENV || 'development'
 process.env.VERSION = process.env.VERSION || 'source'
 process.env.BUILDPLATFORM = process.env.BUILDPLATFORM || 'local'
 process.env.SHA = process.env.SHA || 'unknown'
+
+import 'reflect-metadata'
+import { Ignitor, prettyPrintError } from '@adonisjs/core'
 
 /**
  * URL to the application root. AdonisJS need it to resolve

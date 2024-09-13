@@ -1,10 +1,3 @@
-import type { ApplicationService } from '@adonisjs/core/types'
-import type server from '@adonisjs/core/services/server'
-import type { Socket } from 'socket.io'
-import type User from '#models/user'
-import type { ApiService, CommandContext } from '#services/api'
-import type { LoggerService } from '@adonisjs/core/types'
-import type { Logger } from '@adonisjs/logger'
 import { Server as SocketIoServer } from 'socket.io'
 import { Secret } from '@adonisjs/core/helpers'
 import Joi from 'joi'
@@ -13,6 +6,15 @@ import { inspect } from 'node:util'
 import logEmitter from '#services/emitter.log'
 import { tokensUserProvider } from '@adonisjs/auth/access_tokens'
 import { DateTime } from 'luxon'
+import { logger as main, loggerBus } from '#services/logger'
+
+import type { ApplicationService } from '@adonisjs/core/types'
+import type server from '@adonisjs/core/services/server'
+import type { Socket } from 'socket.io'
+import type User from '#models/user'
+import type { ApiService, CommandContext } from '#services/api'
+import type { LoggerService } from '@adonisjs/core/types'
+import type winston from 'winston'
 
 type HttpServerService = typeof server
 
@@ -71,13 +73,14 @@ export interface PinoLog {
 
 export class SocketIoService {
   #io: SocketIoServer
-  #logger?: Logger
+  readonly #logger: winston.Logger
   readonly #api: ApiService
   readonly #sockets: Map<string, AppSocket>
   readonly #logs: PinoLog[] = []
   readonly #userProvider: UserProvider
 
   constructor(_app: ApplicationService, api: ApiService) {
+    this.#logger = main.child({ service: 'socket.io' })
     this.#sockets = new Map()
     this.#api = api
     this.#userProvider = tokensUserProvider({
@@ -95,6 +98,8 @@ export class SocketIoService {
     this.#io.on('connection', this.#onIncomingConnection.bind(this))
     logEmitter.on('log', this.broadcast.bind(this, 'log'))
     logEmitter.on('log', (log) => this.#pushLog(log))
+    loggerBus.on('log', this.broadcast.bind(this, 'log'))
+    loggerBus.on('log', (log) => this.#pushLog(log))
   }
 
   get #log() {
@@ -115,9 +120,7 @@ export class SocketIoService {
   /**
    * @private
    */
-  boot(logger: LoggerServiceWithConfig) {
-    this.#logger = logger.child({ service: 'socket.io' })
-  }
+  boot(_logger: LoggerServiceWithConfig) {}
 
   /**
    * @private

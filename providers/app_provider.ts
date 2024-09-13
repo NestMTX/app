@@ -2,6 +2,7 @@ import type { ApplicationService } from '@adonisjs/core/types'
 import type { LoggerServiceWithConfig } from '#services/socket.io'
 import type { IClientOptions, MqttClient } from 'mqtt'
 import type { Server } from 'node:net'
+import type winston from 'winston'
 import { Application } from '@adonisjs/core/app'
 import fs from 'node:fs/promises'
 import { join } from 'node:path'
@@ -24,6 +25,7 @@ import { PM3 } from '#services/pm3'
 import { HttpsService } from '#services/https'
 import { execa } from 'execa'
 import { BusService } from '#services/bus'
+import { logger as main } from '#services/logger'
 
 const base = new URL('../', import.meta.url).pathname
 
@@ -66,6 +68,7 @@ declare module '@adonisjs/core/app' {
 }
 
 export default class AppProvider {
+  readonly #logger: winston.Logger
   #api: ApiService
   #io: SocketIoService
   #mediamtx: MediaMTXService
@@ -81,6 +84,7 @@ export default class AppProvider {
   #https: HttpsService
   #bus: BusService
   constructor(protected app: ApplicationService) {
+    this.#logger = main.child({ service: 'core' })
     this.#api = new ApiService()
     this.#io = new SocketIoService(this.app, this.#api)
     this.#mediamtx = new MediaMTXService(this.app)
@@ -119,7 +123,7 @@ export default class AppProvider {
    */
   async boot() {
     const logger = await this.app.container.make('logger')
-    const pm3Logger = logger.child({ service: 'pm3' })
+    const pm3Logger = main.child({ service: 'pm3' })
     this.#pm3.on('debug', (message) => {
       pm3Logger.info(message)
     })
@@ -131,9 +135,9 @@ export default class AppProvider {
       await this.#ipc.boot(logger as LoggerServiceWithConfig)
       const db = await this.app.container.make('lucid.db')
       const hash = await this.app.container.make('hash')
-      logger.info('Updating Database...')
+      this.#logger.info('Updating Database...')
       const { stdout } = await execa('node', ['ace', 'migration:run', '--force'], { cwd: base })
-      logger.info(stdout)
+      this.#logger.info(stdout)
       const systemUserExists = await db.from('users').where('username', 'system').first()
       if (!systemUserExists) {
         await db.table('users').insert({
@@ -153,10 +157,10 @@ export default class AppProvider {
           created_at: DateTime.utc().toSQL(),
         })
       }
-      logger.info('Database Updated')
+      this.#logger.info('Database Updated')
     }
     if ('web' === env) {
-      logger.info('Loading API Modules...')
+      this.#logger.info('Loading API Modules...')
     }
     const apiModuleDir = join(base, 'app', 'modules')
     const files = await fs.readdir(apiModuleDir)
@@ -164,14 +168,14 @@ export default class AppProvider {
       if (file.endsWith('.md')) continue
       if (file.endsWith('.map')) continue
       if ('web' === env) {
-        logger.info(`Loading API Module from ${file}...`)
+        this.#logger.info(`Loading API Module from ${file}...`)
       }
       const { default: mod } = await import(join(apiModuleDir, file))
       const name = string.dashCase(mod.name.replace(/Module$/, ''))
       const instance = new mod(this.app)
       this.#api.modules.add(name, instance)
       if ('web' === env) {
-        logger.info(`Added API Module "${name}"`)
+        this.#logger.info(`Added API Module "${name}"`)
       }
     }
     if ('web' === env) {
@@ -192,13 +196,13 @@ export default class AppProvider {
       const { value, error } = mqttConfigSchema.validate(mqttConfig)
       if (!error) {
         if (value.host === ':instance:') {
-          logger.info('Starting local MQTT Broker...')
+          this.#logger.info('Starting local MQTT Broker...')
           this.#mqttBroker = MqttService.serve(value.port!, logger)
           value.host = '127.0.0.1'
         }
         this.#mqtt = MqttConnect(value)
       } else {
-        logger.error('Invalid MQTT Configuration. Not connecting to MQTT Server.')
+        this.#logger.error('Invalid MQTT Configuration. Not connecting to MQTT Server.')
       }
       await this.#mediamtx.boot(logger, this.#nat, this.#ice, this.#pm3)
       await this.#streamer.boot(logger, this.#nat, this.#ice, this.#pm3, this.#ipc)
@@ -228,10 +232,9 @@ export default class AppProvider {
    * The application has been booted
    */
   async start() {
-    const logger = await this.app.container.make('logger')
     const env = this.app.getEnvironment()
     if ('web' === env) {
-      logger.info('Starting Cron Service...')
+      this.#logger.info('Starting Cron Service...')
       this.#cron.start()
     }
   }
@@ -244,7 +247,7 @@ export default class AppProvider {
     const env = this.app.getEnvironment()
     if ('web' === env) {
       await this.#io.start(server)
-      logger.info('Socket.IO Server Attached')
+      this.#logger.info('Socket.IO Server Attached')
       await this.#https.boot(logger as LoggerServiceWithConfig)
       this.#bus.publish('application', 'ready', null, {
         at: DateTime.utc().toISO(),
@@ -259,7 +262,6 @@ export default class AppProvider {
    * Preparing to shutdown the app
    */
   async shutdown() {
-    const logger = await this.app.container.make('logger')
     const env = this.app.getEnvironment()
     if ('web' === env) {
       this.#bus.publish('application', 'shutdown', null, {
@@ -267,9 +269,9 @@ export default class AppProvider {
       })
       await this.#https.shutdown()
       this.#cron.$off('*/5 * * * * *', this.#mediamtx.cron.bind(this.#mediamtx))
-      logger.info('Shutting down child processes')
+      this.#logger.info('Shutting down child processes')
       await this.#pm3.kill()
-      logger.info('Shutting down Cron Service...')
+      this.#logger.info('Shutting down Cron Service...')
       this.#cron.stop()
       await this.#ipc.shutdown()
     }

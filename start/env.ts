@@ -17,7 +17,16 @@ export default await Env.create(new URL('../', import.meta.url), {
   PORT: Env.schema.number(),
   APP_KEY: Env.schema.string(),
   HOST: Env.schema.string({ format: 'host' }),
-  LOG_LEVEL: Env.schema.string(),
+  LOG_LEVEL: Env.schema.enum.optional([
+    'emerg',
+    'alert',
+    'crit',
+    'error',
+    'warning',
+    'notice',
+    'info',
+    'debug',
+  ]),
   PINO_PORT: Env.schema.number.optional(),
   NO_SUCH_CAMERA_PORT: Env.schema.number.optional(),
   CAMERA_DISABLED_PORT: Env.schema.number.optional(),
@@ -94,12 +103,34 @@ export default await Env.create(new URL('../', import.meta.url), {
    * GStreamer Configuration
    */
   GSTREAMER_BIN: Env.schema.string.optional(),
+  GSTREAMER_DEBUG_LEVEL: Env.schema.enum.optional([
+    '0',
+    '1',
+    '2',
+    '3',
+    '4',
+    '5',
+    '6',
+    '7',
+    '9',
+  ] as const),
   /**
    * FFmpeg Configuration
    */
   FFMPEG_BIN: Env.schema.string.optional(),
   FFMPEG_HW_ACCELERATOR: Env.schema.string.optional(),
   FFMPEG_HW_ACCELERATOR_DEVICE: Env.schema.string.optional(),
+  FFMPEG_DEBUG_LEVEL: Env.schema.enum.optional([
+    'quiet',
+    'panic',
+    'fatal',
+    'error',
+    'warning',
+    'info',
+    'verbose',
+    'debug',
+    'trace',
+  ] as const),
   /**
    * WebRTC Configuration
    */

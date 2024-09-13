@@ -48,3 +48,6 @@ streamer/Cargo.lock
 
 *.fifo
 *.sdp
+
+# Other
+version.txt

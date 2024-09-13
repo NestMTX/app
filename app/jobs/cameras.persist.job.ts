@@ -4,6 +4,7 @@ import { execa } from 'execa'
 import env from '#start/env'
 import { resolve } from 'node:path'
 import type { ApplicationService } from '@adonisjs/core/types'
+import { logger as main } from '#services/logger'
 
 export default class PersistCameraJob extends CronJob {
   #app: ApplicationService
@@ -19,8 +20,7 @@ export default class PersistCameraJob extends CronJob {
     if (!this.#app) {
       return
     }
-    const mainLogger = await this.#app.container.make('logger')
-    const logger = mainLogger.child({ service: `job-PersistCameraJob` })
+    const logger = main.child({ service: 'cron', job: 'cameras.persist' })
     const liveCameras = await Camera.query().where('is_enabled', true).where('is_persistent', true)
     logger.info(`Found ${liveCameras.length} cameras which should be persisted`)
     if (liveCameras.length === 0) {

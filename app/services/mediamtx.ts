@@ -2,13 +2,14 @@ import env from '#start/env'
 import fs from 'node:fs/promises'
 import yaml from 'yaml'
 import { mediamtxClientFactory } from '#clients/mediamtx'
+import { logger as main } from '#services/logger'
 import type { PM3 } from '#services/pm3'
 import type { ApplicationService } from '@adonisjs/core/types'
 import type { LoggerService } from '@adonisjs/core/types'
-import type { Logger } from '@adonisjs/logger'
 import type { NATService } from '#services/nat'
 import type { ICEService } from '#services/ice'
 import type { MediaMTXClient } from '#clients/mediamtx'
+import type winston from 'winston'
 
 interface MediaMTXApiPathSource {
   type?:
@@ -64,11 +65,12 @@ export class MediaMTXService {
   readonly #configPath: string
   readonly #app: ApplicationService
   readonly #paths: Map<string, MediaMtxPath> = new Map()
-  #logger?: Logger
+  readonly #logger: winston.Logger
   #apiClient?: MediaMTXClient
   #cronAbortController?: AbortController
 
   constructor(app: ApplicationService) {
+    this.#logger = main.child({ service: 'mediamtx' })
     this.#app = app
     this.#binaryPath = env.get('MEDIA_MTX_PATH')!
     this.#configPath = env.get('MEDIA_MTX_CONFIG_PATH')!
@@ -82,21 +84,15 @@ export class MediaMTXService {
     return [...this.#paths].map(([, path]) => path)
   }
 
-  async boot(logger: LoggerService, nat: NATService, ice: ICEService, pm3: PM3) {
-    this.#logger = logger.child({ service: 'mediamtx' })
+  async boot(_logger: LoggerService, nat: NATService, ice: ICEService, pm3: PM3) {
     pm3.on('stdout:mediamtx', (data) => {
-      if (data.includes('INF reloading configuration (file changed)')) {
-        pm3.restart('mediamtx')
-        this.#logger!.warn('Restarting MediaMTX service due to configuration change')
-      } else {
-        this.#logger!.info(data)
-      }
+      this.#logFromMediaMtx(data)
     })
     pm3.on('stderr:mediamtx', (data) => {
-      this.#logger!.error(data)
+      this.#logFromMediaMtx(data, 'error')
     })
     pm3.on('error:mediamtx', (data) => {
-      this.#logger!.error(data)
+      this.#logFromMediaMtx(data, 'error')
     })
     const mediaMtxConfigRaw = await fs.readFile(this.#configPath, 'utf-8')
     const mediaMtxConfig = yaml.parse(mediaMtxConfigRaw)
@@ -336,5 +332,38 @@ export class MediaMTXService {
       }
     }
     return ret
+  }
+
+  #logFromMediaMtx(line: string, fallback: string = 'info') {
+    const pattern =
+      /^\d+\/\d+\/\d+\s+\d+:\d+:\d+\s+((DEB|INF|WAR|ERR))\s+(\[[a-zA-Z0-9]+\]\s*)?(.*)$/gm
+    const matches = [...line.matchAll(pattern)]
+    matches.forEach((match) => {
+      const mediaMtxLevel = match[1] ? match[1].trim() : undefined
+      const mediaMtxService = match[3]
+        ? match[3].trim().replace('[', '').replace(']', '').trim()
+        : undefined
+      const mediaMtxMessage = match[4] ? match[4].trim() : undefined
+      let level: string = fallback
+      switch (mediaMtxLevel) {
+        case 'DEB':
+          level = 'debug'
+          break
+
+        case 'INF':
+          level = 'info'
+          break
+
+        case 'WAR':
+          level = 'warning'
+          break
+
+        case 'ERR':
+          level = 'error'
+          break
+      }
+      const logger = this.#logger.child({ subservice: mediaMtxService })
+      logger.log(level, mediaMtxMessage)
+    })
   }
 }

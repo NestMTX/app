@@ -2,9 +2,11 @@ import env from '#start/env'
 import preconfigured from '#config/ice'
 import joi from 'joi'
 import Twilio from 'twilio'
+import { logger as main } from '#services/logger'
+
 import type { LoggerService } from '@adonisjs/core/types'
-import type { Logger } from '@adonisjs/logger'
 import type { RTCIceServer } from 'werift'
+import type winston from 'winston'
 
 interface IceServer {
   url?: string
@@ -34,16 +36,16 @@ export class IceCandidateError extends Error {
 
 export class ICEService {
   readonly #known: Set<IceServer> = new Set<any>()
-  #logger?: Logger
+  readonly #logger: winston.Logger
 
   constructor() {
+    this.#logger = main.child({ service: 'ice' })
     preconfigured.forEach((server) => {
       this.#known.add(server)
     })
   }
 
-  async boot(logger: LoggerService) {
-    this.#logger = logger.child({ service: 'ice' })
+  async boot(_logger: LoggerService) {
     const loadIceServersFromTwilio = env.get('ICE_USE_TWILIO', false)
     if (loadIceServersFromTwilio) {
       this.#logger.info('Loading ICE servers from Twilio')

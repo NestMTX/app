@@ -3,6 +3,7 @@ import http from 'node:http'
 import { createReqHandler } from '../lib/mjpeg-server/index.js'
 import { readFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
+import { subProcessLogger as logger } from '#services/logger'
 import type { CommandOptions } from '@adonisjs/core/types/ace'
 
 export default class MjpegStream extends BaseCommand {
@@ -53,7 +54,7 @@ export default class MjpegStream extends BaseCommand {
         }
       })
       .listen(port, () => {
-        this.logger.info(`Streaming "${this.path}" on port ${port}`)
+        logger.info(`Streaming "${this.path}" on port ${port}`)
       })
   }
 }

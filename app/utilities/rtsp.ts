@@ -1,9 +1,6 @@
 import { execa } from 'execa'
-import app from '@adonisjs/core/services/app'
-import {
-  // getUrlObjectForRtspUrl,
-  getHostnameFromRtspUrl,
-} from '#utilities/url'
+import { getHostnameFromRtspUrl } from '#utilities/url'
+import { subProcessLogger as main } from '#services/logger'
 
 import {
   MissingStreamCharacteristicsException,
@@ -121,8 +118,7 @@ const getRtspStreamCharacteristicsFromGstDiscoverer = async (
   url: string,
   signal: AbortSignal
 ): Promise<RtspStreamCharacteristics | undefined> => {
-  // const mainLogger = await app.container.make('logger')
-  // const logger = mainLogger.child({ service: `rtsp-utils` })
+  const logger = main.child({ service: `utilities`, utility: `rtsp` })
   const characteristics: RtspStreamCharacteristics = {
     url,
     audio: {},
@@ -234,8 +230,7 @@ const getRtspStreamCharacteristicsFromFfprobe = async (
   url: string,
   signal: AbortSignal
 ): Promise<RtspStreamCharacteristics | undefined> => {
-  // const mainLogger = await app.container.make('logger')
-  // const logger = mainLogger.child({ service: `rtsp-utils` })
+  const logger = main.child({ service: `utilities`, utility: `rtsp` })
   const characteristics: RtspStreamCharacteristics = {
     url,
     audio: {},
@@ -254,11 +249,14 @@ const getRtspStreamCharacteristicsFromFfprobe = async (
         '-show_streams',
         '-i',
         url,
+        '-rtsp_transport',
+        'udp', // Use TCP for RTSP transport
         '-rw_timeout',
         '6000000',
       ],
       {
         reject: true,
+        signal,
       }
     )
     characteristics.raw = stdout
@@ -343,8 +341,7 @@ export const getRtspStreamCharacteristics = async (
   url: string,
   signal?: AbortSignal
 ): Promise<RtspStreamCharacteristics> => {
-  const mainLogger = await app.container.make('logger')
-  const logger = mainLogger.child({ service: `rtsp-utils` })
+  const logger = main.child({ service: `utilities`, utility: `rtsp` })
   const abortController = new AbortController()
   if (signal) {
     signal.addEventListener('abort', () => {

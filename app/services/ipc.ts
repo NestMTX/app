@@ -1,21 +1,24 @@
 import { createServer, Socket } from 'node:net'
 import { EventEmitter } from 'node:events'
 import { rm } from 'node:fs/promises'
+import { logger as main } from '#services/logger'
+
 import type { Server } from 'node:net'
 import type { ApplicationService } from '@adonisjs/core/types'
 import type { LoggerService } from '@adonisjs/core/types'
-import type { Logger } from '@adonisjs/logger'
+import type winston from 'winston'
 
 export class IPCService extends EventEmitter {
   readonly #app: ApplicationService
   readonly #server: Server
-  #logger?: Logger
+  readonly #logger: winston.Logger
 
   constructor(app: ApplicationService) {
     super()
+    this.#logger = main.child({ service: 'ipc' })
     this.#app = app
     this.#server = createServer((socket: Socket) => {
-      this.#log.info(`IPC Client Connected`)
+      this.#log.debug(`IPC Client Connected`)
       socket.on('data', (raw) => {
         const asString = raw.toString()
         try {
@@ -39,28 +42,16 @@ export class IPCService extends EventEmitter {
         }
       })
       socket.on('end', () => {
-        this.#log.info(`IPC Client Disconnected`)
+        this.#log.debug(`IPC Client Disconnected`)
       })
     })
   }
 
   get #log() {
-    if (!this.#logger) {
-      return {
-        debug: () => {},
-        info: () => {},
-        warn: () => {},
-        error: () => {},
-        fatal: () => {},
-        silent: () => {},
-      }
-    } else {
-      return this.#logger
-    }
+    return this.#logger
   }
 
-  async boot(logger: LoggerService) {
-    this.#logger = logger.child({ service: 'ipc' })
+  async boot(_logger: LoggerService) {
     const ipcSocketPath = this.#app.makePath('resources/ipc.sock')
     await rm(ipcSocketPath, { force: true })
     this.#server.listen(ipcSocketPath, () => {

@@ -3,9 +3,9 @@ import Camera from '#models/camera'
 import { CronJob } from '#services/cron'
 import dot from 'dot-object'
 import crypto from 'node:crypto'
+import { logger as main } from '#services/logger'
 
 import type { smartdevicemanagement_v1 } from 'googleapis'
-import type { ApplicationService } from '@adonisjs/core/types'
 
 const makeChecksum = (data: string) => {
   const hash = crypto.createHash('sha256')
@@ -14,19 +14,12 @@ const makeChecksum = (data: string) => {
 }
 
 export default class SyncCloudCamerasJob extends CronJob {
-  #app: ApplicationService
-  constructor(protected app: ApplicationService) {
-    super(app)
-    this.#app = app
-  }
-
   get crontab() {
     return '0 * * * *'
   }
 
   async run() {
-    const mainLogger = await this.#app.container.make('logger')
-    const logger = mainLogger.child({ service: `job-SyncCloudCamerasJob` })
+    const logger = main.child({ service: 'cron', job: 'cameras.sync' })
     logger.info('Fetching all authenticated credentials')
     const authenticatedCredentials = await Credential.query().whereNotNull('tokens')
     for (const credential of authenticatedCredentials) {
@@ -41,7 +34,7 @@ export default class SyncCloudCamerasJob extends CronJob {
           parent: ['enterprises', credential.dacProjectId].join('/'),
         })
         if (!devices) {
-          logger.warn(`${credential.description} did not return a devices list`)
+          logger.warning(`${credential.description} did not return a devices list`)
           continue
         }
         logger.info(`Found ${devices.length} devices for ${credential.description}`)
