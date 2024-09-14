@@ -138,6 +138,12 @@ export default class NestmtxStream extends BaseCommand {
     this.#streamerSocket.listen(this.#streamerPassthroughSock)
     this.#cameraSocket = createServer(this.#onCameraUnixSocketConnection.bind(this))
     this.#cameraSocket.listen(this.#cameraPassthroughSock)
+    this.#streamerSocket.on('error', (error) => {
+      logger.error(`Error from Streamer Unix Socket: ${error.message}`)
+    })
+    this.#cameraSocket.on('error', (error) => {
+      logger.error(`Error from Camera Unix Socket: ${error.message}`)
+    })
     this.#startOutputStreamer()
     const privateApiServerUrl = `http://127.0.0.1:${this.port}`
     logger.info(`Searching for Private API Server`)
@@ -265,6 +271,9 @@ export default class NestmtxStream extends BaseCommand {
         this.#streamer.stdio[3].write(raw)
       }
     })
+    socket.on('error', (error) => {
+      logger.error(error)
+    })
   }
 
   #onCameraUnixSocketConnection(socket: UnixSocket) {
@@ -281,6 +290,9 @@ export default class NestmtxStream extends BaseCommand {
         // @ts-expect-error - this is correct
         this.#streamer.stdio[3].write(raw)
       }
+    })
+    socket.on('error', (error) => {
+      logger.error(error)
     })
   }
 
