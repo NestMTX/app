@@ -12,7 +12,7 @@ import { EventEmitter } from 'node:events'
 import env from '#start/env'
 import Camera from '#models/camera'
 import { createServer } from 'node:net'
-import { writeFile } from 'node:fs/promises'
+import { writeFile, unlink } from 'node:fs/promises'
 import {
   getHardwareAcceleratedDecodingArgumentsFor,
   getHardwareAcceleratedEncodingArgumentsFor,
@@ -129,11 +129,28 @@ export default class NestmtxStream extends BaseCommand {
   async run() {
     process.once('SIGINT', this.#gracefulExit.bind(this))
     logger.info(`NestMTX Streamer for "${this.path}". PID: ${process.pid}`)
+    logger.info(`Cleaning up old files`)
+
+    const filesToCleanup = [
+      this.#streamerPassthroughSock,
+      this.#cameraPassthroughSock,
+      this.#streamerFFMpegInputSdp,
+    ]
+    await Promise.all(
+      filesToCleanup.map(async (f) => {
+        try {
+          await unlink(f)
+        } catch (e) {
+          logger.error(`Failed to delete ${f}: ${e.message}`)
+        }
+      })
+    )
     this.#abortController.signal.addEventListener('abort', () => {
       if (this.#packetsToOutputInterval) {
         clearInterval(this.#packetsToOutputInterval)
       }
     })
+    logger.info(`Starting Unix Sockets`)
     this.#streamerSocket = createServer(this.#onStreamerUnixSocketConnection.bind(this))
     this.#streamerSocket.listen(this.#streamerPassthroughSock)
     this.#cameraSocket = createServer(this.#onCameraUnixSocketConnection.bind(this))
@@ -144,6 +161,7 @@ export default class NestmtxStream extends BaseCommand {
     this.#cameraSocket.on('error', (error) => {
       logger.error(`Error from Camera Unix Socket: ${error.message}`)
     })
+    logger.info(`Starting output streamer`)
     this.#startOutputStreamer()
     const privateApiServerUrl = `http://127.0.0.1:${this.port}`
     logger.info(`Searching for Private API Server`)
