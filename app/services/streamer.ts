@@ -158,7 +158,7 @@ export class StreamerService {
     livePaths.forEach((path) => {
       const last = this.#lastDataCounts.get(path.path)
       if ('number' === typeof last && last >= path.dataRx) {
-        this.#logger.warn(
+        this.#logger.warning(
           `Stream for path "${path.path}" is stalled, based on data transmission statistics`
         )
         if (this.#internalApiServer) {
