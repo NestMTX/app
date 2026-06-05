@@ -48,6 +48,16 @@ export default class ExtendCameraStreamAuthenticationJob extends CronJob {
               name: camera.name,
               error,
             })
+            try {
+              const slug = camera.mtxPath.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+              const processName = `mtx-${slug}`
+              logger.info(`Restarting stream process "${processName}" to obtain fresh SDM token`)
+              await this.#app.pm3.restart(processName)
+            } catch (restartError) {
+              logger.error(
+                `Failed to restart stream process for camera "${camera.name}": ${(restartError as Error).message}`
+              )
+            }
           }
         } else {
           logger.info(

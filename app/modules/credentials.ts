@@ -28,7 +28,7 @@ const authorizationDataSchema = Joi.object<AuthorizationData>({
   authuser: Joi.number().optional(),
   prompt: Joi.string().required().allow('consent'),
   origin: Joi.string().required().uri(),
-})
+}).unknown(true)
 
 export default class CredentialsModule implements ApiServiceModule {
   #app: ApplicationService

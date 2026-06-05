@@ -105,6 +105,7 @@ export class MediaMTXService {
     const updated: any = {
       ...mediaMtxConfig,
       readTimeout: '60s',
+      writeTimeout: '60s',
       writeQueueSize: 1024,
       metrics: false,
       metricsEncryption: false,

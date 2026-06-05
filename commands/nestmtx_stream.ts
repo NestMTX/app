@@ -22,7 +22,6 @@ import { subProcessLogger as logger } from '#services/logger'
 import type { CommandOptions } from '@adonisjs/core/types/ace'
 import type { ExecaChildProcess } from 'execa'
 import type { smartdevicemanagement_v1 } from 'googleapis'
-import type { RtspStreamCharacteristics } from '#utilities/rtsp'
 import type { Socket as StreamPrivateApiClient } from 'socket.io-client'
 import type { RTCIceServer, RTCTrackEvent } from 'werift'
 import type { PickPortOptions } from '#utilities/ports'
@@ -54,6 +53,7 @@ export default class NestmtxStream extends BaseCommand {
   #api?: StreamPrivateApiClient
   #streamerSocket?: UnixSocketServer
   #cameraSocket?: UnixSocketServer
+  #udpSocket?: DGramSocket
   #streamer?: ExecaChildProcess
   #staticStreamer?: ExecaChildProcess
   #cameraStreamer?: ExecaChildProcess
@@ -320,7 +320,9 @@ export default class NestmtxStream extends BaseCommand {
       '-loglevel',
       env.get('FFMPEG_DEBUG_LEVEL', 'warning'),
       '-fflags',
-      '+discardcorrupt', // Ignore corrupted frames
+      '+discardcorrupt+genpts', // Ignore corrupted frames, regenerate PTS on discontinuity
+      '-avoid_negative_ts',
+      'make_zero',
 
       // Hardware-accelerated decoding arguments
       ...this.#hardwareAcceleratedDecodingArguments,
@@ -329,24 +331,29 @@ export default class NestmtxStream extends BaseCommand {
       '-i',
       `pipe:3`,
 
-      // Hardware-accelerated encoding arguments (no conflict now)
-      ...this.#hardwareAcceleratedEncodingArguments,
+      // Normalize to constant 15fps, filling CDN gaps with last frame
+      '-vf',
+      'fps=15',
 
-      // Other video options such as tune, bitrate, etc.
-      '-tune',
-      'zerolatency', // Tune for low latency
-      '-x264opts',
-      'bframes=0', // No B-frames
+      // Re-encode to H.264 baseline (no B-frames) for maximum decoder compatibility
+      '-c:v',
+      'libx264',
       '-preset',
-      'ultrafast', // Ultrafast preset
+      'veryfast',
+      '-profile:v',
+      'baseline',
+      '-level:v',
+      '4.1',
+      '-tune',
+      'zerolatency',
+      '-g',
+      '15', // Keyframe every 1s at 15fps
       '-b:v',
-      '100k', // Set video bitrate dynamically
-      '-r',
-      '10', // Set frame rate dynamically
-
-      // Set pixel format to avoid deprecated warning
-      '-pix_fmt',
-      'yuv420p',
+      '2M',
+      '-maxrate',
+      '2M',
+      '-bufsize',
+      '4M',
 
       // AAC Audio Stream (track 1)
       '-c:a:0',
@@ -370,12 +377,10 @@ export default class NestmtxStream extends BaseCommand {
 
       // Output Format
       '-f',
-      'mpegts', // Set the format to MPEG-TS
-      '-use_wallclock_as_timestamps',
-      '1',
+      'mpegts',
 
       // Destination (SRT or other media server)
-      `"${this.#destination}"`, // Destination path (quoted)
+      `"${this.#destination}"`,
     ]
 
     this.#streamer = execa(ffmpegBinary, ffmpegArgs, {
@@ -476,12 +481,18 @@ export default class NestmtxStream extends BaseCommand {
       'anullsrc=r=48000:cl=stereo', // Synthetic audio source
       // Hardware-accelerated encoding arguments (no conflict now)
       ...this.#hardwareAcceleratedEncodingArguments,
+      '-c:v',
+      'libx264',
+      '-preset',
+      'ultrafast', // Ultrafast preset for low CPU on static placeholder
       '-profile:v',
-      'main',
+      'baseline', // baseline required with ultrafast preset
       '-tune',
       'zerolatency',
       '-r',
-      '25',
+      '2', // 2fps is sufficient for a static placeholder image
+      '-b:v',
+      '100k', // Cap bitrate — static frame needs very little
       '-s',
       size,
       '-pix_fmt',
@@ -543,7 +554,7 @@ export default class NestmtxStream extends BaseCommand {
         }
         this.#gracefulExit(code || 0)
       } else {
-        this.#streamJpegToOutputStream(src, size, signal)
+        void this.#streamJpegToOutputStream(src, size, signal)
       }
     })
   }
@@ -597,7 +608,7 @@ export default class NestmtxStream extends BaseCommand {
     service: smartdevicemanagement_v1.Smartdevicemanagement,
     camera: Camera,
     depth: number = 0
-  ) {
+  ): Promise<void> {
     const ffmpegBinary = env.get('FFMPEG_BIN', 'ffmpeg')
     const rtspSrc = await this.#getRtspUrl(service, camera)
     this.#cameraStreamLogger.info(
@@ -607,9 +618,8 @@ export default class NestmtxStream extends BaseCommand {
     setTimeout(() => {
       getCharacteristicsAbortController.abort()
     }, 30000)
-    let characteristics: RtspStreamCharacteristics
     try {
-      characteristics = await getRtspStreamCharacteristics(
+      await getRtspStreamCharacteristics(
         rtspSrc,
         getCharacteristicsAbortController.signal
       )
@@ -619,19 +629,9 @@ export default class NestmtxStream extends BaseCommand {
       if (depth > 5) {
         return this.#gracefulExit(1)
       } else {
-        this.#rtspStart(service, camera, depth + 1)
-        return
+        return this.#rtspStart(service, camera, depth + 1)
       }
     }
-    const videoBitrate = characteristics.video.bitrate || 1000
-    const size =
-      characteristics.video.width && characteristics.video.height
-        ? `${characteristics.video.width}x${characteristics.video.height}`
-        : camera.resolution || '640x480'
-
-    const videoSizeArguments =
-      characteristics.video.width && characteristics.video.height ? ['-s', size] : []
-
     const ffmpegArgs: string[] = [
       '-loglevel',
       env.get('FFMPEG_DEBUG_LEVEL', 'warning'), // Suppress most log messages, only show warnings
@@ -641,36 +641,19 @@ export default class NestmtxStream extends BaseCommand {
       // Hardware-accelerated decoding arguments
       ...this.#hardwareAcceleratedDecodingArguments,
 
+      // Rate-limit reading to the stream's own timestamps, absorbing CDN burst delivery
+      '-re',
+
       '-i',
-      `"${rtspSrc}"`, // Input RTSP stream with quotes
+      `"${rtspSrc}"`,
 
       // Retry options for network issues
       '-rtsp_transport',
       'udp', // Use UDP to reduce latency
 
-      // Hardware-accelerated encoding arguments
-      ...this.#hardwareAcceleratedEncodingArguments,
-
-      // Single H.264 Video Stream (without B-frames)
-      '-tune',
-      'zerolatency', // Tune for low latency
-      '-x264opts',
-      'bframes=0', // No B-frames
-      '-preset',
-      'ultrafast', // Ultrafast preset
-      `-b:v`,
-      `${videoBitrate}k`, // Set video bitrate dynamically
-      ...videoSizeArguments,
-
-      // Set buffer size and limit delay
-      '-bufsize',
-      `${videoBitrate}k`, // Set buffer size equal to the bitrate for low latency
-      '-max_delay',
-      '1000000', // Max delay of 1000ms
-
-      // Set pixel format to avoid deprecated warning
-      '-pix_fmt',
-      'yuv420p',
+      // Pass through video without re-encoding
+      '-c:v',
+      'copy',
 
       // AAC Audio Stream
       '-c:a:0',
@@ -723,19 +706,19 @@ export default class NestmtxStream extends BaseCommand {
     this.#cameraStreamer.on('exit', async (code, es?: NodeJS.Signals) => {
       this.#cameraStreamLogger.info(`RTSP Camera FFMpeg exited with code ${code}`)
       if (code !== 0 && code !== 8 && es !== 'SIGABRT') {
-        const res = await this.#streamer
+        const res = this.#streamer ? await this.#streamer : undefined
         if (res) {
           this.#cameraStreamLogger.info(res.escapedCommand)
         }
         this.#gracefulExit(code || 0)
       } else {
         this.#connectingStreamAbortController = new AbortController()
-        this.#streamJpegToOutputStream(
+        void this.#streamJpegToOutputStream(
           this.#connectingFilePath,
-          size,
+          camera.resolution || '640x480',
           this.#connectingStreamAbortController.signal
         )
-        this.#rtspStart(service, camera, 0)
+        void this.#rtspStart(service, camera, 0)
       }
     })
   }
@@ -764,7 +747,7 @@ export default class NestmtxStream extends BaseCommand {
     const audioRTCPPort = await pickPort(getPortOptions)
     const videoPort = await pickPort(getPortOptions)
     const videoRTCPPort = await pickPort(getPortOptions)
-    const udp: DGramSocket = createSocket('udp4')
+    this.#udpSocket = createSocket('udp4')
 
     const pc = new RTCPeerConnection({
       bundlePolicy: 'max-bundle',
@@ -840,9 +823,13 @@ export default class NestmtxStream extends BaseCommand {
       )
     })
 
-    peerConnected.then(() => {
-      this.#cameraStreamLogger.info('WebRTC Peer connection established')
-    })
+    peerConnected
+      .then(() => {
+        this.#cameraStreamLogger.info('WebRTC Peer connection established')
+      })
+      .catch((err: Error) => {
+        this.#cameraStreamLogger.error(`WebRTC peer connection failed: ${err.message}`)
+      })
 
     pc.addEventListener('icecandidateerror', (event) => {
       const e = new IceCandidateError(
@@ -887,7 +874,7 @@ export default class NestmtxStream extends BaseCommand {
       const { unSubscribe } = event.track.onReceiveRtp.subscribe((rtp) => {
         switch (event.track.kind) {
           case 'video':
-            udp.send(rtp.serialize(), videoPort, '0.0.0.0', (error, _bytes) => {
+            this.#udpSocket!.send(rtp.serialize(), videoPort, '0.0.0.0', (error, _bytes) => {
               if (error) {
                 this.#cameraStreamLogger.error(error)
                 return
@@ -898,7 +885,7 @@ export default class NestmtxStream extends BaseCommand {
             break
 
           case 'audio':
-            udp.send(rtp.serialize(), audioPort, '0.0.0.0', (error, _bytes) => {
+            this.#udpSocket!.send(rtp.serialize(), audioPort, '0.0.0.0', (error, _bytes) => {
               if (error) {
                 this.#cameraStreamLogger.error(error)
                 return
@@ -1006,31 +993,9 @@ a=rtcp:${audioRTCPPort}
       '-i',
       `"${this.#streamerFFMpegInputSdp}"`, // SDP File input with quotes
 
-      // Hardware-accelerated encoding arguments (no conflict now)
-      ...this.#hardwareAcceleratedEncodingArguments,
-
-      '-tune',
-      'zerolatency', // Tune for low latency
-      '-x264opts',
-      'bframes=0', // No B-frames
-      '-preset',
-      'ultrafast', // Ultrafast preset
-      '-b:v',
-      '100k',
-      '-r',
-      '10', // Set frame rate dynamically
-
-      // Set the size and pixel format
-      '-s',
-      '1920x1080', // Set video size
-      '-pix_fmt',
-      'yuv420p',
-
-      // Set buffer size and limit delay
-      '-bufsize',
-      `100k`, // Set buffer size equal to the bitrate for low latency
-      '-max_delay',
-      '1000000', // Max delay of 1000ms
+      // Pass through video without re-encoding
+      '-c:v',
+      'copy',
 
       // AAC Audio Stream (track 1)
       '-c:a:0',
@@ -1087,13 +1052,13 @@ a=rtcp:${audioRTCPPort}
     this.#cameraStreamer.on('exit', async (code, es?: NodeJS.Signals) => {
       this.#cameraStreamLogger.info(`WebRTC Camera FFMpeg exited with code ${code}`)
       if (code !== 0 && code !== 8 && es !== 'SIGABRT') {
-        const res = await this.#streamer
+        const res = this.#streamer ? await this.#streamer : undefined
         if (res) {
           this.#cameraStreamLogger.info(res.escapedCommand)
         }
         this.#gracefulExit(code || 0)
       } else {
-        this.#webrtcStart(service, camera)
+        void this.#webrtcStart(service, camera)
       }
     })
   }
@@ -1110,6 +1075,12 @@ a=rtcp:${audioRTCPPort}
     }
     if (this.#streamerSocket) {
       this.#streamerSocket.close()
+    }
+    if (this.#cameraSocket) {
+      this.#cameraSocket.close()
+    }
+    if (this.#udpSocket) {
+      this.#udpSocket.close()
     }
     execa('rm', [this.#streamerPassthroughSock, this.#streamerFFMpegInputSdp])
       .catch(() => {})

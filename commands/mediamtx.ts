@@ -40,7 +40,7 @@ export default class Mediamtx extends BaseCommand {
     } else {
       this.logger.info(`Found Asset ${asset.name} for ${platform} ${arch}`)
     }
-    const openApiManifestUrl = `https://raw.githubusercontent.com/bluenviron/mediamtx/${latest.name}/apidocs/openapi.yaml`
+    const openApiManifestUrl = `https://raw.githubusercontent.com/bluenviron/mediamtx/${latest.name}/api/openapi.yaml`
     const [{ data: releaseFile }, { data: openApiManifestFile }] = await Promise.all([
       axios.get(asset.browser_download_url, {
         responseType: 'arraybuffer',
