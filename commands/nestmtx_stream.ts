@@ -112,6 +112,14 @@ export default class NestmtxStream extends BaseCommand {
     return `srt://127.0.0.1:${env.get('MEDIA_MTX_SRT_PORT', 8890)}/?streamid=publish:${this.path}&pkt_size=1316`
   }
 
+  #emitStreamHealth(state: 'placeholder' | 'live') {
+    try {
+      this.#api?.emit(state, this.path)
+    } catch {
+      // Private API may not be connected yet.
+    }
+  }
+
   get #hardwareAcceleratedDecodingArguments() {
     return getHardwareAcceleratedDecodingArgumentsFor(
       env.get('FFMPEG_HW_ACCELERATOR', ''),
@@ -522,6 +530,9 @@ export default class NestmtxStream extends BaseCommand {
       shell: true,
       signal,
     })
+    if (src === this.#connectingFilePath) {
+      this.#emitStreamHealth('placeholder')
+    }
     this.#staticStreamer.catch((err) => {
       logger.error(err.message)
     })
@@ -704,6 +715,7 @@ export default class NestmtxStream extends BaseCommand {
     ]
 
     this.#connectingStreamAbortController.abort()
+    this.#emitStreamHealth('live')
     this.#cameraStreamLogger.info(`Starting FFMpeg with RTSP stream`)
     this.#cameraStreamer = execa(ffmpegBinary, ffmpegArgs, {
       stdio: 'pipe',
@@ -988,6 +1000,7 @@ a=rtcp:${audioRTCPPort}
 
     await writeFile(this.#streamerFFMpegInputSdp, sdp)
     this.#connectingStreamAbortController.abort()
+    this.#emitStreamHealth('live')
     this.#cameraStreamLogger.info(`Starting FFMpeg with WebRTC stream`)
     const ffmpegArgs: string[] = [
       '-y', // Overwrite output files

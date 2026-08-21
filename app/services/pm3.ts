@@ -202,6 +202,15 @@ export class PM3 extends EventEmitter<PM3ProcessEventMap> {
         this.#debug(
           `Process exited: ${name} with code: ${code} and signal: ${signal}. Abort signal ${abortController.signal.aborted ? 'was' : 'was not'} sent`
         )
+        // Always drop the dead child handle. Leaving a finished Execa process in
+        // #processes makes get() claim the worker is "alive" forever and blocks
+        // on-demand restarts (NestMTX zombie stream failure mode).
+        if (this.#processes.get(name) === process) {
+          this.#processes.delete(name)
+        }
+        if (this.#abortControllers.get(name) === abortController) {
+          this.#abortControllers.delete(name)
+        }
         if (abortController.signal.aborted) {
           return
         }
@@ -212,11 +221,14 @@ export class PM3 extends EventEmitter<PM3ProcessEventMap> {
             : Number.POSITIVE_INFINITY
         if (restartable && attempt < maxRestarts) {
           await new Promise((resolve) => setTimeout(resolve, 1000))
-          this.#processes.delete(name)
           this.#start(name, attempt + 1)
         } else {
           abortController.abort()
-          process!.kill()
+          try {
+            process!.kill()
+          } catch {
+            // noop
+          }
         }
       })
       process.catch((e) => {
@@ -239,20 +251,50 @@ export class PM3 extends EventEmitter<PM3ProcessEventMap> {
 
   async stop(name: string, _signal: NodeJS.Signals | number = 'SIGTERM') {
     this.#debug(`Stopping process: ${name}`)
-    if (!this.#desired.has(name)) {
+    const process = this.#processes.get(name)
+    const abortController = this.#abortControllers.get(name)
+    const known = this.#desired.has(name) || Boolean(process) || Boolean(abortController)
+    if (!known) {
       this.#debug(`No process with name ${name} exists`)
       throw new PM3NoSuchProcess(name)
     }
-    const process = this.#processes.get(name)
-    const abortController = this.#abortControllers.get(name)
-    if (!process || !abortController) {
+    if (!process) {
       this.#debug(`Process for ${name} is not running`)
+      if (abortController) {
+        abortController.abort()
+        this.#abortControllers.delete(name)
+      }
       return
     }
     this.#debug(`Killing process: ${name}`)
-    process.kill('SIGINT')
-    await process
-    abortController.abort()
+    // Abort first so the exit handler does not auto-restart while we stop.
+    if (abortController) {
+      abortController.abort()
+    }
+    try {
+      process.kill('SIGINT')
+    } catch {
+      // noop
+    }
+    try {
+      await process
+    } catch {
+      // noop
+    }
+    // Escalation: if the child ignored SIGINT, force-kill.
+    if (process.exitCode === null && process.pid) {
+      this.#debug(`Force-killing process: ${name}`)
+      try {
+        process.kill('SIGKILL')
+      } catch {
+        // noop
+      }
+      try {
+        await process
+      } catch {
+        // noop
+      }
+    }
     this.#debug(`Cleaning up process: ${name}`)
     this.#processes.delete(name)
     this.#abortControllers.delete(name)
@@ -260,9 +302,38 @@ export class PM3 extends EventEmitter<PM3ProcessEventMap> {
 
   async restart(name: string) {
     this.#debug(`Restarting process: ${name}`)
-    await this.stop(name)
-    await this.start(name)
+    try {
+      await this.stop(name)
+    } catch (error) {
+      if (!(error instanceof PM3NoSuchProcess)) {
+        throw error
+      }
+      // stop() throws only when the name is completely unknown.
+    }
+    if (!this.#desired.has(name)) {
+      throw new PM3NoSuchProcess(name)
+    }
+    this.start(name)
     this.#debug(`Restarted process: ${name}`)
+  }
+
+  /**
+   * Hard recycle: stop any live child, drop all bookkeeping, then re-register
+   * and start from the provided options. Used when a worker is "alive" but
+   * stuck (stale SDM tokens / frozen MediaMTX publisher).
+   */
+  async hardRecycle(name: string, options: Omit<PM3ProcessOptions, 'name'>, start: boolean = true) {
+    this.#debug(`Hard-recycling process: ${name}`)
+    try {
+      await this.stop(name)
+    } catch (error) {
+      if (!(error instanceof PM3NoSuchProcess)) {
+        throw error
+      }
+    }
+    await this.#cleanup(name)
+    await this.add(name, options, start)
+    this.#debug(`Hard-recycled process: ${name}`)
   }
 
   async remove(name: string) {
